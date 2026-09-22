@@ -306,4 +306,4 @@ python3 python/tests/test_thaibreak.py
 - **Thai Character Cluster (TCC):** Theeramunkong et al., *Multi-segmentation for Thai word extraction*, 2000
 - **Unicode Line Breaking Algorithm:** [Unicode Standard Annex #14 (UAX #14)](https://www.unicode.org/reports/tr14/)
 - **W3C Requirements for Thai Text Layout:** [W3C Working Group Note (tlreq)](https://www.w3.org/TR/tlreq/)
-- **License:** Apache-2.0
+- **License:** [Apache-2.0](LICENSE)
