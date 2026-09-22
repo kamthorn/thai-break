@@ -1,0 +1,57 @@
+{
+    "name": "kamthorn/thai-break",
+    "description": "Fast, high-accuracy Thai word segmentation & typographic line breaker for PHP and Laravel (dompdf, mPDF, Web)",
+    "type": "library",
+    "keywords": ["thai", "word-segmentation", "line-breaker", "thai-break", "tokenizer", "tcc", "laravel", "mpdf", "dompdf", "tcpdf"],
+    "homepage": "https://github.com/kamthorn/thai-break",
+    "license": "Apache-2.0",
+    "authors": [
+        {
+            "name": "kamthorn",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.1",
+        "ext-mbstring": "*",
+        "ext-pcre": "*",
+        "ext-spl": "*"
+    },
+    "require-dev": {
+        "illuminate/support": "^11.0",
+        "orchestra/testbench": "^9.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "suggest": {
+        "illuminate/support": "To use Laravel ServiceProvider, Facade, Blade directives, and Str macros (^10.0 || ^11.0 || ^12.0)"
+    },
+    "autoload": {
+        "psr-4": {
+            "ThaiBreak\\": "src/"
+        },
+        "files": [
+            "src/compatibility.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "ThaiBreak\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "data-dir": "data/",
+        "laravel": {
+            "providers": [
+                "ThaiBreak\\Laravel\\ThaiBreakServiceProvider"
+            ],
+            "aliases": {
+                "ThaiBreak": "ThaiBreak\\Laravel\\Facades\\ThaiBreak"
+            }
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    },
+    "minimum-stability": "stable"
+}

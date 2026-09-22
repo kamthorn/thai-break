@@ -1,0 +1,22 @@
+vendor/
+.phpunit.cache/
+.phpunit.result.cache
+composer.phar
+*.log
+
+# Rust
+rust/target/
+**/target/
+Cargo.lock
+
+# Node / TypeScript
+node_modules/
+typescript/node_modules/
+typescript/dist/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+

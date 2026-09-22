@@ -1,0 +1,28 @@
+{
+  "name": "thai-break",
+  "version": "1.0.0",
+  "description": "Fast, high-accuracy Thai word segmentation and typographic line breaker for JavaScript and TypeScript",
+  "main": "dist/index.js",
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test"
+  },
+  "keywords": [
+    "thai",
+    "word-break",
+    "line-break",
+    "tokenizer",
+    "tcc",
+    "pdf",
+    "epub",
+    "html"
+  ],
+  "author": "kamthorn",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  }
+}

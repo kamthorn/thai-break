@@ -1,0 +1,260 @@
+package thaibreak
+
+import (
+	"math"
+	"regexp"
+	"strings"
+	"unicode/utf8"
+)
+
+const (
+	unknownWordCost = 10.0
+	abbrWeight      = 60000.0
+	maxEdges        = 50000
+)
+
+var (
+	patNonThai = regexp.MustCompile(`^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\x{0e00}-\x{0e7f}a-zA-Z0-9 \t\r\n])`)
+	patAbbr    = regexp.MustCompile(`^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+`)
+)
+
+type dagEdge struct {
+	from   int
+	word   string
+	weight float64
+}
+
+// Tokenizer performs weighted Thai word segmentation.
+type Tokenizer struct {
+	trie    *ThaiTrie
+	bigrams *BigramModel
+}
+
+// NewTokenizer creates a new Tokenizer.
+func NewTokenizer(trie *ThaiTrie, bigrams *BigramModel) *Tokenizer {
+	return &Tokenizer{
+		trie:    trie,
+		bigrams: bigrams,
+	}
+}
+
+func isThaiRune(r rune) bool {
+	return r >= 0x0E00 && r <= 0x0E7F
+}
+
+func isThaiString(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if !isThaiRune(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// Tokenize segments text into word tokens.
+func (tok *Tokenizer) Tokenize(text string, keepWhitespace bool) []string {
+	if text == "" {
+		return nil
+	}
+
+	runes := []rune(text)
+	n := len(runes)
+	if n == 0 {
+		return nil
+	}
+
+	validPos := TCCPosArray(runes)
+
+	// Precompute byte offsets for regex matching on string slices
+	charByteOffsets := make([]int, n+1)
+	b := 0
+	for i, r := range runes {
+		charByteOffsets[i] = b
+		b += utf8.RuneLen(r)
+	}
+	charByteOffsets[n] = b
+
+	// Pass 1: Collect edgesTo[j]
+	edgesTo := make([][]dagEdge, n+1)
+	maxWeight := 1.0
+	edgeCount := 0
+
+CollectLoop:
+	for i := 0; i < n; i++ {
+		if !validPos[i] {
+			continue
+		}
+
+		bytePos := charByteOffsets[i]
+		subText := text[bytePos:]
+
+		if isThaiRune(runes[i]) {
+			// 1. Thai dictionary words starting at i
+			matches := tok.trie.Prefixes(runes, i, 25)
+			for _, m := range matches {
+				j := m.End
+				if j > n || !validPos[j] {
+					continue
+				}
+				if m.Weight > maxWeight {
+					maxWeight = m.Weight
+				}
+				word := string(runes[i:j])
+				edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: word, weight: m.Weight})
+				edgeCount++
+				if edgeCount >= maxEdges {
+					break CollectLoop
+				}
+			}
+
+			// 2. Thai abbreviation patterns
+			if loc := patAbbr.FindStringIndex(subText); loc != nil && loc[0] == 0 {
+				mStr := subText[:loc[1]]
+				abbrLen := len([]rune(mStr))
+				j := i + abbrLen
+				if j <= n && validPos[j] {
+					if abbrWeight > maxWeight {
+						maxWeight = abbrWeight
+					}
+					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, weight: abbrWeight})
+				}
+			}
+		} else {
+			// 3. Non-Thai tokens
+			if loc := patNonThai.FindStringIndex(subText); loc != nil && loc[0] == 0 {
+				mStr := subText[:loc[1]]
+				wordLen := len([]rune(mStr))
+				j := i + wordLen
+				if j <= n {
+					if 1.0 > maxWeight {
+						maxWeight = 1.0
+					}
+					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, weight: 1.0})
+				}
+			}
+		}
+	}
+
+	// Pass 2: Viterbi forward DP
+	dp := make([]float64, n+1)
+	from := make([]int, n+1)
+	word := make([]string, n+1)
+	isUnk := make([]bool, n+1)
+
+	for i := range dp {
+		dp[i] = math.Inf(1)
+		from[i] = -1
+	}
+	dp[0] = 0.0
+
+	for j := 1; j <= n; j++ {
+		if !validPos[j] {
+			continue
+		}
+
+		// Try all dictionary/pattern edges ending at j
+		if len(edgesTo[j]) > 0 {
+			for _, e := range edgesTo[j] {
+				i := e.from
+				if math.IsInf(dp[i], 1) {
+					continue
+				}
+				wLen := j - i
+				if wLen < 1 {
+					wLen = 1
+				}
+				normalized := e.weight / maxWeight
+				baseCost := unknownWordCost / float64(wLen)
+				if normalized > 0 {
+					baseCost = -math.Log(normalized) / float64(wLen)
+				}
+
+				edgeCost := baseCost
+				if tok.bigrams != nil && word[i] != "" {
+					bonus := tok.bigrams.GetBonus(word[i], e.word, wLen)
+					edgeCost = math.Max(0.01, baseCost-bonus)
+				}
+
+				newCost := dp[i] + edgeCost
+				if newCost < dp[j] {
+					dp[j] = newCost
+					from[j] = i
+					word[j] = e.word
+					isUnk[j] = false
+				}
+			}
+		}
+
+		// Unknown-word fallback: connect to nearest reachable predecessor
+		if math.IsInf(dp[j], 1) {
+			for i := j - 1; i >= 0; i-- {
+				if !math.IsInf(dp[i], 1) && validPos[i] {
+					unknownWord := string(runes[i:j])
+					newCost := dp[i] + unknownWordCost
+					dp[j] = newCost
+					from[j] = i
+					word[j] = unknownWord
+					isUnk[j] = true
+					break
+				}
+			}
+		}
+	}
+
+	// Traceback
+	if math.IsInf(dp[n], 1) {
+		return []string{text}
+	}
+
+	var rawTokens []string
+	var rawIsUnk []bool
+	pos := n
+	for pos > 0 {
+		rawTokens = append(rawTokens, word[pos])
+		rawIsUnk = append(rawIsUnk, isUnk[pos])
+		pos = from[pos]
+		if pos < 0 {
+			break
+		}
+	}
+
+	// Reverse
+	for l, r := 0, len(rawTokens)-1; l < r; l, r = l+1, r-1 {
+		rawTokens[l], rawTokens[r] = rawTokens[r], rawTokens[l]
+		rawIsUnk[l], rawIsUnk[r] = rawIsUnk[r], rawIsUnk[l]
+	}
+
+	// Syllable-based OOV chunking: merge consecutive unknown Thai clusters
+	var tokens []string
+	var curChunk strings.Builder
+
+	for idx, tokStr := range rawTokens {
+		if rawIsUnk[idx] && isThaiString(tokStr) {
+			curChunk.WriteString(tokStr)
+		} else {
+			if curChunk.Len() > 0 {
+				tokens = append(tokens, curChunk.String())
+				curChunk.Reset()
+			}
+			tokens = append(tokens, tokStr)
+		}
+	}
+	if curChunk.Len() > 0 {
+		tokens = append(tokens, curChunk.String())
+	}
+
+	if !keepWhitespace {
+		var filtered []string
+		for _, t := range tokens {
+			if strings.TrimSpace(t) != "" {
+				filtered = append(filtered, t)
+			}
+		}
+		return filtered
+	}
+
+	return tokens
+}
