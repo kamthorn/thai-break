@@ -88,6 +88,15 @@ class PHPUnitTokenizerTest extends TestCase
         $this->assertStringContainsString('</p>', $result);
     }
 
+    public function testLineBreaksHtmlRawProtection(): void
+    {
+        $html = '<p>สวัสดีครับ</p><script>var x = "สวัสดีครับ";</script><!-- หมายเหตุ -->';
+        $result = $this->defaultTok->insertLineBreaks($html, '|', true);
+        $this->assertStringContainsString('<script>var x = "สวัสดีครับ";</script>', $result);
+        $this->assertStringContainsString('<!-- หมายเหตุ -->', $result);
+    }
+
+
     public function testWrapText(): void
     {
         $wrapped = $this->defaultTok->wrap('ประเทศไทยมีวัฒนธรรมที่สวยงามและหลากหลาย', 20);

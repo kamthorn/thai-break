@@ -273,7 +273,7 @@ console.log(tb.words("ฉันรักภาษาไทย"));
 1. **ห้ามขึ้นต้นบรรทัด (No Line-Start):** ไม้ยมก (`ๆ`), ไปยาลน้อย (`ฯ`), ไปยาลใหญ่ (`ฯลฯ`), เครื่องหมายวรรคตอนปิด (`)`, `]`, `}`, `”`, `’`), เครื่องหมายจุลภาค/มหัพภาค (`,`, `.`, `:`) จะต้องไม่ไปอยู่โดดเดี่ยวที่ต้นบรรทัดใหม่
 2. **ห้ามลงท้ายบรรทัด (No Line-End):** วงเล็บเปิด (`(`, `[`, `{`, `“`), สัญลักษณ์สกุลเงิน (`฿`, `$`) จะต้องไม่ค้างอยู่ท้ายบรรทัดโดยไม่มีข้อความตาม
 3. **ป้องกัน Orphan Spaces:** จุดที่มีช่องว่าง (` `) อยู่แล้ว จะไม่ใส่ break marker ติดกับช่องว่าง ป้องกันไม่ให้เกิดวรรคนำหน้าในบรรทัดใหม่
-4. **คงความถูกต้องของ HTML/EPUB:** แท็ก HTML (`<p>`, `<b>`, `<span>`) และ HTML Entities (`&amp;`, `&quot;`) จะถูกรักษาไว้อย่างสมบูรณ์ ไม่ถูกแทรกสัญลักษณ์ตัดคำเข้าไปภายในแท็ก
+4. **คงความถูกต้องของ HTML/EPUB:** แท็ก HTML (`<p>`, `<b>`, `<span>`), บล็อกสคริปต์/สไตล์ (`<script>`, `<style>`, `<!-- คอมเมนต์ -->`) และ HTML Entities (`&amp;`, `&quot;`) จะถูกรักษาไว้อย่างสมบูรณ์ ไม่ถูกแทรกสัญลักษณ์ตัดคำเข้าไปภายในแท็กหรือสคริปต์
 5. **คำนวณความกว้างคอลัมน์ถูกต้อง:** สระบน-ล่าง วรรณยุกต์ ไม่นับความกว้างคอลัมน์ (`thaiDisplayWidth`) ทำให้ตัดบรรทัดได้พอดีความกว้างจริง
 
 ---
@@ -295,8 +295,19 @@ cd typescript && npm run build && node --test tests/index.test.ts
 cd rust && cargo test && cargo build --release
 
 # 5. Python Tests
-python3 python/tests/test_thaibreak.py
+cd python && python3 -m unittest tests/test_thaibreak.py
 ```
+
+---
+
+## การจัดทำโค้ดและการเปิดเผยบทบาทของ AI (AI Disclosure & Attribution)
+
+โครงการ **ThaiBreak** ได้รับการพัฒนา วางสถาปัตยกรรม และกำกับดูแลทิศทางโดยมนุษย์ (**Kamthorn Krairaksa**) โดยมีการใช้เทคโนโลยีปัญญาประดิษฐ์ (Generative AI) ในรูปแบบ **Pair Programming & Multi-Agent Engineering** ร่วมจัดทำโค้ดอย่างโปร่งใส ดังนี้:
+
+- **Claude Sonnet 4.6 (Anthropic):** ร่วมออกแบบโครงสร้างอัลกอริทึมหลัก (Thai Character Cluster: TCC, DAG Word Graph, Viterbi Forward/Backward Dynamic Programming, W3C/Unicode Typographic Line Breaking Rules) และการพัฒนาโค้ด Native ในภาษา PHP, Go, TypeScript รวมถึง Rust Core Engine
+- **Gemini 3.8 Flash (Google DeepMind):** ร่วมวิเคราะห์ประสิทธิภาพ (Performance Optimization), การตรวจสอบความถูกต้องข้ามภาษา (Cross-language Verification), การจัดทำชุดทดสอบรอบด้าน (Test Suites across all 5+ languages), การตรวจสอบความปลอดภัยและการจัดการหน่วยความจำ (Memory Safety & C-FFI Hardening) และการคัดกรองฐานข้อมูลพจนานุกรมให้เป็น Public Domain 100%
+
+> โค้ดทุกโมดูลได้รับการออกแบบ ตรวจทาน ปรับแก้สถาปัตยกรรม และผ่านการทดสอบอัตโนมัติ (Automated Unit & Integration Tests) ครบถ้วนทุกภาษา ทั้ง PHP, Go, TypeScript, Rust, C/C++ และ Python เพื่อความมั่นใจในคุณภาพ ความปลอดภัย และความถูกต้องตามหลักภาษาศาสตร์
 
 ---
 
@@ -307,3 +318,4 @@ python3 python/tests/test_thaibreak.py
 - **Unicode Line Breaking Algorithm:** [Unicode Standard Annex #14 (UAX #14)](https://www.unicode.org/reports/tr14/)
 - **W3C Requirements for Thai Text Layout:** [W3C Working Group Note (tlreq)](https://www.w3.org/TR/tlreq/)
 - **License:** [Apache-2.0](LICENSE)
+

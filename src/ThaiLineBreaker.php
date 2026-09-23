@@ -48,8 +48,8 @@ class ThaiLineBreaker
      */
     private const PAT_NO_BREAK_BEFORE = '/^(?:[)\\]}\"”’>»,.:;!?ๆฯ๏๚๛）】》]|ฯลฯ)$/u';
 
-    /** Pattern matching HTML tags and HTML entities */
-    private const PAT_HTML_TAGS = '/(<[^>]+>|&[a-zA-Z0-9#]+;)/u';
+    /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
+    private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';
 
     private ThaiTokenizer $tokenizer;
 

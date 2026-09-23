@@ -15,8 +15,10 @@ static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {
 });
 
 static PAT_HTML_TAGS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(<[^>]+>|&[a-zA-Z0-9#]+;)").expect("Failed to compile PAT_HTML_TAGS")
+    Regex::new(r"(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))")
+        .expect("Failed to compile PAT_HTML_TAGS")
 });
+
 
 static RE_THAI_COMBINING: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"[\x{0E31}\x{0E34}-\x{0E3A}\x{0E47}-\x{0E4E}\x{200B}]")

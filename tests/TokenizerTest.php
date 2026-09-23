@@ -454,6 +454,19 @@ test('LineBreaker: HTML tags and entities protected', function () {
     return true;
 });
 
+test('LineBreaker: HTML raw scripts, styles, and comments preserved untouched', function () {
+    $html = '<p>สวัสดีประเทศไทย</p><script>var x = "สวัสดีประเทศไทย";</script><!-- หมายเหตุ -->';
+    $result = ThaiTokenizer::breakLines($html, '|', true);
+    if (!str_contains($result, '<script>var x = "สวัสดีประเทศไทย";</script>')) {
+        return 'Script tag content was modified';
+    }
+    if (!str_contains($result, '<!-- หมายเหตุ -->')) {
+        return 'Comment was modified';
+    }
+    return true;
+});
+
+
 test('LineBreaker: thaiDisplayWidth correctly ignores combining marks', function () {
     if (ThaiLineBreaker::thaiDisplayWidth('ก') !== 1) {
         return 'Base consonant should be 1 column';

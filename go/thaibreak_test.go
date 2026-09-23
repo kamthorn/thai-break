@@ -41,7 +41,7 @@ func TestTypographicRules(t *testing.T) {
 }
 
 func TestHtmlPreservation(t *testing.T) {
-	html := "<div class=\"title\"><b>สวัสดี</b> &amp; ประเทศไทย</div>"
+	html := "<div class=\"title\"><b>สวัสดี</b> &amp; ประเทศไทย</div><script>var x = \"สวัสดีประเทศไทย\";</script><!-- คอมเมนต์ -->"
 	broken := Lines(html, true)
 
 	if !strings.Contains(broken, "<div class=\"title\">") {
@@ -49,6 +49,12 @@ func TestHtmlPreservation(t *testing.T) {
 	}
 	if !strings.Contains(broken, "&amp;") {
 		t.Error("HTML entity damaged")
+	}
+	if !strings.Contains(broken, "<script>var x = \"สวัสดีประเทศไทย\";</script>") {
+		t.Error("Script tag content damaged")
+	}
+	if !strings.Contains(broken, "<!-- คอมเมนต์ -->") {
+		t.Error("HTML comment damaged")
 	}
 	if strings.ReplaceAll(broken, DefaultBreakMarker, "") != html {
 		t.Error("Stripped HTML does not match original")

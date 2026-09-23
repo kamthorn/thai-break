@@ -28,9 +28,6 @@ function tryLoadDefault(): void {
       path.resolve(currentDir, '../../data/words.txt'),
       path.resolve(currentDir, '../data/words.txt'),
       path.resolve(process.cwd(), 'data/words.txt'),
-      path.resolve(currentDir, '../../data/wordlist.txt'),
-      path.resolve(currentDir, '../data/wordlist.txt'),
-      path.resolve(process.cwd(), 'data/wordlist.txt'),
     ];
 
     for (const c of candidates) {

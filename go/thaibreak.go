@@ -3,10 +3,12 @@ package thaibreak
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
 var (
+	defaultMu          sync.RWMutex
 	defaultTokenizer   *Tokenizer
 	defaultLineBreaker *LineBreaker
 	defaultInitOnce    sync.Once
@@ -19,8 +21,6 @@ func initDefault() {
 			"../data/words.txt",
 			"data/words.txt",
 			"../../data/words.txt",
-			"../data/wordlist.txt",
-			"data/wordlist.txt",
 		}
 		var dictPath, bigramPath string
 		for _, c := range candidates {
@@ -56,6 +56,8 @@ func initDefault() {
 
 // SetDefault configures the global shared tokenizer instance.
 func SetDefault(tok *Tokenizer) {
+	defaultMu.Lock()
+	defer defaultMu.Unlock()
 	defaultTokenizer = tok
 	defaultLineBreaker = NewLineBreaker(tok)
 }
@@ -63,12 +65,16 @@ func SetDefault(tok *Tokenizer) {
 // GetDefaultTokenizer returns the global shared Tokenizer.
 func GetDefaultTokenizer() *Tokenizer {
 	initDefault()
+	defaultMu.RLock()
+	defer defaultMu.RUnlock()
 	return defaultTokenizer
 }
 
 // GetDefaultLineBreaker returns the global shared LineBreaker.
 func GetDefaultLineBreaker() *LineBreaker {
 	initDefault()
+	defaultMu.RLock()
+	defer defaultMu.RUnlock()
 	return defaultLineBreaker
 }
 
@@ -84,19 +90,9 @@ func Tokenize(text string) []string {
 
 // Join tokenizes and joins tokens with a delimiter.
 func Join(text string, sep string) string {
-	return stringsJoin(Words(text), sep)
+	return strings.Join(Words(text), sep)
 }
 
-func stringsJoin(tokens []string, sep string) string {
-	if len(tokens) == 0 {
-		return ""
-	}
-	res := tokens[0]
-	for i := 1; i < len(tokens); i++ {
-		res += sep + tokens[i]
-	}
-	return res
-}
 
 // Lines inserts Zero-Width Space (U+200B) break markers adhering to Thai typographic rules.
 func Lines(text string, isHtml bool) string {

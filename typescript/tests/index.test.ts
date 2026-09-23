@@ -44,11 +44,13 @@ test('Typographic rules', () => {
 });
 
 test('HTML preservation', () => {
-  const html = '<div class="title"><b>สวัสดี</b> &amp; ประเทศไทย</div>';
+  const html = '<div class="title"><b>สวัสดี</b> &amp; ประเทศไทย</div><script>var x = "สวัสดีประเทศไทย";</script><!-- คอมเมนต์ -->';
   const broken = lines(html, true);
 
   assert.ok(broken.includes('<div class="title">'), 'Opening tag intact');
   assert.ok(broken.includes('&amp;'), 'Entity intact');
+  assert.ok(broken.includes('<script>var x = "สวัสดีประเทศไทย";</script>'), 'Script intact');
+  assert.ok(broken.includes('<!-- คอมเมนต์ -->'), 'Comment intact');
   assert.strictEqual(
     broken.replaceAll(DEFAULT_BREAK_MARKER, ''),
     html,

@@ -21,9 +21,10 @@ class TestThaiBreak(unittest.TestCase):
         self.assertEqual(tokens, ["ฉัน", "รัก", "ภาษา", "ไทย"])
 
     def test_lines_html(self):
-        html = '<div class="title"><b>สวัสดี</b> &amp; ประเทศไทย</div>'
+        html = '<div class="title"><b>สวัสดี</b> &amp; ประเทศไทย</div><script>var x = "สวัสดีประเทศไทย";</script><!-- หมายเหตุ -->'
         broken = thaibreak.lines(html, marker="|", is_html=True)
-        self.assertEqual('<div class="title"><b>สวัสดี</b> &amp; ประเทศ|ไทย</div>', broken)
+        self.assertEqual('<div class="title"><b>สวัสดี</b> &amp; ประเทศ|ไทย</div><script>var x = "สวัสดีประเทศไทย";</script><!-- หมายเหตุ -->', broken)
+
 
     def test_display_width(self):
         self.assertEqual(thaibreak.display_width("ภาษาไทย"), 7)

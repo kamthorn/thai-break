@@ -14,7 +14,7 @@ const (
 var (
 	reNoBreakAfter  = regexp.MustCompile(`^[(\[{\\"“‘<«฿$€¥£#@（【《]$`)
 	reNoBreakBefore = regexp.MustCompile(`^(?:[)\]}\\"”’>»,.:;!?ๆฯ๏๚๛）】》]|ฯลฯ)$`)
-	reHtmlTags      = regexp.MustCompile(`(<[^>]+>|&[a-zA-Z0-9#]+;)`)
+	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))`)
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
 )
 

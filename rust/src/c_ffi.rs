@@ -13,13 +13,13 @@ static GLOBAL_TOKENIZER: Lazy<RwLock<Option<Tokenizer>>> = Lazy::new(|| RwLock::
 static GLOBAL_BREAKER: Lazy<RwLock<Option<LineBreaker>>> = Lazy::new(|| RwLock::new(None));
 
 fn ensure_initialized() {
-    let read_guard = GLOBAL_TOKENIZER.read().unwrap();
+    let read_guard = GLOBAL_TOKENIZER.read().unwrap_or_else(|e| e.into_inner());
     if read_guard.is_some() {
         return;
     }
     drop(read_guard);
 
-    let mut write_guard = GLOBAL_TOKENIZER.write().unwrap();
+    let mut write_guard = GLOBAL_TOKENIZER.write().unwrap_or_else(|e| e.into_inner());
     if write_guard.is_some() {
         return;
     }
@@ -29,8 +29,6 @@ fn ensure_initialized() {
         "data/words.txt",
         "../data/words.txt",
         "../../data/words.txt",
-        "data/wordlist.txt",
-        "../data/wordlist.txt",
     ];
     let mut trie = ThaiTrie::new();
     let mut bigrams = None;
@@ -53,7 +51,7 @@ fn ensure_initialized() {
     let breaker = LineBreaker::new(tokenizer.clone());
 
     *write_guard = Some(tokenizer);
-    *GLOBAL_BREAKER.write().unwrap() = Some(breaker);
+    *GLOBAL_BREAKER.write().unwrap_or_else(|e| e.into_inner()) = Some(breaker);
 }
 
 /// Initialize ThaiBreak with custom dictionary and bigram file paths.
@@ -64,37 +62,40 @@ pub unsafe extern "C" fn thaibreak_init(
     dict_path: *const c_char,
     bigram_path: *const c_char,
 ) -> c_int {
-    if dict_path.is_null() {
-        return -1;
-    }
+    std::panic::catch_unwind(|| {
+        if dict_path.is_null() {
+            return -1;
+        }
 
-    let dict_str = match CStr::from_ptr(dict_path).to_str() {
-        Ok(s) => s,
-        Err(_) => return -1,
-    };
+        let dict_str = match CStr::from_ptr(dict_path).to_str() {
+            Ok(s) => s,
+            Err(_) => return -1,
+        };
 
-    let trie = match ThaiTrie::load_tsv_file(dict_str) {
-        Ok(t) => t,
-        Err(_) => return -1,
-    };
+        let trie = match ThaiTrie::load_tsv_file(dict_str) {
+            Ok(t) => t,
+            Err(_) => return -1,
+        };
 
-    let bigrams = if !bigram_path.is_null() {
-        if let Ok(b_str) = CStr::from_ptr(bigram_path).to_str() {
-            BigramModel::load_tsv_file(b_str, 0.15).ok()
+        let bigrams = if !bigram_path.is_null() {
+            if let Ok(b_str) = CStr::from_ptr(bigram_path).to_str() {
+                BigramModel::load_tsv_file(b_str, 0.15).ok()
+            } else {
+                None
+            }
         } else {
             None
-        }
-    } else {
-        None
-    };
+        };
 
-    let tokenizer = Tokenizer::new(trie, bigrams);
-    let breaker = LineBreaker::new(tokenizer.clone());
+        let tokenizer = Tokenizer::new(trie, bigrams);
+        let breaker = LineBreaker::new(tokenizer.clone());
 
-    *GLOBAL_TOKENIZER.write().unwrap() = Some(tokenizer);
-    *GLOBAL_BREAKER.write().unwrap() = Some(breaker);
+        *GLOBAL_TOKENIZER.write().unwrap_or_else(|e| e.into_inner()) = Some(tokenizer);
+        *GLOBAL_BREAKER.write().unwrap_or_else(|e| e.into_inner()) = Some(breaker);
 
-    0
+        0
+    })
+    .unwrap_or(-1)
 }
 
 /// Tokenize UTF-8 Thai text.
@@ -105,51 +106,56 @@ pub unsafe extern "C" fn thaibreak_tokenize(
     text: *const c_char,
     count: *mut usize,
 ) -> *mut *mut c_char {
-    if text.is_null() || count.is_null() {
-        return std::ptr::null_mut();
-    }
+    std::panic::catch_unwind(|| {
+        if text.is_null() || count.is_null() {
+            return std::ptr::null_mut();
+        }
 
-    ensure_initialized();
+        ensure_initialized();
 
-    let text_str = match CStr::from_ptr(text).to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
+        let text_str = match CStr::from_ptr(text).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
 
-    let read_guard = GLOBAL_TOKENIZER.read().unwrap();
-    let tokenizer = match read_guard.as_ref() {
-        Some(t) => t,
-        None => return std::ptr::null_mut(),
-    };
+        let read_guard = GLOBAL_TOKENIZER.read().unwrap_or_else(|e| e.into_inner());
+        let tokenizer = match read_guard.as_ref() {
+            Some(t) => t,
+            None => return std::ptr::null_mut(),
+        };
 
-    let tokens = tokenizer.tokenize(text_str, false);
-    let n = tokens.len();
-    *count = n;
+        let tokens = tokenizer.tokenize(text_str, false);
+        let n = tokens.len();
+        *count = n;
 
-    let mut c_tokens: Vec<*mut c_char> = Vec::with_capacity(n);
-    for t in tokens {
-        let c_string = CString::new(t).unwrap_or_default();
-        c_tokens.push(c_string.into_raw());
-    }
+        let mut c_tokens: Vec<*mut c_char> = Vec::with_capacity(n);
+        for t in tokens {
+            let c_string = CString::new(t).unwrap_or_default();
+            c_tokens.push(c_string.into_raw());
+        }
 
-    let ptr = c_tokens.as_mut_ptr();
-    std::mem::forget(c_tokens);
-    ptr
+        let ptr = c_tokens.as_mut_ptr();
+        std::mem::forget(c_tokens);
+        ptr
+    })
+    .unwrap_or(std::ptr::null_mut())
 }
 
 /// Free token array allocated by `thaibreak_tokenize`.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_free_tokens(tokens: *mut *mut c_char, count: usize) {
-    if tokens.is_null() {
-        return;
-    }
-    let slice = std::slice::from_raw_parts_mut(tokens, count);
-    for &mut ptr in slice.iter_mut() {
-        if !ptr.is_null() {
-            drop(CString::from_raw(ptr));
+    let _ = std::panic::catch_unwind(|| {
+        if tokens.is_null() {
+            return;
         }
-    }
-    drop(Vec::from_raw_parts(tokens, count, count));
+        let slice = std::slice::from_raw_parts_mut(tokens, count);
+        for &mut ptr in slice.iter_mut() {
+            if !ptr.is_null() {
+                drop(CString::from_raw(ptr));
+            }
+        }
+        drop(Vec::from_raw_parts(tokens, count, count));
+    });
 }
 
 /// Insert line break opportunities into UTF-8 text.
@@ -161,32 +167,35 @@ pub unsafe extern "C" fn thaibreak_lines(
     marker: *const c_char,
     is_html: c_int,
 ) -> *mut c_char {
-    if text.is_null() {
-        return std::ptr::null_mut();
-    }
+    std::panic::catch_unwind(|| {
+        if text.is_null() {
+            return std::ptr::null_mut();
+        }
 
-    ensure_initialized();
+        ensure_initialized();
 
-    let text_str = match CStr::from_ptr(text).to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
+        let text_str = match CStr::from_ptr(text).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
 
-    let marker_str = if !marker.is_null() {
-        CStr::from_ptr(marker).to_str().unwrap_or("\u{200B}")
-    } else {
-        "\u{200B}"
-    };
+        let marker_str = if !marker.is_null() {
+            CStr::from_ptr(marker).to_str().unwrap_or("\u{200B}")
+        } else {
+            "\u{200B}"
+        };
 
-    let read_guard = GLOBAL_BREAKER.read().unwrap();
-    let breaker = match read_guard.as_ref() {
-        Some(b) => b,
-        None => return std::ptr::null_mut(),
-    };
+        let read_guard = GLOBAL_BREAKER.read().unwrap_or_else(|e| e.into_inner());
+        let breaker = match read_guard.as_ref() {
+            Some(b) => b,
+            None => return std::ptr::null_mut(),
+        };
 
-    let result = breaker.insert_line_breaks(text_str, marker_str, is_html != 0);
-    let c_string = CString::new(result).unwrap_or_default();
-    c_string.into_raw()
+        let result = breaker.insert_line_breaks(text_str, marker_str, is_html != 0);
+        let c_string = CString::new(result).unwrap_or_default();
+        c_string.into_raw()
+    })
+    .unwrap_or(std::ptr::null_mut())
 }
 
 /// Hard-wrap text to visual display width.
@@ -197,44 +206,53 @@ pub unsafe extern "C" fn thaibreak_wrap(
     width: usize,
     is_html: c_int,
 ) -> *mut c_char {
-    if text.is_null() {
-        return std::ptr::null_mut();
-    }
+    std::panic::catch_unwind(|| {
+        if text.is_null() {
+            return std::ptr::null_mut();
+        }
 
-    ensure_initialized();
+        ensure_initialized();
 
-    let text_str = match CStr::from_ptr(text).to_str() {
-        Ok(s) => s,
-        Err(_) => return std::ptr::null_mut(),
-    };
+        let text_str = match CStr::from_ptr(text).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
 
-    let read_guard = GLOBAL_BREAKER.read().unwrap();
-    let breaker = match read_guard.as_ref() {
-        Some(b) => b,
-        None => return std::ptr::null_mut(),
-    };
+        let read_guard = GLOBAL_BREAKER.read().unwrap_or_else(|e| e.into_inner());
+        let breaker = match read_guard.as_ref() {
+            Some(b) => b,
+            None => return std::ptr::null_mut(),
+        };
 
-    let result = breaker.wrap(text_str, width, is_html != 0);
-    let c_string = CString::new(result).unwrap_or_default();
-    c_string.into_raw()
+        let result = breaker.wrap(text_str, width, is_html != 0);
+        let c_string = CString::new(result).unwrap_or_default();
+        c_string.into_raw()
+    })
+    .unwrap_or(std::ptr::null_mut())
 }
 
 /// Calculate terminal / column visual display width for Thai text.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_display_width(text: *const c_char) -> usize {
-    if text.is_null() {
-        return 0;
-    }
-    match CStr::from_ptr(text).to_str() {
-        Ok(s) => thai_display_width(s),
-        Err(_) => 0,
-    }
+    std::panic::catch_unwind(|| {
+        if text.is_null() {
+            return 0;
+        }
+        match CStr::from_ptr(text).to_str() {
+            Ok(s) => thai_display_width(s),
+            Err(_) => 0,
+        }
+    })
+    .unwrap_or(0)
 }
 
 /// Free string allocated by `thaibreak_lines` or `thaibreak_wrap`.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_free_string(s: *mut c_char) {
-    if !s.is_null() {
-        drop(CString::from_raw(s));
-    }
+    let _ = std::panic::catch_unwind(|| {
+        if !s.is_null() {
+            drop(CString::from_raw(s));
+        }
+    });
 }
+
