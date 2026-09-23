@@ -3,7 +3,7 @@ import { Tokenizer } from './tokenizer.js';
 export const DEFAULT_BREAK_MARKER = '\u200B';
 
 const PAT_NO_BREAK_AFTER = /^[([{"“‘<«฿$€¥£#@（【《]$/u;
-const PAT_NO_BREAK_BEFORE = /^(?:[)\]}"”’>»,.:;!?ๆฯ๏๚๛）】》]|ฯลฯ)$/u;
+const PAT_NO_BREAK_BEFORE = /^(?:[)\]}"”’>»,.:;!?\/ๆฯ๏๚๛）】》]|ฯลฯ)$/u;
 const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/gi;
 const RE_THAI_COMBINING = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]/g;
 
@@ -23,8 +23,14 @@ export function canBreakBetween(left: string, right: string): boolean {
     return false;
   }
 
-  // No break before closing symbols / postfixes (ๆ, ฯ)
+  // No break before closing symbols, the solidus (UAX #14 LB13), postfixes (ๆ, ฯ)
   if (PAT_NO_BREAK_BEFORE.test(right)) {
+    return false;
+  }
+
+  // Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
+  if ((/[A-Za-z]$/.test(left) && /^[0-9]/.test(right)) ||
+      (/[0-9]$/.test(left) && /^[A-Za-z]/.test(right))) {
     return false;
   }
 

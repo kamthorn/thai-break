@@ -43,6 +43,17 @@ test('Typographic rules', () => {
   assert.ok(!broken.includes(DEFAULT_BREAK_MARKER + ' '), 'Should not break before space');
 });
 
+test('Latin letters and digits stay together (UAX #14 LB23)', () => {
+  const broken = lines('ตาม WP01 และมาตรฐาน ISO29110', false, '|');
+  assert.ok(broken.includes('WP01'), broken);
+  assert.ok(broken.includes('ISO29110'), broken);
+});
+
+test('No break before a solidus (UAX #14 LB13)', () => {
+  const broken = lines('ISO/IEC 29110 กำหนดให้มี', false, '|');
+  assert.ok(!broken.includes('|/'), broken);
+});
+
 test('HTML preservation', () => {
   const html = '<div class="title"><b>สวัสดี</b> &amp; ประเทศไทย</div><script>var x = "สวัสดีประเทศไทย";</script><!-- คอมเมนต์ -->';
   const broken = lines(html, true);

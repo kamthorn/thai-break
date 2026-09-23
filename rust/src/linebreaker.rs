@@ -10,7 +10,7 @@ static PAT_NO_BREAK_AFTER: Lazy<Regex> = Lazy::new(|| {
 });
 
 static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^(?:[)\]}\\"”’>»,.:;!?ๆฯ๏๚๛）】》]|ฯลฯ)$"#)
+    Regex::new(r#"^(?:[)\]}\\"”’>»,.:;!?/ๆฯ๏๚๛）】》]|ฯลฯ)$"#)
         .expect("Failed to compile PAT_NO_BREAK_BEFORE")
 });
 
@@ -40,9 +40,18 @@ pub fn can_break_between(left: &str, right: &str) -> bool {
         return false;
     }
 
-    // No break before closing symbols
+    // No break before closing symbols or the solidus (UAX #14 LB13)
     if PAT_NO_BREAK_BEFORE.is_match(right) {
         return false;
+    }
+
+    // Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
+    if let (Some(l), Some(r)) = (left.chars().last(), right.chars().next()) {
+        if (l.is_ascii_alphabetic() && r.is_ascii_digit())
+            || (l.is_ascii_digit() && r.is_ascii_alphabetic())
+        {
+            return false;
+        }
     }
 
     true

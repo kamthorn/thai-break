@@ -88,3 +88,20 @@ fn test_wrapping() {
     let line_count = wrapped.lines().count();
     assert!(line_count >= 2, "Should wrap into multiple lines");
 }
+
+#[test]
+fn test_latin_letters_and_digits_stay_together() {
+    // UAX #14 LB23: no break between letters and digits.
+    init_test_dict();
+    let broken = lines("ตาม WP01 และมาตรฐาน ISO29110", "|", false);
+    assert!(broken.contains("WP01"), "{}", broken);
+    assert!(broken.contains("ISO29110"), "{}", broken);
+}
+
+#[test]
+fn test_no_break_before_solidus() {
+    // UAX #14 LB13: "ISO/IEC" must not become "ISO" + "/IEC".
+    init_test_dict();
+    let broken = lines("ISO/IEC 29110 กำหนดให้มี", "|", false);
+    assert!(!broken.contains("|/"), "{}", broken);
+}

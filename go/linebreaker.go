@@ -13,7 +13,7 @@ const (
 
 var (
 	reNoBreakAfter  = regexp.MustCompile(`^[(\[{\\"“‘<«฿$€¥£#@（【《]$`)
-	reNoBreakBefore = regexp.MustCompile(`^(?:[)\]}\\"”’>»,.:;!?ๆฯ๏๚๛）】》]|ฯลฯ)$`)
+	reNoBreakBefore = regexp.MustCompile(`^(?:[)\]}\\"”’>»,.:;!?/ๆฯ๏๚๛）】》]|ฯลฯ)$`)
 	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))`)
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
 )
@@ -47,13 +47,23 @@ func CanBreakBetween(left, right string) bool {
 		return false
 	}
 
-	// No break before closing symbols / postfixes (ๆ, ฯ)
+	// No break before closing symbols, the solidus (UAX #14 LB13), postfixes (ๆ, ฯ)
 	if reNoBreakBefore.MatchString(right) {
+		return false
+	}
+
+	// Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
+	l, r := leftRunes[len(leftRunes)-1], rightRunes[0]
+	if (isASCIILetter(l) && isASCIIDigit(r)) || (isASCIIDigit(l) && isASCIILetter(r)) {
 		return false
 	}
 
 	return true
 }
+
+func isASCIILetter(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }
+
+func isASCIIDigit(r rune) bool { return r >= '0' && r <= '9' }
 
 // ThaiDisplayWidth calculates the visual terminal/column width for Thai text.
 // Combining above/below marks, tone marks, and ZWSP are counted as 0 width.

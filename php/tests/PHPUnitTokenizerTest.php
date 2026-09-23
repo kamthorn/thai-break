@@ -80,6 +80,22 @@ class PHPUnitTokenizerTest extends TestCase
         $this->assertStringNotContainsString("\u{200B} ", $result);
     }
 
+    public function testLineBreaksKeepLatinLettersAndDigitsTogether(): void
+    {
+        // UAX #14 LB23: no break between letters and digits.
+        $result = $this->defaultTok->insertLineBreaks('ตาม WP01 และมาตรฐาน ISO29110', '|');
+        $this->assertStringContainsString('WP01', $result);
+        $this->assertStringContainsString('ISO29110', $result);
+        $this->assertStringContainsString('และ|มาตรฐาน', $result);
+    }
+
+    public function testLineBreaksNeverBreakBeforeASolidus(): void
+    {
+        // UAX #14 LB13: "ISO/IEC" must not become "ISO" + "/IEC" across lines.
+        $result = $this->defaultTok->insertLineBreaks('ISO/IEC 29110 กำหนดให้มี', '|');
+        $this->assertStringNotContainsString('|/', $result);
+    }
+
     public function testLineBreaksHtmlProtection(): void
     {
         $html = '<p class="lead">สวัสดีครับ</p>';
