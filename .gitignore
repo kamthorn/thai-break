@@ -18,5 +18,9 @@ typescript/dist/
 __pycache__/
 *.pyc
 *.egg-info/
+python/*.egg-info/
 .pytest_cache/
+python/dist/
+dist/
+build/
 
