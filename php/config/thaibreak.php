@@ -60,4 +60,17 @@ return [
         // Automatically detect HTML markup and preserve tags/entities
         'auto_detect_html' => true,
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Eager Preload Dictionary (Octane / Swoole / Queue Workers)
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the dictionary will be loaded immediately upon application boot
+    | rather than lazily on the first request. Recommended for Laravel Octane,
+    | Swoole, RoadRunner, and long-running queue worker daemons.
+    |
+    */
+    'preload' => env('THAIBREAK_PRELOAD', false),
 ];
+

@@ -116,4 +116,11 @@ class LaravelIntegrationTest extends TestCase
         $compiledWrap = $blade->compileString("@thaiwrap('สวัสดีครับ', 40)");
         $this->assertStringContainsString("app('thaibreak')->wrap('สวัสดีครับ', 40)", $compiledWrap);
     }
+
+    public function testPreloadConfiguration(): void
+    {
+        $this->app['config']->set('thaibreak.preload', true);
+        (new ThaiBreakServiceProvider($this->app))->boot();
+        $this->assertTrue($this->app->resolved(ThaiTokenizer::class));
+    }
 }
