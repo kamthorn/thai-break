@@ -27,15 +27,15 @@
     },
     "autoload": {
         "psr-4": {
-            "ThaiBreak\\": "src/"
+            "ThaiBreak\\": "php/src/"
         },
         "files": [
-            "src/compatibility.php"
+            "php/src/compatibility.php"
         ]
     },
     "autoload-dev": {
         "psr-4": {
-            "ThaiBreak\\Tests\\": "tests/"
+            "ThaiBreak\\Tests\\": "php/tests/"
         }
     },
     "extra": {

@@ -1,0 +1,10 @@
+# Packaging rules for Composer / Packagist (dist archives)
+/go export-ignore
+/rust export-ignore
+/typescript export-ignore
+/python export-ignore
+/.github export-ignore
+/php/tests export-ignore
+/php/examples export-ignore
+phpunit.xml export-ignore
+.gitignore export-ignore

@@ -29,7 +29,10 @@ ThaiBreak ได้รับการออกแบบสถาปัตยก�
 ```
 PHPThaiNLP / ThaiBreak
 ├── data/                 # Shared Dictionary (data/words.txt)
-├── src/                  # Native PHP & Laravel Package (Composer: kamthorn/thai-break)
+├── php/                  # Native PHP & Laravel Package (Composer: kamthorn/thai-break)
+│   ├── src/              # PHP Source & Laravel Integration
+│   ├── tests/            # PHPUnit & Integration Tests
+│   └── examples/         # Demo Scripts
 ├── go/                   # Native Go Package (go get github.com/kamthorn/thai-break/go)
 ├── typescript/           # Native TypeScript / Node.js Package (npm: thai-break)
 ├── rust/                 # High-Performance Rust Core (Cargo: thaibreak)
@@ -283,7 +286,7 @@ console.log(tb.words("ฉันรักภาษาไทย"));
 ```bash
 # 1. PHP & Laravel Tests
 ./vendor/bin/phpunit
-php tests/TokenizerTest.php
+php php/tests/TokenizerTest.php
 
 # 2. Go Tests & Benchmarks
 cd go && go test -v ./... && go test -bench=. ./...
