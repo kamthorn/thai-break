@@ -17,6 +17,11 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+[project.urls]
+Homepage = "https://github.com/kamthorn/thai-break"
+Repository = "https://github.com/kamthorn/thai-break"
+
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["thaibreak*"]
