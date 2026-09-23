@@ -116,3 +116,17 @@ func TestNoBreakBeforeSolidus(t *testing.T) {
 		t.Errorf("break marker should not precede '/', got %q", broken)
 	}
 }
+
+func TestEmbeddedDictionary(t *testing.T) {
+	if len(defaultWordsData) == 0 {
+		t.Fatal("embedded dictionary should not be empty")
+	}
+	trie, err := LoadTsv(strings.NewReader(defaultWordsData))
+	if err != nil {
+		t.Fatalf("failed to load embedded dictionary: %v", err)
+	}
+	if len(trie.prefixes) == 0 {
+		t.Fatal("trie prefixes should not be empty")
+	}
+}
+
