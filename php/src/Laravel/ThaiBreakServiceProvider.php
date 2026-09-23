@@ -64,6 +64,11 @@ class ThaiBreakServiceProvider extends ServiceProvider
 
         // Register Str and Stringable macros
         $this->registerStrMacros();
+
+        // Eager preload dictionary if enabled (e.g. Octane / Swoole / Daemons)
+        if ($this->app['config']->get('thaibreak.preload', false)) {
+            $this->app->make(ThaiTokenizer::class);
+        }
     }
 
     /**
