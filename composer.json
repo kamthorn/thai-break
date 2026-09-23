@@ -18,9 +18,9 @@
         "ext-spl": "*"
     },
     "require-dev": {
-        "illuminate/support": "^11.0",
-        "orchestra/testbench": "^9.0",
-        "phpunit/phpunit": "^11.0"
+        "illuminate/support": "^10.0 || ^11.0 || ^12.0",
+        "orchestra/testbench": "^8.0 || ^9.0 || ^10.0",
+        "phpunit/phpunit": "^10.5 || ^11.0"
     },
     "suggest": {
         "illuminate/support": "To use Laravel ServiceProvider, Facade, Blade directives, and Str macros (^10.0 || ^11.0 || ^12.0)"

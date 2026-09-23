@@ -32,7 +32,7 @@ jobs:
           coverage: none
 
       - name: Install Composer dependencies
-        run: composer install --prefer-dist --no-progress --no-interaction
+        run: composer update --prefer-dist --no-progress --no-interaction
 
       - name: Run PHPUnit
         run: ./vendor/bin/phpunit --colors=always
