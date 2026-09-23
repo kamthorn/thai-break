@@ -1,11 +1,15 @@
 package thaibreak
 
 import (
+	_ "embed"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 )
+
+//go:embed data/words.txt
+var defaultWordsData string
 
 var (
 	defaultMu          sync.RWMutex
@@ -38,6 +42,10 @@ func initDefault() {
 		trie := NewThaiTrie()
 		if dictPath != "" {
 			if t, err := LoadTsvFile(dictPath); err == nil {
+				trie = t
+			}
+		} else if defaultWordsData != "" {
+			if t, err := LoadTsv(strings.NewReader(defaultWordsData)); err == nil {
 				trie = t
 			}
 		}
