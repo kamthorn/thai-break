@@ -98,3 +98,21 @@ func BenchmarkTokenize(b *testing.B) {
 		_ = Words(text)
 	}
 }
+
+// UAX #14 LB23: no break between letters and digits.
+func TestLatinLettersAndDigitsStayTogether(t *testing.T) {
+	broken := Lines("ตาม WP01 และมาตรฐาน ISO29110", false)
+	for _, want := range []string{"WP01", "ISO29110"} {
+		if !strings.Contains(broken, want) {
+			t.Errorf("expected %q to stay unbroken, got %q", want, broken)
+		}
+	}
+}
+
+// UAX #14 LB13: "ISO/IEC" must not become "ISO" + "/IEC".
+func TestNoBreakBeforeSolidus(t *testing.T) {
+	broken := Lines("ISO/IEC 29110 กำหนดให้มี", false)
+	if strings.Contains(broken, DefaultBreakMarker+"/") {
+		t.Errorf("break marker should not precede '/', got %q", broken)
+	}
+}

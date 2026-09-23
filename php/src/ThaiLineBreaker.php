@@ -44,9 +44,10 @@ class ThaiLineBreaker
 
     /**
      * Tokens that must NOT start a line (never break BEFORE these).
-     * Includes close brackets, quotes, sentence punctuation, and Thai postfixes (ๆ, ฯ, ฯลฯ).
+     * Includes close brackets, quotes, sentence punctuation, the solidus (UAX #14
+     * LB13: "ISO/IEC" must not become "ISO" + "/IEC"), and Thai postfixes (ๆ, ฯ, ฯลฯ).
      */
-    private const PAT_NO_BREAK_BEFORE = '/^(?:[)\\]}\"”’>»,.:;!?ๆฯ๏๚๛）】》]|ฯลฯ)$/u';
+    private const PAT_NO_BREAK_BEFORE = '/^(?:[)\\]}\"”’>»,.:;!?\/ๆฯ๏๚๛）】》]|ฯลฯ)$/u';
 
     /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
     private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';
@@ -217,7 +218,13 @@ class ThaiLineBreaker
             return false;
         }
 
-        // 4. Numbers connected by hyphen, slash, colon, or period (e.g. 10-20, 1/2)
+        // 4. Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
+        if ((preg_match('/[A-Za-z]$/', $left) && preg_match('/^[0-9]/', $right)) ||
+            (preg_match('/[0-9]$/', $left) && preg_match('/^[A-Za-z]/', $right))) {
+            return false;
+        }
+
+        // 5. Numbers connected by hyphen, slash, colon, or period (e.g. 10-20, 1/2)
         if (is_numeric($left) && in_array($right, ['-', '/', ':', '.', '%'], true)) {
             return false;
         }
