@@ -1,6 +1,15 @@
 # ThaiBreak — Fast Thai Word Segmenter & Typographic Line Breaker
 
+[![CI](https://github.com/kamthorn/thai-break/actions/workflows/ci.yml/badge.svg)](https://github.com/kamthorn/thai-break/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Packagist Version](https://img.shields.io/packagist/v/kamthorn/thai-break.svg)](https://packagist.org/packages/kamthorn/thai-break)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kamthorn/thai-break/go.svg)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
+[![npm version](https://img.shields.io/npm/v/thai-break.svg)](https://www.npmjs.com/package/thai-break)
+[![crates.io](https://img.shields.io/crates/v/thaibreak.svg)](https://crates.io/crates/thaibreak)
+[![PyPI version](https://img.shields.io/pypi/v/thaibreak.svg)](https://pypi.org/project/thaibreak/)
+
 ระบบตัดคำและตัดแบ่งบรรทัดภาษาไทยประสิทธิภาพสูงแบบ **Multi-Language Engine** รองรับ **PHP / Laravel**, **Go**, **TypeScript / Node.js**, **Rust Core**, **C / C++**, **Python**, และ **WebAssembly**  
+
 ใช้อัลกอริทึม **Shortest Path Viterbi DAG** ร่วมกับ **Theeramunkong 30-Rule Thai Character Cluster (TCC)** บนพจนานุกรมมาตรฐานภาษาไทย (`data/words.txt` 25,907 คำ)
 
 🚀 **Zero External Corpus Dependency:** ไม่พึ่งพาคลังข้อความที่มีข้อจำกัดทางลิขสิทธิ์ เป็น Open Source Apache-2.0 แท้ 100% ใช้งานเชิงพาณิชย์ได้อย่างสบายใจ  
