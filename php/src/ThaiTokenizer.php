@@ -54,9 +54,9 @@ class ThaiTokenizer
         $path = $dictPath;
         if ($path === null) {
             $candidates = [
+                __DIR__ . '/../../data/words.txt',
                 __DIR__ . '/../data/words.txt',
-                __DIR__ . '/../data/wordlist.txt',
-                __DIR__ . '/../data/wordlist.tsv',
+                'data/words.txt',
             ];
             foreach ($candidates as $c) {
                 if (file_exists($c)) {

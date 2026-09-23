@@ -5,13 +5,13 @@
          colors="true">
     <testsuites>
         <testsuite name="PHPThaiNLP">
-            <file>tests/PHPUnitTokenizerTest.php</file>
-            <file>tests/LaravelIntegrationTest.php</file>
+            <file>php/tests/PHPUnitTokenizerTest.php</file>
+            <file>php/tests/LaravelIntegrationTest.php</file>
         </testsuite>
     </testsuites>
     <source>
         <include>
-            <directory>src/</directory>
+            <directory>php/src/</directory>
         </include>
     </source>
 </phpunit>

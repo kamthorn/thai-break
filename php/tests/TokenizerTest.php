@@ -310,7 +310,7 @@ test('Whitespace: keep whitespace when flag set', function () {
 // -----------------------------------------------------------------------
 
 test('DictionaryLoader: from text file', function () {
-    $path = __DIR__ . '/../data/words.txt';
+    $path = __DIR__ . '/../../data/words.txt';
     if (!file_exists($path)) {
         return 'words.txt not found — skip';
     }
@@ -321,7 +321,7 @@ test('DictionaryLoader: from text file', function () {
 });
 
 test('DictionaryLoader: from text file words count', function () {
-    $path = __DIR__ . '/../data/words.txt';
+    $path = __DIR__ . '/../../data/words.txt';
     if (!file_exists($path)) {
         return 'words.txt not found — skip';
     }
