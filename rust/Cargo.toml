@@ -1,6 +1,6 @@
 [package]
 name = "thaibreak"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["kamthorn"]
 description = "Fast, high-accuracy Thai word segmentation and typographic line breaker core engine"
