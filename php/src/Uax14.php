@@ -144,37 +144,43 @@ final class Uax14
         $actions[$n] = self::MANDATORY;
 
         // LB9/LB10: group X (CM|ZWJ)* into units that take the class of X.
-        $units = [];
+        // Units are stored as parallel lists: class (SA kept), class with SA
+        // resolved to AL, code point, start position and flags.
+        $cls = $rc = $cpu = $start = $ea = $xp = $zwj = [];
+        $last = -1;
         foreach ($cps as $i => $cp) {
-            $value = self::value($cp);
-            $cls   = $value & self::CLASS_MASK;
-            if ($cls === self::SM) {
-                $cls = self::CM;
+            $value = self::$valueCache[$cp] ?? self::value($cp);
+            $c     = $value & self::CLASS_MASK;
+            if ($c === self::SM) {
+                $c = self::CM;
             }
-            if ($cls === self::CM || $cls === self::ZWJ) {
-                $last = count($units) - 1;
-                if ($last >= 0 && !in_array($units[$last]['cls'], [self::BK, self::CR, self::LF, self::NL, self::SP, self::ZW], true)) {
-                    $units[$last]['zwj'] = $cls === self::ZWJ;
-                    continue;
-                }
+            if (($c === self::CM || $c === self::ZWJ) && $last >= 0
+                && !in_array($cls[$last], [self::BK, self::CR, self::LF, self::NL, self::SP, self::ZW], true)) {
+                $zwj[$last] = $c === self::ZWJ;
+                continue;
             }
-            $units[] = [
-                'cls'   => match ($cls) {
-                    self::CM, self::ZWJ => self::AL,
-                    self::SA            => $dictBreaks === null ? self::AL : self::SA,
-                    default             => $cls,
-                },
-                'cp'    => $cp,
-                'start' => $i,
-                'ea'    => ($value & self::FLAG_EAST_ASIAN) !== 0,
-                'xp'    => ($value & self::FLAG_EXT_PICT_UNASSIGNED) !== 0,
-                'zwj'   => $cls === self::ZWJ,
-            ];
+            $zwj[]   = $c === self::ZWJ;
+            if ($c === self::CM || $c === self::ZWJ || ($c === self::SA && $dictBreaks === null)) {
+                $c = self::AL;
+            }
+            $cls[]   = $c;
+            $rc[]    = $c === self::SA ? self::AL : $c;
+            $cpu[]   = $cp;
+            $start[] = $i;
+            $ea[]    = ($value & self::FLAG_EAST_ASIAN) !== 0;
+            $xp[]    = ($value & self::FLAG_EXT_PICT_UNASSIGNED) !== 0;
+            $last++;
         }
 
-        $count = count($units);
-        for ($u = 1; $u < $count; $u++) {
-            $actions[$units[$u]['start']] = self::pairAction($units, $u, $dictBreaks);
+        $units = ['cls' => $cls, 'rc' => $rc, 'cp' => $cpu, 'ea' => $ea, 'xp' => $xp, 'zwj' => $zwj];
+        for ($u = 1; $u <= $last; $u++) {
+            // Fast path for the common Thai|Thai boundary (same result as pairAction)
+            if ($cls[$u] === self::SA && $cls[$u - 1] === self::SA && !$zwj[$u - 1]) {
+                $actions[$start[$u]] = ($cpu[$u] !== self::THAI_MAIYAMOK && $cpu[$u] !== self::THAI_PAIYANNOI
+                    && ($dictBreaks[$start[$u]] ?? false)) ? self::ALLOWED : self::NO_BREAK;
+                continue;
+            }
+            $actions[$start[$u]] = self::pairAction($units, $u, $start[$u], $dictBreaks);
         }
 
         return $actions;
@@ -183,16 +189,17 @@ final class Uax14
     /**
      * Apply rules LB4–LB31 in order to the boundary before unit $b.
      *
-     * @param list<array{cls:int,cp:int,start:int,ea:bool,xp:bool,zwj:bool}> $units
+     * @param array{cls:list<int>,rc:list<int>,cp:list<int>,ea:list<bool>,xp:list<bool>,zwj:list<bool>} $units
+     * @param int             $pos        Text position of unit $b
      * @param list<bool>|null $dictBreaks
      */
-    private static function pairAction(array $units, int $b, ?array $dictBreaks): int
+    private static function pairAction(array $units, int $b, int $pos, ?array $dictBreaks): int
     {
         $a     = $b - 1;
-        $count = count($units);
-        $A     = $units[$a]['cls'];
-        $B     = $units[$b]['cls'];
-        $cls   = static fn(int $i): ?int => ($i >= 0 && $i < $count) ? ($units[$i]['cls'] === self::SA ? self::AL : $units[$i]['cls']) : null;
+        $rc    = $units['rc'];
+        $count = count($rc);
+        $A     = $units['cls'][$a];
+        $B     = $units['cls'][$b];
 
         // LB4–LB6: mandatory breaks
         if ($A === self::BK) {
@@ -213,28 +220,28 @@ final class Uax14
         }
         // Last unit before the boundary, skipping spaces (for the "X SP*" rules)
         $k = $a;
-        while ($k > 0 && $units[$k]['cls'] === self::SP) {
+        while ($k > 0 && $rc[$k] === self::SP) {
             $k--;
         }
-        $K = $cls($k);
+        $K = $rc[$k] ?? null;
         // LB8: ZW SP* ÷
         if ($K === self::ZW) {
             return self::ALLOWED;
         }
         // LB8a: ZWJ ×
-        if ($units[$a]['zwj']) {
+        if ($units['zwj'][$a]) {
             return self::NO_BREAK;
         }
         // SA resolution (LB1), Thai tailoring: ๆ and ฯ never start a line, even after spaces
-        if ($dictBreaks !== null && ($units[$b]['cp'] === self::THAI_MAIYAMOK || $units[$b]['cp'] === self::THAI_PAIYANNOI)) {
+        if ($dictBreaks !== null && ($units['cp'][$b] === self::THAI_MAIYAMOK || $units['cp'][$b] === self::THAI_PAIYANNOI)) {
             return self::NO_BREAK;
         }
         // SA resolution (LB1): the dictionary decides inside SA runs
         if ($A === self::SA && $B === self::SA) {
-            return ($dictBreaks[$units[$b]['start']] ?? false) ? self::ALLOWED : self::NO_BREAK;
+            return ($dictBreaks[$pos] ?? false) ? self::ALLOWED : self::NO_BREAK;
         }
-        $A = $cls($a);
-        $B = $cls($b);
+        $A = $rc[$a] ?? null;
+        $B = $rc[$b] ?? null;
         // LB11: × WJ, WJ ×
         if ($A === self::WJ || $B === self::WJ) {
             return self::NO_BREAK;
@@ -256,15 +263,15 @@ final class Uax14
             return self::NO_BREAK;
         }
         // LB15a: (sot | BK | CR | LF | NL | OP | QU | GL | SP | ZW) [\p{Pi}&QU] SP* ×
-        if ($K === self::QI && ($k === 0 || in_array($cls($k - 1), [self::BK, self::CR, self::LF, self::NL, self::OP, self::QU, self::QI, self::QF, self::GL, self::SP, self::ZW], true))) {
+        if ($K === self::QI && ($k === 0 || in_array($rc[$k - 1] ?? null, [self::BK, self::CR, self::LF, self::NL, self::OP, self::QU, self::QI, self::QF, self::GL, self::SP, self::ZW], true))) {
             return self::NO_BREAK;
         }
         // LB15b: × [\p{Pf}&QU] (SP | GL | WJ | CL | QU | CP | EX | IS | SY | BK | CR | LF | NL | ZW | eot)
-        if ($B === self::QF && ($b + 1 === $count || in_array($cls($b + 1), [self::SP, self::GL, self::WJ, self::CL, self::QU, self::QI, self::QF, self::CP, self::EX, self::IS, self::SY, self::BK, self::CR, self::LF, self::NL, self::ZW], true))) {
+        if ($B === self::QF && ($b + 1 === $count || in_array($rc[$b + 1] ?? null, [self::SP, self::GL, self::WJ, self::CL, self::QU, self::QI, self::QF, self::CP, self::EX, self::IS, self::SY, self::BK, self::CR, self::LF, self::NL, self::ZW], true))) {
             return self::NO_BREAK;
         }
         // LB15c: SP ÷ IS NU
-        if ($A === self::SP && $B === self::IS && $cls($b + 1) === self::NU) {
+        if ($A === self::SP && $B === self::IS && ($rc[$b + 1] ?? null) === self::NU) {
             return self::ALLOWED;
         }
         // LB15d: × IS
@@ -288,10 +295,10 @@ final class Uax14
             return self::NO_BREAK;
         }
         // LB19a: quotation marks bind unless both neighbours are East Asian
-        if (self::isQuote($B) && (!$units[$a]['ea'] || $b + 1 === $count || !$units[$b + 1]['ea'])) {
+        if (self::isQuote($B) && (!$units['ea'][$a] || $b + 1 === $count || !$units['ea'][$b + 1])) {
             return self::NO_BREAK;
         }
-        if (self::isQuote($A) && (!$units[$b]['ea'] || $a === 0 || !$units[$a - 1]['ea'])) {
+        if (self::isQuote($A) && (!$units['ea'][$b] || $a === 0 || !$units['ea'][$a - 1])) {
             return self::NO_BREAK;
         }
         // LB20: ÷ CB, CB ÷
@@ -299,8 +306,8 @@ final class Uax14
             return self::ALLOWED;
         }
         // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [\u2010]) × AL
-        if (($A === self::HY || $units[$a]['cp'] === self::HYPHEN) && $B === self::AL
-            && ($a === 0 || in_array($cls($a - 1), [self::BK, self::CR, self::LF, self::NL, self::SP, self::ZW, self::CB, self::GL], true))) {
+        if (($A === self::HY || $units['cp'][$a] === self::HYPHEN) && $B === self::AL
+            && ($a === 0 || in_array($rc[$a - 1] ?? null, [self::BK, self::CR, self::LF, self::NL, self::SP, self::ZW, self::CB, self::GL], true))) {
             return self::NO_BREAK;
         }
         // LB21: × BA, × HY, × NS, BB ×
@@ -308,7 +315,7 @@ final class Uax14
             return self::NO_BREAK;
         }
         // LB21a: HL (HY | [BA - $EastAsian]) × [^HL]
-        if (($A === self::HY || ($A === self::BA && !$units[$a]['ea'])) && $cls($a - 1) === self::HL && $B !== self::HL) {
+        if (($A === self::HY || ($A === self::BA && !$units['ea'][$a])) && ($rc[$a - 1] ?? null) === self::HL && $B !== self::HL) {
             return self::NO_BREAK;
         }
         // LB21b: SY × HL
@@ -337,15 +344,15 @@ final class Uax14
         if ($B === self::PO || $B === self::PR) {
             // NU (SY | IS)* (CL | CP)? × (PO | PR)
             $j = ($A === self::CL || $A === self::CP) ? $a - 1 : $a;
-            while (in_array($cls($j), [self::SY, self::IS], true)) {
+            while (in_array($rc[$j] ?? null, [self::SY, self::IS], true)) {
                 $j--;
             }
-            if ($cls($j) === self::NU) {
+            if (($rc[$j] ?? null) === self::NU) {
                 return self::NO_BREAK;
             }
         }
         if (($A === self::PO || $A === self::PR) && $B === self::OP
-            && ($cls($b + 1) === self::NU || ($cls($b + 1) === self::IS && $cls($b + 2) === self::NU))) {
+            && (($rc[$b + 1] ?? null) === self::NU || (($rc[$b + 1] ?? null) === self::IS && ($rc[$b + 2] ?? null) === self::NU))) {
             return self::NO_BREAK; // (PO | PR) × OP IS? NU
         }
         if ($B === self::NU && in_array($A, [self::PO, self::PR, self::HY, self::IS], true)) {
@@ -354,10 +361,10 @@ final class Uax14
         if ($B === self::NU) {
             // NU (SY | IS)* × NU
             $j = $a;
-            while (in_array($cls($j), [self::SY, self::IS], true)) {
+            while (in_array($rc[$j] ?? null, [self::SY, self::IS], true)) {
                 $j--;
             }
-            if ($cls($j) === self::NU) {
+            if (($rc[$j] ?? null) === self::NU) {
                 return self::NO_BREAK;
             }
         }
@@ -376,7 +383,7 @@ final class Uax14
             return self::NO_BREAK;
         }
         // LB28a: Brahmic orthographic syllables
-        if (self::inAksara($units, $a, $b, $cls)) {
+        if (self::inAksara($units, $a, $b)) {
             return self::NO_BREAK;
         }
         // LB29: IS × (AL | HL)
@@ -384,14 +391,14 @@ final class Uax14
             return self::NO_BREAK;
         }
         // LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
-        if (((self::isAlpha($A) || $A === self::NU) && $B === self::OP && !$units[$b]['ea'])
-            || ($A === self::CP && !$units[$a]['ea'] && (self::isAlpha($B) || $B === self::NU))) {
+        if (((self::isAlpha($A) || $A === self::NU) && $B === self::OP && !$units['ea'][$b])
+            || ($A === self::CP && !$units['ea'][$a] && (self::isAlpha($B) || $B === self::NU))) {
             return self::NO_BREAK;
         }
         // LB30a: break between pairs of regional indicators only
         if ($A === self::RI && $B === self::RI) {
             $run = 0;
-            for ($j = $a; $j >= 0 && $units[$j]['cls'] === self::RI; $j--) {
+            for ($j = $a; $j >= 0 && $rc[$j] === self::RI; $j--) {
                 $run++;
             }
             if ($run % 2 === 1) {
@@ -399,7 +406,7 @@ final class Uax14
             }
         }
         // LB30b: EB × EM, [\p{Extended_Pictographic}&\p{Cn}] × EM
-        if ($B === self::EM && ($A === self::EB || $units[$a]['xp'])) {
+        if ($B === self::EM && ($A === self::EB || $units['xp'][$a])) {
             return self::NO_BREAK;
         }
         // LB31: ÷
@@ -409,19 +416,19 @@ final class Uax14
     /**
      * LB28a for the boundary between units $a and $b.
      *
-     * @param list<array{cls:int,cp:int,start:int,ea:bool,xp:bool,zwj:bool}> $units
-     * @param callable(int): ?int $cls
+     * @param array{cls:list<int>,rc:list<int>,cp:list<int>,ea:list<bool>,xp:list<bool>,zwj:list<bool>} $units
      */
-    private static function inAksara(array $units, int $a, int $b, callable $cls): bool
+    private static function inAksara(array $units, int $a, int $b): bool
     {
-        $aksara = static fn(int $i): bool => in_array($cls($i), [self::AK, self::AS], true)
-            || (($units[$i]['cp'] ?? null) === self::DOTTED_CIRCLE);
-        $A = $cls($a);
-        $B = $cls($b);
+        $rc = $units['rc'];
+        $aksara = static fn(int $i): bool => in_array($rc[$i] ?? null, [self::AK, self::AS], true)
+            || (($units['cp'][$i] ?? null) === self::DOTTED_CIRCLE);
+        $A = $rc[$a] ?? null;
+        $B = $rc[$b] ?? null;
         return ($A === self::AP && $aksara($b))
             || ($aksara($a) && ($B === self::VF || $B === self::VI))
-            || ($A === self::VI && $aksara($a - 1) && ($B === self::AK || $units[$b]['cp'] === self::DOTTED_CIRCLE))
-            || ($aksara($a) && $aksara($b) && $cls($b + 1) === self::VF);
+            || ($A === self::VI && $aksara($a - 1) && ($B === self::AK || $units['cp'][$b] === self::DOTTED_CIRCLE))
+            || ($aksara($a) && $aksara($b) && ($rc[$b + 1] ?? null) === self::VF);
     }
 
     private static function isAlpha(?int $cls): bool
