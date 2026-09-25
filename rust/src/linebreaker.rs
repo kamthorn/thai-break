@@ -2,6 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 use crate::tokenizer::Tokenizer;
+use crate::uax14;
 
 pub const DEFAULT_BREAK_MARKER: &str = "\u{200B}";
 
@@ -25,11 +26,25 @@ static RE_THAI_COMBINING: Lazy<Regex> = Lazy::new(|| {
         .expect("Failed to compile RE_THAI_COMBINING")
 });
 
+/// Whether a line break is permissible between two adjacent tokens. The tokens
+/// are treated as separate dictionary words, so a Thai|Thai junction is a word
+/// boundary.
 pub fn can_break_between(left: &str, right: &str) -> bool {
     if left.is_empty() || right.is_empty() {
         return false;
     }
 
+    let cps: Vec<char> = left.chars().chain(right.chars()).collect();
+    let at = left.chars().count();
+    let mut dict = vec![false; cps.len() + 1];
+    dict[at] = true;
+
+    uax14::break_opportunities(&cps, Some(&dict))[at] == uax14::ALLOWED
+        && passes_typographic_rules(left, right)
+}
+
+/// Legacy token-level rules that are not yet expressed as UAX #14 rules.
+fn passes_typographic_rules(left: &str, right: &str) -> bool {
     // Whitespace safety
     if left.ends_with(char::is_whitespace) || right.starts_with(char::is_whitespace) {
         return false;
@@ -109,10 +124,26 @@ impl LineBreaker {
             return text.to_string();
         }
 
+        // Token ends are the dictionary word boundaries inside Thai runs
+        let mut cps: Vec<char> = Vec::with_capacity(text.len());
+        let mut ends = Vec::with_capacity(n);
+        for tok in &tokens {
+            cps.extend(tok.chars());
+            ends.push(cps.len());
+        }
+        let mut dict = vec![false; cps.len() + 1];
+        for &end in &ends {
+            dict[end] = true;
+        }
+        let actions = uax14::break_opportunities(&cps, Some(&dict));
+
         let mut res = String::with_capacity(text.len() + n * marker.len());
         for i in 0..n {
             res.push_str(&tokens[i]);
-            if i + 1 < n && can_break_between(&tokens[i], &tokens[i + 1]) {
+            if i + 1 < n
+                && actions[ends[i]] == uax14::ALLOWED
+                && passes_typographic_rules(&tokens[i], &tokens[i + 1])
+            {
                 res.push_str(marker);
             }
         }

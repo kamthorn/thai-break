@@ -198,10 +198,31 @@ class ThaiLineBreaker
     /**
      * Determine whether a line break is permissible between two adjacent tokens.
      *
+     * The tokens are treated as separate dictionary words, so a Thai|Thai
+     * junction is a word boundary.
+     *
      * @param string $left  The token preceding the potential break point
      * @param string $right The token following the potential break point
      */
     public static function canBreakBetween(string $left, string $right): bool
+    {
+        if ($left === '' || $right === '') {
+            return false;
+        }
+
+        $cps  = self::codePoints($left . $right);
+        $at   = count(self::codePoints($left));
+        $dict = array_fill(0, count($cps) + 1, false);
+        $dict[$at] = true;
+
+        return Uax14::breakOpportunities($cps, $dict)[$at] === Uax14::ALLOWED
+            && self::passesTypographicRules($left, $right);
+    }
+
+    /**
+     * Legacy token-level rules that are not yet expressed as UAX #14 rules.
+     */
+    private static function passesTypographicRules(string $left, string $right): bool
     {
         // 1. Whitespace safety: never insert break adjacent to spaces
         if (preg_match('/\s$/u', $left) || preg_match('/^\s/u', $right)) {
@@ -265,15 +286,42 @@ class ThaiLineBreaker
             return $text;
         }
 
+        // Token ends are the dictionary word boundaries inside Thai runs
+        $cps  = [];
+        $ends = [];
+        foreach ($tokens as $tok) {
+            array_push($cps, ...self::codePoints($tok));
+            $ends[] = count($cps);
+        }
+        $dict = array_fill(0, count($cps) + 1, false);
+        foreach ($ends as $end) {
+            $dict[$end] = true;
+        }
+        $actions = Uax14::breakOpportunities($cps, $dict);
+
         $out = '';
         for ($i = 0; $i < $n; $i++) {
             $out .= $tokens[$i];
-            if ($i + 1 < $n && self::canBreakBetween($tokens[$i], $tokens[$i + 1])) {
+            if ($i + 1 < $n && $actions[$ends[$i]] === Uax14::ALLOWED
+                && self::passesTypographicRules($tokens[$i], $tokens[$i + 1])) {
                 $out .= $breakMarker;
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Split a UTF-8 string into Unicode code points.
+     *
+     * @return list<int>
+     */
+    private static function codePoints(string $text): array
+    {
+        if ($text === '') {
+            return [];
+        }
+        return array_values(unpack('N*', mb_convert_encoding($text, 'UTF-32BE', 'UTF-8')) ?: []);
     }
 
     /**

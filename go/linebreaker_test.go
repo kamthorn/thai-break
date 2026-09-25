@@ -1,0 +1,27 @@
+package thaibreak
+
+import (
+	"reflect"
+	"testing"
+)
+
+// lineBreakCases maps input to expected output with '|' as the break marker.
+var lineBreakCases = []struct{ name, input, want string }{
+	{"LB9 combining mark stays with its base", "สวัสดี́ครับ", "สวัสดี́|ครับ"},
+}
+
+func TestInsertLineBreaksUAX14(t *testing.T) {
+	for _, c := range lineBreakCases {
+		if got := GetDefaultLineBreaker().InsertLineBreaks(c.input, "|", false); got != c.want {
+			t.Errorf("%s: InsertLineBreaks(%q) = %q, want %q", c.name, c.input, got, c.want)
+		}
+	}
+}
+
+func TestMandatoryBreaks(t *testing.T) {
+	got := lbBreakOpportunities([]rune("a\r\nb"), nil)
+	want := []uint8{lbNoBreak, lbNoBreak, lbNoBreak, lbMandatory, lbMandatory}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
