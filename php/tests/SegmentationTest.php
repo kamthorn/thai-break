@@ -24,6 +24,8 @@ class SegmentationTest extends TestCase
             'ก็ is not swallowed by the cluster before it' => ['ทะเลก็สวย', 'ทะเล|ก็|สวย'],
             'a final consonant before a vowel starts the next cluster' => ['รึยัง', 'รึ|ยัง'],
             'no-break spaces are whitespace, not words' => ['ราคา 100 บาท', 'ราคา|100|บาท'],
+            'two sara e are matched as sara ae, the text is kept' => ['เเข็งเเรงมาก', 'เเข็งเเรง|มาก'],
+            'nikhahit + sara aa is matched as sara am, the text is kept' => ['นํ้าตาลทราย', 'นํ้าตาล|ทราย'],
         ];
     }
 
