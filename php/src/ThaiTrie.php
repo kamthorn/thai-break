@@ -11,7 +11,7 @@ namespace ThaiBreak;
  *   $prefixes[$prefix] = float (weight > 0.0 if a complete word, 0.0 if only a prefix)
  *
  * Performance characteristics:
- *   - Memory: ~16 MB for 40,851 words (down from ~96 MB with nested trees, an 83% reduction).
+ *   - Memory: about 9 MB for the 25,907-word default dictionary (PHP 8.4), far less than nested trees.
  *   - Speed: Direct PHP hash lookup ($prefixes[$sub] ?? null) is 2.1x faster than recursive tree traversal.
  *   - 100% backward compatible with existing ThaiTrie public API.
  *
