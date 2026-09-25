@@ -53,9 +53,6 @@ func CanBreakBetween(left, right string) bool {
 // passesTypographicRules applies legacy token-level rules that are not yet
 // expressed as UAX #14 rules.
 func passesTypographicRules(left, right string) bool {
-	leftRunes := []rune(left)
-	rightRunes := []rune(right)
-
 	// No break after opening symbols
 	if reNoBreakAfter.MatchString(left) {
 		return false
@@ -66,18 +63,8 @@ func passesTypographicRules(left, right string) bool {
 		return false
 	}
 
-	// Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
-	l, r := leftRunes[len(leftRunes)-1], rightRunes[0]
-	if (isASCIILetter(l) && isASCIIDigit(r)) || (isASCIIDigit(l) && isASCIILetter(r)) {
-		return false
-	}
-
 	return true
 }
-
-func isASCIILetter(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }
-
-func isASCIIDigit(r rune) bool { return r >= '0' && r <= '9' }
 
 // ThaiDisplayWidth calculates the visual terminal/column width for Thai text.
 // Combining above/below marks, tone marks, and ZWSP are counted as 0 width.

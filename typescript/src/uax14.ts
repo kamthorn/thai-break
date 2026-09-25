@@ -206,6 +206,14 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if (A === LB.SY && B === LB.HL) {
     return NO_BREAK;
   }
+  // LB23: (AL | HL) × NU, NU × (AL | HL)
+  if ((isAlpha(A) && B === LB.NU) || (A === LB.NU && isAlpha(B))) {
+    return NO_BREAK;
+  }
+  // LB23a: PR × (ID | EB | EM), (ID | EB | EM) × PO
+  if ((A === LB.PR && [LB.ID, LB.EB, LB.EM].includes(B)) || ([LB.ID, LB.EB, LB.EM].includes(A) && B === LB.PO)) {
+    return NO_BREAK;
+  }
   // LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
   if (((A === LB.PR || A === LB.PO) && isAlpha(B)) || (isAlpha(A) && (B === LB.PR || B === LB.PO))) {
     return NO_BREAK;

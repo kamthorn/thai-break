@@ -44,12 +44,6 @@ function passesTypographicRules(left: string, right: string): boolean {
     return false;
   }
 
-  // Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
-  if ((/[A-Za-z]$/.test(left) && /^[0-9]/.test(right)) ||
-      (/[0-9]$/.test(left) && /^[A-Za-z]/.test(right))) {
-    return false;
-  }
-
   return true;
 }
 

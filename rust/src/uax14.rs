@@ -256,6 +256,14 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if A == SY && B == HL {
         return NO_BREAK;
     }
+    // LB23: (AL | HL) × NU, NU × (AL | HL)
+    if (is_alpha(A) && B == NU) || (A == NU && is_alpha(B)) {
+        return NO_BREAK;
+    }
+    // LB23a: PR × (ID | EB | EM), (ID | EB | EM) × PO
+    if (A == PR && [ID, EB, EM].contains(&B)) || ([ID, EB, EM].contains(&A) && B == PO) {
+        return NO_BREAK;
+    }
     // LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
     if ((A == PR || A == PO) && is_alpha(B)) || (is_alpha(A) && (B == PR || B == PO)) {
         return NO_BREAK;

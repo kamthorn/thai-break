@@ -29,6 +29,9 @@ const LINE_BREAK_CASES: &[(&str, &str, &str)] = &[
     ("LB28 no break inside an email address", "ติดต่อ user@example.com ได้", "ติดต่อ user@example.com ได้"),
     ("LB28 no break around # (AL)", "แท็ก#ไทยดี", "แท็ก#ไทย|ดี"),
     ("LB28 no break inside a Latin word with a combining mark", "café́ ไทย", "café́ ไทย"),
+    ("LB23 no break between Thai letters and digits", "ราคา100บาท", "ราคา100บาท"),
+    ("LB23 no break between Thai letters and Thai digits", "ปี๒๕๖๗นะ", "ปี๒๕๖๗นะ"),
+    ("LB23 no break between Latin letters and digits", "เอกสารWP01ของ", "เอกสารWP01ของ"),
 ];
 
 #[test]

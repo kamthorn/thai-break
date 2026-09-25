@@ -268,6 +268,15 @@ final class Uax14
         if ($A === self::SY && $B === self::HL) {
             return self::NO_BREAK;
         }
+        // LB23: (AL | HL) × NU, NU × (AL | HL)
+        if ((self::isAlpha($A) && $B === self::NU) || ($A === self::NU && self::isAlpha($B))) {
+            return self::NO_BREAK;
+        }
+        // LB23a: PR × (ID | EB | EM), (ID | EB | EM) × PO
+        if (($A === self::PR && in_array($B, [self::ID, self::EB, self::EM], true))
+            || (in_array($A, [self::ID, self::EB, self::EM], true) && $B === self::PO)) {
+            return self::NO_BREAK;
+        }
         // LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
         if ((($A === self::PR || $A === self::PO) && self::isAlpha($B))
             || (self::isAlpha($A) && ($B === self::PR || $B === self::PO))) {
