@@ -37,6 +37,42 @@ struct DagEdge {
     cost: f64,
 }
 
+/// Normalize common Thai spelling variants for dictionary matching:
+/// เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ").
+/// Returns the normalized characters and, for each of them, the index of the
+/// original character it starts at (plus a final entry for the end). Token
+/// boundaries never fall inside a replaced pair, so tokens map back to exact
+/// slices of the original text.
+fn normalize_for_matching(chars: &[char]) -> (Vec<char>, Vec<usize>) {
+    let n = chars.len();
+    let mut norm = Vec::with_capacity(n);
+    let mut orig = Vec::with_capacity(n + 1);
+    let at = |i: usize| chars.get(i).copied().unwrap_or('\0');
+    let mut i = 0;
+    while i < n {
+        let next = at(i + 1);
+        if chars[i] == 'เ' && next == 'เ' {
+            norm.push('แ');
+            orig.push(i);
+            i += 2;
+        } else if chars[i] == '\u{0E4D}' && next == 'า' {
+            norm.push('ำ');
+            orig.push(i);
+            i += 2;
+        } else if chars[i] == '\u{0E4D}' && ('่'..='๋').contains(&next) && at(i + 2) == 'า' {
+            norm.extend([next, 'ำ']);
+            orig.extend([i, i]);
+            i += 3;
+        } else {
+            norm.push(chars[i]);
+            orig.push(i);
+            i += 1;
+        }
+    }
+    orig.push(n);
+    (norm, orig)
+}
+
 #[inline]
 fn is_thai_rune(ch: char) -> bool {
     let cp = ch as u32;
@@ -68,18 +104,41 @@ impl Tokenizer {
             return Vec::new();
         }
 
+        // Match against a normalized copy, but return the original characters
         let chars: Vec<char> = text.chars().collect();
+        let (norm, orig_pos) = normalize_for_matching(&chars);
+        let mut tokens = self.segment(&norm);
+        if norm != chars {
+            let mut pos = 0;
+            for tok in tokens.iter_mut() {
+                let end = pos + tok.chars().count();
+                *tok = chars[orig_pos[pos]..orig_pos[end]].iter().collect();
+                pos = end;
+            }
+        }
+
+        if !keep_whitespace {
+            tokens.retain(|t| !t.trim().is_empty());
+        }
+        tokens
+    }
+
+    /// Run the Viterbi segmentation over `chars` and return all tokens,
+    /// including whitespace.
+    fn segment(&self, chars: &[char]) -> Vec<String> {
+        let text: String = chars.iter().collect();
+        let text = text.as_str();
         let n = chars.len();
         if n == 0 {
             return Vec::new();
         }
 
-        let valid_pos = tcc_pos_array(&chars);
+        let valid_pos = tcc_pos_array(chars);
 
         // Precompute character index to byte offset mapping
         let mut char_byte_offsets = Vec::with_capacity(n + 1);
         let mut b = 0;
-        for &ch in &chars {
+        for &ch in chars {
             char_byte_offsets.push(b);
             b += ch.len_utf8();
         }
@@ -130,7 +189,7 @@ impl Tokenizer {
 
             if is_thai_rune(chars[i]) {
                 // 1. Thai dictionary words starting at i
-                for m in self.trie.prefixes_from_chars(&chars, i, 25) {
+                for m in self.trie.prefixes_from_chars(chars, i, 25) {
                     if m.end <= n && valid_pos[m.end] {
                         edges.push(DagEdge {
                             to: m.end,
@@ -226,10 +285,6 @@ impl Tokenizer {
             tokens.push(cur_chunk);
         }
 
-        if !keep_whitespace {
-            tokens.into_iter().filter(|t| !t.trim().is_empty()).collect()
-        } else {
-            tokens
-        }
+        tokens
     }
 }

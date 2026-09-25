@@ -28,6 +28,39 @@ interface DagEdge {
   cost: number;
 }
 
+/**
+ * Normalize common Thai spelling variants for dictionary matching:
+ * เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ").
+ * Returns the normalized characters and, for each of them, the index of the
+ * original character it starts at (plus a final entry for the end). Token
+ * boundaries never fall inside a replaced pair, so tokens map back to exact
+ * slices of the original text.
+ */
+function normalizeForMatching(chars: string[]): [string[], number[]] {
+  const norm: string[] = [];
+  const orig: number[] = [];
+  const n = chars.length;
+  for (let i = 0; i < n; i++) {
+    const next = chars[i + 1] ?? '';
+    if (chars[i] === 'เ' && next === 'เ') {
+      norm.push('แ');
+      orig.push(i++);
+    } else if (chars[i] === '\u0e4d' && next === 'า') {
+      norm.push('ำ');
+      orig.push(i++);
+    } else if (chars[i] === '\u0e4d' && next >= '่' && next <= '๋' && chars[i + 2] === 'า') {
+      norm.push(next, 'ำ');
+      orig.push(i, i);
+      i += 2;
+    } else {
+      norm.push(chars[i]);
+      orig.push(i);
+    }
+  }
+  orig.push(n);
+  return [norm, orig];
+}
+
 function isThaiRune(code: number): boolean {
   return code >= 0x0e00 && code <= 0x0e7f;
 }
@@ -61,7 +94,29 @@ export class Tokenizer {
       return [];
     }
 
+    // Match against a normalized copy, but return the original characters
     const chars = Array.from(text);
+    const [norm, origPos] = normalizeForMatching(chars);
+    let tokens = this.segment(norm);
+    if (norm.join('') !== text) {
+      let pos = 0;
+      tokens = tokens.map((tok) => {
+        const end = pos + Array.from(tok).length;
+        const original = chars.slice(origPos[pos], origPos[end]).join('');
+        pos = end;
+        return original;
+      });
+    }
+
+    if (!keepWhitespace) {
+      return tokens.filter((t) => t.trim().length > 0);
+    }
+    return tokens;
+  }
+
+  /** Run the Viterbi segmentation over chars and return all tokens, including whitespace. */
+  private segment(chars: string[]): string[] {
+    const text = chars.join('');
     const n = chars.length;
     if (n === 0) {
       return [];
@@ -210,10 +265,6 @@ export class Tokenizer {
     }
     if (curChunk.length > 0) {
       tokens.push(curChunk);
-    }
-
-    if (!keepWhitespace) {
-      return tokens.filter((t) => t.trim().length > 0);
     }
 
     return tokens;

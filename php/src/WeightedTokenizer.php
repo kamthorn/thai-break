@@ -103,8 +103,21 @@ class WeightedTokenizer
             return [];
         }
 
-        $chars  = $this->trie->splitChars($text);
-        $tokens = $this->segment($chars);
+        $chars = $this->trie->splitChars($text);
+
+        // Match against a normalized copy, but return the original characters
+        [$normChars, $origPos] = self::normalizeForMatching($chars);
+        $tokens = $this->segment($normChars);
+        if ($normChars !== $chars) {
+            $original = [];
+            $pos      = 0;
+            foreach ($tokens as $tok) {
+                $end        = $pos + mb_strlen($tok, 'UTF-8');
+                $original[] = implode('', array_slice($chars, $origPos[$pos], $origPos[$end] - $origPos[$pos]));
+                $pos        = $end;
+            }
+            $tokens = $original;
+        }
 
         if (!$keepWhitespace) {
             // Unicode whitespace (e.g. NBSP), as in the Go, Rust and TypeScript ports
@@ -281,6 +294,45 @@ class WeightedTokenizer
     // ──────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────
+
+    /**
+     * Normalize common Thai spelling variants for dictionary matching:
+     *   เ + เ → แ,  ํ + า → ำ,  ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ")
+     *
+     * Returns the normalized characters and, for each of them, the index of
+     * the original character it starts at (plus a final entry for the end).
+     * Token boundaries never fall inside a replaced pair, so tokens map back
+     * to exact slices of the original text.
+     *
+     * @param  list<string> $chars
+     * @return array{0: list<string>, 1: list<int>}
+     */
+    private static function normalizeForMatching(array $chars): array
+    {
+        $norm = [];
+        $orig = [];
+        $n    = count($chars);
+        for ($i = 0; $i < $n; $i++) {
+            $next = $chars[$i + 1] ?? '';
+            if ($chars[$i] === 'เ' && $next === 'เ') {
+                array_push($norm, 'แ');
+                array_push($orig, $i++);
+            } elseif ($chars[$i] === "\u{0E4D}" && $next === 'า') {
+                array_push($norm, 'ำ');
+                array_push($orig, $i++);
+            } elseif ($chars[$i] === "\u{0E4D}" && preg_match('/^[่-๋]$/u', $next) && ($chars[$i + 2] ?? '') === 'า') {
+                array_push($norm, $next, 'ำ');
+                array_push($orig, $i, $i);
+                $i += 2;
+            } else {
+                $norm[] = $chars[$i];
+                $orig[] = $i;
+            }
+        }
+        $orig[] = $n;
+
+        return [$norm, $orig];
+    }
 
     /** Return true if the character is in the Thai Unicode block U+0E00-U+0E7F */
     private function isThai(string $char): bool

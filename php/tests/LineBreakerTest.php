@@ -49,6 +49,7 @@ class LineBreakerTest extends TestCase
             'UAX #14 applies inside URLs' => ['https://example.com/a-b?x=1', 'https://|example.com/|a-|b?|x=1'],
             'comparison signs are not mistaken for HTML tags' => ['x < 5 และถ้าy > 3', 'x < 5 และ|ถ้าy > 3'],
             'HTML tags are still preserved' => ['<b>ภาษาไทย</b>', '<b>ภาษา|ไทย</b>'],
+            'line breaks in text with un-normalized vowels' => ['เเข็งเเรงมาก', 'เเข็งเเรง|มาก'],
         ];
     }
 

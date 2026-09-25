@@ -63,7 +63,72 @@ func (tok *Tokenizer) Tokenize(text string, keepWhitespace bool) []string {
 		return nil
 	}
 
+	// Match against a normalized copy, but return the original characters
 	runes := []rune(text)
+	norm, origPos := normalizeForMatching(runes)
+	tokens := tok.segment(norm)
+	if len(norm) != len(runes) || string(norm) != text {
+		original := make([]string, 0, len(tokens))
+		pos := 0
+		for _, t := range tokens {
+			end := pos + utf8.RuneCountInString(t)
+			original = append(original, string(runes[origPos[pos]:origPos[end]]))
+			pos = end
+		}
+		tokens = original
+	}
+
+	if !keepWhitespace {
+		var filtered []string
+		for _, t := range tokens {
+			if strings.TrimSpace(t) != "" {
+				filtered = append(filtered, t)
+			}
+		}
+		return filtered
+	}
+
+	return tokens
+}
+
+// normalizeForMatching normalizes common Thai spelling variants for
+// dictionary matching: เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ
+// (e.g. "นํ้า" → "น้ำ"). It returns the normalized runes and, for each of
+// them, the index of the original rune it starts at (plus a final entry for
+// the end). Token boundaries never fall inside a replaced pair, so tokens map
+// back to exact slices of the original text.
+func normalizeForMatching(runes []rune) ([]rune, []int) {
+	n := len(runes)
+	norm := make([]rune, 0, n)
+	orig := make([]int, 0, n+1)
+	at := func(i int) rune {
+		if i < n {
+			return runes[i]
+		}
+		return 0
+	}
+	for i := 0; i < n; i++ {
+		switch next := at(i + 1); {
+		case runes[i] == 'เ' && next == 'เ':
+			norm, orig = append(norm, 'แ'), append(orig, i)
+			i++
+		case runes[i] == '\u0E4D' && next == 'า':
+			norm, orig = append(norm, 'ำ'), append(orig, i)
+			i++
+		case runes[i] == '\u0E4D' && next >= '่' && next <= '๋' && at(i+2) == 'า':
+			norm, orig = append(norm, next, 'ำ'), append(orig, i, i)
+			i += 2
+		default:
+			norm, orig = append(norm, runes[i]), append(orig, i)
+		}
+	}
+	return norm, append(orig, n)
+}
+
+// segment runs the Viterbi segmentation over runes and returns all tokens,
+// including whitespace.
+func (tok *Tokenizer) segment(runes []rune) []string {
+	text := string(runes)
 	n := len(runes)
 	if n == 0 {
 		return nil
@@ -220,16 +285,6 @@ func (tok *Tokenizer) Tokenize(text string, keepWhitespace bool) []string {
 	}
 	if curChunk.Len() > 0 {
 		tokens = append(tokens, curChunk.String())
-	}
-
-	if !keepWhitespace {
-		var filtered []string
-		for _, t := range tokens {
-			if strings.TrimSpace(t) != "" {
-				filtered = append(filtered, t)
-			}
-		}
-		return filtered
 	}
 
 	return tokens
