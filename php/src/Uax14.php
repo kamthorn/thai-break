@@ -235,6 +235,18 @@ final class Uax14
         }
         $A = $cls($a);
         $B = $cls($b);
+        // LB11: × WJ, WJ ×
+        if ($A === self::WJ || $B === self::WJ) {
+            return self::NO_BREAK;
+        }
+        // LB12: GL ×
+        if ($A === self::GL) {
+            return self::NO_BREAK;
+        }
+        // LB12a: [^SP BA HY] × GL
+        if ($B === self::GL && !in_array($A, [self::SP, self::BA, self::HY], true)) {
+            return self::NO_BREAK;
+        }
         // LB13: × CL, × CP, × EX, × SY
         if (in_array($B, [self::CL, self::CP, self::EX, self::SY], true)) {
             return self::NO_BREAK;
@@ -259,6 +271,14 @@ final class Uax14
         if ($B === self::IS) {
             return self::NO_BREAK;
         }
+        // LB16: (CL | CP) SP* × NS
+        if ($B === self::NS && ($K === self::CL || $K === self::CP)) {
+            return self::NO_BREAK;
+        }
+        // LB17: B2 SP* × B2
+        if ($B === self::B2 && $K === self::B2) {
+            return self::NO_BREAK;
+        }
         // LB18: SP ÷
         if ($A === self::SP) {
             return self::ALLOWED;
@@ -273,6 +293,10 @@ final class Uax14
         }
         if (self::isQuote($A) && (!$units[$b]['ea'] || $a === 0 || !$units[$a - 1]['ea'])) {
             return self::NO_BREAK;
+        }
+        // LB20: ÷ CB, CB ÷
+        if ($A === self::CB || $B === self::CB) {
+            return self::ALLOWED;
         }
         // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [\u2010]) × AL
         if (($A === self::HY || $units[$a]['cp'] === self::HYPHEN) && $B === self::AL
@@ -289,6 +313,10 @@ final class Uax14
         }
         // LB21b: SY × HL
         if ($A === self::SY && $B === self::HL) {
+            return self::NO_BREAK;
+        }
+        // LB22: × IN
+        if ($B === self::IN) {
             return self::NO_BREAK;
         }
         // LB23: (AL | HL) × NU, NU × (AL | HL)
@@ -333,6 +361,12 @@ final class Uax14
                 return self::NO_BREAK;
             }
         }
+        // LB26: Korean syllable blocks
+        if (($A === self::JL && in_array($B, [self::JL, self::JV, self::H2, self::H3], true))
+            || (($A === self::JV || $A === self::H2) && ($B === self::JV || $B === self::JT))
+            || (($A === self::JT || $A === self::H3) && $B === self::JT)) {
+            return self::NO_BREAK;
+        }
         // LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
         if ((self::isHangul($A) && $B === self::PO) || ($A === self::PR && self::isHangul($B))) {
             return self::NO_BREAK;
@@ -352,6 +386,20 @@ final class Uax14
         // LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
         if (((self::isAlpha($A) || $A === self::NU) && $B === self::OP && !$units[$b]['ea'])
             || ($A === self::CP && !$units[$a]['ea'] && (self::isAlpha($B) || $B === self::NU))) {
+            return self::NO_BREAK;
+        }
+        // LB30a: break between pairs of regional indicators only
+        if ($A === self::RI && $B === self::RI) {
+            $run = 0;
+            for ($j = $a; $j >= 0 && $units[$j]['cls'] === self::RI; $j--) {
+                $run++;
+            }
+            if ($run % 2 === 1) {
+                return self::NO_BREAK;
+            }
+        }
+        // LB30b: EB × EM, [\p{Extended_Pictographic}&\p{Cn}] × EM
+        if ($B === self::EM && ($A === self::EB || $units[$a]['xp'])) {
             return self::NO_BREAK;
         }
         // LB31: ÷

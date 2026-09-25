@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import { lbClass, isEastAsian, isExtPictUnassigned } from '../dist/uax14.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { lbClass, isEastAsian, isExtPictUnassigned, breakOpportunities, NO_BREAK } from '../dist/uax14.js';
 
 // Class ids in the order of the LB enum in src/uax14.ts.
 const NAMES = (
@@ -30,4 +33,26 @@ test('Line_Break flags', () => {
   assert.ok(!isEastAsian('('.codePointAt(0)!));
   assert.ok(isExtPictUnassigned(0x1fffd));
   assert.ok(!isExtPictUnassigned('😀'.codePointAt(0)!));
+});
+
+test('LineBreakTest conformance (SA resolved to AL, no dictionary)', (t) => {
+  const file = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../testdata/LineBreakTest-16.0.0.txt');
+  if (!fs.existsSync(file)) {
+    t.skip('LineBreakTest data not found');
+    return;
+  }
+  const failures: string[] = [];
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const cps: number[] = [];
+    const expected: boolean[] = [];
+    for (const field of line.trim().split(/\s+/)) {
+      if (field === '×') expected.push(false);
+      else if (field === '÷') expected.push(true);
+      else cps.push(parseInt(field, 16));
+    }
+    const actual = breakOpportunities(cps).map((a) => a !== NO_BREAK);
+    if (expected.some((e, i) => actual[i] !== e)) failures.push(line);
+  }
+  assert.deepStrictEqual(failures.slice(0, 10), [], `${failures.length} LineBreakTest cases failed`);
 });

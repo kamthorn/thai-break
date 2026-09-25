@@ -173,6 +173,18 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   }
   A = cls(a);
   B = cls(b);
+  // LB11: × WJ, WJ ×
+  if (A === LB.WJ || B === LB.WJ) {
+    return NO_BREAK;
+  }
+  // LB12: GL ×
+  if (A === LB.GL) {
+    return NO_BREAK;
+  }
+  // LB12a: [^SP BA HY] × GL
+  if (B === LB.GL && ![LB.SP, LB.BA, LB.HY].includes(A)) {
+    return NO_BREAK;
+  }
   // LB13: × CL, × CP, × EX, × SY
   if ([LB.CL, LB.CP, LB.EX, LB.SY].includes(B)) {
     return NO_BREAK;
@@ -197,6 +209,14 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if (B === LB.IS) {
     return NO_BREAK;
   }
+  // LB16: (CL | CP) SP* × NS
+  if (B === LB.NS && (K === LB.CL || K === LB.CP)) {
+    return NO_BREAK;
+  }
+  // LB17: B2 SP* × B2
+  if (B === LB.B2 && K === LB.B2) {
+    return NO_BREAK;
+  }
   // LB18: SP ÷
   if (A === LB.SP) {
     return ALLOWED;
@@ -211,6 +231,10 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   }
   if (isQuote(A) && (!units[b].ea || a === 0 || !units[a - 1].ea)) {
     return NO_BREAK;
+  }
+  // LB20: ÷ CB, CB ÷
+  if (A === LB.CB || B === LB.CB) {
+    return ALLOWED;
   }
   // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
   if ((A === LB.HY || units[a].cp === HYPHEN) && B === LB.AL &&
@@ -227,6 +251,10 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   }
   // LB21b: SY × HL
   if (A === LB.SY && B === LB.HL) {
+    return NO_BREAK;
+  }
+  // LB22: × IN
+  if (B === LB.IN) {
     return NO_BREAK;
   }
   // LB23: (AL | HL) × NU, NU × (AL | HL)
@@ -264,6 +292,12 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
       return NO_BREAK;
     }
   }
+  // LB26: Korean syllable blocks
+  if ((A === LB.JL && [LB.JL, LB.JV, LB.H2, LB.H3].includes(B)) ||
+      ((A === LB.JV || A === LB.H2) && (B === LB.JV || B === LB.JT)) ||
+      ((A === LB.JT || A === LB.H3) && B === LB.JT)) {
+    return NO_BREAK;
+  }
   // LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
   if ((isHangul(A) && B === LB.PO) || (A === LB.PR && isHangul(B))) {
     return NO_BREAK;
@@ -283,6 +317,18 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   // LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
   if (((isAlpha(A) || A === LB.NU) && B === LB.OP && !units[b].ea) ||
       (A === LB.CP && !units[a].ea && (isAlpha(B) || B === LB.NU))) {
+    return NO_BREAK;
+  }
+  // LB30a: break between pairs of regional indicators only
+  if (A === LB.RI && B === LB.RI) {
+    let run = 0;
+    for (let j = a; j >= 0 && units[j].cls === LB.RI; j--) run++;
+    if (run % 2 === 1) {
+      return NO_BREAK;
+    }
+  }
+  // LB30b: EB × EM, [\p{Extended_Pictographic}&\p{Cn}] × EM
+  if (B === LB.EM && (A === LB.EB || units[a].xp)) {
     return NO_BREAK;
   }
   // LB31: ÷

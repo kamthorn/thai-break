@@ -25,6 +25,37 @@ class Uax14Test extends TestCase
         }
     }
 
+    /** Official conformance test (SA resolved to AL, no dictionary) */
+    public function testLineBreakTestConformance(): void
+    {
+        $path = __DIR__ . '/../../testdata/LineBreakTest-16.0.0.txt';
+        if (!is_file($path)) {
+            $this->markTestSkipped('LineBreakTest data not found');
+        }
+
+        $failures = [];
+        foreach (file($path, FILE_IGNORE_NEW_LINES) ?: [] as $line) {
+            if ($line === '' || $line[0] === '#') {
+                continue;
+            }
+            $cps      = [];
+            $expected = [];
+            foreach (preg_split('/\s+/', trim($line)) ?: [] as $field) {
+                match ($field) {
+                    '×'     => $expected[] = false,
+                    '÷'     => $expected[] = true,
+                    default => $cps[] = (int) hexdec($field),
+                };
+            }
+            $actual = array_map(fn(int $a) => $a !== Uax14::NO_BREAK, Uax14::breakOpportunities($cps));
+            if ($actual !== $expected) {
+                $failures[] = $line;
+            }
+        }
+
+        $this->assertSame([], array_slice($failures, 0, 10), count($failures) . ' LineBreakTest cases failed');
+    }
+
     public function testFlags(): void
     {
         $this->assertTrue(Uax14::isEastAsian(mb_ord('（')));

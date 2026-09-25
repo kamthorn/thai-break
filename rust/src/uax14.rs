@@ -222,6 +222,18 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     }
     A = cls(ai);
     B = cls(bi);
+    // LB11: × WJ, WJ ×
+    if A == WJ || B == WJ {
+        return NO_BREAK;
+    }
+    // LB12: GL ×
+    if A == GL {
+        return NO_BREAK;
+    }
+    // LB12a: [^SP BA HY] × GL
+    if B == GL && ![SP, BA, HY].contains(&A) {
+        return NO_BREAK;
+    }
     // LB13: × CL, × CP, × EX, × SY
     if [CL, CP, EX, SY].contains(&B) {
         return NO_BREAK;
@@ -246,6 +258,14 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if B == IS {
         return NO_BREAK;
     }
+    // LB16: (CL | CP) SP* × NS
+    if B == NS && (K == CL || K == CP) {
+        return NO_BREAK;
+    }
+    // LB17: B2 SP* × B2
+    if B == B2 && K == B2 {
+        return NO_BREAK;
+    }
     // LB18: SP ÷
     if A == SP {
         return ALLOWED;
@@ -260,6 +280,10 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     }
     if is_quote(A) && (!units[b].ea || a == 0 || !units[a - 1].ea) {
         return NO_BREAK;
+    }
+    // LB20: ÷ CB, CB ÷
+    if A == CB || B == CB {
+        return ALLOWED;
     }
     // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
     if (A == HY || units[a].cp == HYPHEN) && B == AL
@@ -277,6 +301,10 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     }
     // LB21b: SY × HL
     if A == SY && B == HL {
+        return NO_BREAK;
+    }
+    // LB22: × IN
+    if B == IN {
         return NO_BREAK;
     }
     // LB23: (AL | HL) × NU, NU × (AL | HL)
@@ -318,6 +346,13 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
             return NO_BREAK;
         }
     }
+    // LB26: Korean syllable blocks
+    if (A == JL && [JL, JV, H2, H3].contains(&B))
+        || ((A == JV || A == H2) && (B == JV || B == JT))
+        || ((A == JT || A == H3) && B == JT)
+    {
+        return NO_BREAK;
+    }
     // LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
     if (is_hangul(A) && B == PO) || (A == PR && is_hangul(B)) {
         return NO_BREAK;
@@ -338,6 +373,17 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if ((is_alpha(A) || A == NU) && B == OP && !units[b].ea)
         || (A == CP && !units[a].ea && (is_alpha(B) || B == NU))
     {
+        return NO_BREAK;
+    }
+    // LB30a: break between pairs of regional indicators only
+    if A == RI && B == RI {
+        let run = units[..=a].iter().rev().take_while(|u| u.cls == RI).count();
+        if run % 2 == 1 {
+            return NO_BREAK;
+        }
+    }
+    // LB30b: EB × EM, [\p{Extended_Pictographic}&\p{Cn}] × EM
+    if B == EM && (A == EB || units[a].xp) {
         return NO_BREAK;
     }
     // LB31: ÷
@@ -400,6 +446,40 @@ mod tests {
 #[cfg(test)]
 mod engine_tests {
     use super::*;
+
+    /// Official conformance test (SA resolved to AL, no dictionary).
+    #[test]
+    fn line_break_test_conformance() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../testdata/LineBreakTest-16.0.0.txt");
+        let Ok(data) = std::fs::read_to_string(path) else {
+            eprintln!("LineBreakTest data not found, skipping");
+            return;
+        };
+        let mut failures = Vec::new();
+        for line in data.lines() {
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            let mut cps = Vec::new();
+            let mut expected = Vec::new();
+            for field in line.split_whitespace() {
+                match field {
+                    "×" => expected.push(false),
+                    "÷" => expected.push(true),
+                    hex => {
+                        let cp = u32::from_str_radix(hex, 16).unwrap();
+                        // Surrogates cannot be a char; they resolve to AL like U+FFFD (AI)
+                        cps.push(char::from_u32(cp).unwrap_or('\u{FFFD}'));
+                    }
+                }
+            }
+            let actual = break_opportunities(&cps, None);
+            if expected.iter().enumerate().any(|(i, &e)| (actual[i] != NO_BREAK) != e) {
+                failures.push(line);
+            }
+        }
+        assert!(failures.is_empty(), "{} LineBreakTest cases failed: {:?}", failures.len(), &failures[..failures.len().min(10)]);
+    }
 
     #[test]
     fn mandatory_breaks() {

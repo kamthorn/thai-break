@@ -3,7 +3,6 @@ import { ALLOWED, breakOpportunities } from './uax14.js';
 
 export const DEFAULT_BREAK_MARKER = '\u200B';
 
-const PAT_NO_BREAK_BEFORE = /^(?:[ๆฯ]|ฯลฯ)$/u;
 const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/gi;
 const RE_THAI_COMBINING = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]/g;
 
@@ -28,17 +27,7 @@ export function canBreakBetween(left: string, right: string): boolean {
     return false;
   }
 
-  return breakOpportunities(cps, dict)[at] === ALLOWED && passesTypographicRules(left, right);
-}
-
-/** Legacy token-level rules that are not yet expressed as UAX #14 rules. */
-function passesTypographicRules(left: string, right: string): boolean {
-  // No break before postfixes (ๆ, ฯ)
-  if (PAT_NO_BREAK_BEFORE.test(right)) {
-    return false;
-  }
-
-  return true;
+  return breakOpportunities(cps, dict)[at] === ALLOWED;
 }
 
 function codePoints(text: string): number[] {
@@ -132,7 +121,7 @@ export class LineBreaker {
     let cur = '';
     for (let i = 0; i < n; i++) {
       cur += tokens[i];
-      if (i + 1 < n && actions[ends[i]] === ALLOWED && passesTypographicRules(tokens[i], tokens[i + 1])) {
+      if (i + 1 < n && actions[ends[i]] === ALLOWED) {
         segments.push(cur);
         cur = '';
       }
