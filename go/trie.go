@@ -21,6 +21,8 @@ type ThaiTrie struct {
 	mu        sync.RWMutex
 	prefixes  map[string]float64
 	maxWeight float64
+	// totalWeight is the sum of the weights of all full words (the unigram normalizer).
+	totalWeight float64
 }
 
 // NewThaiTrie creates an empty ThaiTrie.
@@ -85,9 +87,20 @@ func (t *ThaiTrie) Add(word string, weight float64) {
 		}
 	}
 
-	if existing, exists := t.prefixes[word]; !exists || weight > existing {
+	if existing := t.prefixes[word]; weight > existing {
+		t.prefixes[word] = weight
+		t.totalWeight += weight - existing
+	} else if _, exists := t.prefixes[word]; !exists {
 		t.prefixes[word] = weight
 	}
+}
+
+// TotalWeight returns the sum of the weights of all words; word probabilities
+// are weight / TotalWeight().
+func (t *ThaiTrie) TotalWeight() float64 {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.totalWeight
 }
 
 // AddMany inserts multiple words with weights.

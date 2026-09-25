@@ -32,6 +32,9 @@ class ThaiTrie implements \Countable
      */
     private array $prefixes = [];
 
+    /** Sum of the weights of all full words (the unigram normalizer) */
+    private float $totalWeight = 0.0;
+
     public function __construct()
     {
         $this->prefixes = [];
@@ -71,7 +74,9 @@ class ThaiTrie implements \Countable
         foreach ($chars as $idx => $ch) {
             $sub .= $ch;
             if ($idx === $last) {
-                $this->prefixes[$sub] = max($this->prefixes[$sub] ?? 0.0, $weight);
+                $old                  = $this->prefixes[$sub] ?? 0.0;
+                $this->prefixes[$sub] = max($old, $weight);
+                $this->totalWeight   += $this->prefixes[$sub] - $old;
             } elseif (!isset($this->prefixes[$sub])) {
                 $this->prefixes[$sub] = 0.0;
             }
@@ -104,6 +109,14 @@ class ThaiTrie implements \Countable
     {
         $word = trim($word);
         return ($this->prefixes[$word] ?? 0.0) > 0.0;
+    }
+
+    /**
+     * Sum of the weights of all words; word probabilities are weight / totalWeight().
+     */
+    public function totalWeight(): float
+    {
+        return $this->totalWeight;
     }
 
     /**

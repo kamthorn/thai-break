@@ -16,6 +16,13 @@ namespace ThaiBreak;
  *      and individual punctuation symbols like _ ( ) " -).
  *
  * 2. Viterbi forward DP with Bigram Transitions:
+ *    - Each word costs -log P(w) with P(w) = weight / total weight of the
+ *      dictionary (a unigram model). With equal weights this prefers the
+ *      segmentation with the fewest words.
+ *    - Non-Thai tokens cost as much as the rarest word (weight 1), Thai
+ *      abbreviation patterns 1.5 times that, and unknown-word fallbacks twice
+ *      that, so a dictionary word followed by "." beats a pattern such as
+ *      "ว." that would cut the word.
  *    - dp[j]   = minimum accumulated cost to reach character position j.
  *    - from[j] = best predecessor position.
  *    - word[j] = word on the winning edge.
@@ -39,11 +46,18 @@ class WeightedTokenizer
     /** Pattern matching Thai abbreviations with periods (e.g. รพ., พญ., ด.ญ., มิ.ย., น., จ.) */
     private const PAT_ABBR = '/\G(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u';
 
-    /** Cost for unknown-word edges (fallback penalty) */
-    private const UNKNOWN_WORD_COST = 10.0;
+    /** Cost of an abbreviation pattern, relative to the cost of the rarest word */
+    private const ABBR_COST_FACTOR = 1.5;
 
-    /** Weight assigned to recognized abbreviations */
-    private const ABBR_WEIGHT = 60_000.0;
+    /**
+     * Extra cost per letter of an abbreviation pattern, relative to the cost of
+     * the rarest word, so "เขต|จ." beats "เข|ตจ." (a pattern taking the last
+     * letter of the previous word).
+     */
+    private const ABBR_LETTER_COST_FACTOR = 0.01;
+
+    /** Cost of an unknown-word fallback edge, relative to the cost of the rarest word */
+    private const UNKNOWN_COST_FACTOR = 2.0;
 
     /**
      * Maximum number of dict-word edges to collect per text.
@@ -122,9 +136,12 @@ class WeightedTokenizer
             $charByteOffsets[] = $b;
         }
 
-        // ── Pass 1: Collect all (from, to, word, rawWeight) edges ──────────
+        // Unigram costs: -log(weight / total); a word of weight 1 costs $rareCost
+        $normalizer = $this->trie->totalWeight() + 1.0;
+        $rareCost   = log($normalizer);
+
+        // ── Pass 1: Collect all (from, to, word, cost) edges ───────────────
         $edgesTo   = [];
-        $maxWeight = 1.0;
         $edgeCount = 0;
 
         for ($i = 0; $i < $n; $i++) {
@@ -146,8 +163,7 @@ class WeightedTokenizer
                         continue;
                     }
 
-                    $maxWeight     = max($maxWeight, $weight);
-                    $edgesTo[$j][] = [$i, $word, $weight];
+                    $edgesTo[$j][] = [$i, $word, log($normalizer / $weight)];
 
                     if (++$edgeCount >= self::MAX_EDGES) {
                         break 2;
@@ -159,8 +175,9 @@ class WeightedTokenizer
                     $abbrLen = mb_strlen($mAbbr[0], 'UTF-8');
                     $j       = $i + $abbrLen;
                     if ($j <= $n && $validPos[$j]) {
-                        $maxWeight     = max($maxWeight, self::ABBR_WEIGHT);
-                        $edgesTo[$j][] = [$i, $mAbbr[0], self::ABBR_WEIGHT];
+                        $letters       = $abbrLen - substr_count($mAbbr[0], '.');
+                        $abbrCost      = (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost;
+                        $edgesTo[$j][] = [$i, $mAbbr[0], $abbrCost];
                     }
                 }
             } else {
@@ -169,8 +186,7 @@ class WeightedTokenizer
                     $wordLen = mb_strlen($mNonThai[0], 'UTF-8');
                     $j       = $i + $wordLen;
                     if ($j <= $n) {
-                        $edgesTo[$j][] = [$i, $mNonThai[0], 1.0];
-                        $maxWeight     = max($maxWeight, 1.0);
+                        $edgesTo[$j][] = [$i, $mNonThai[0], $rareCost];
                     }
                 }
             }
@@ -194,13 +210,11 @@ class WeightedTokenizer
 
             // ── Try all dictionary / pattern edges ending at j
             if (isset($edgesTo[$j])) {
-                foreach ($edgesTo[$j] as [$i, $w, $rawWeight]) {
+                foreach ($edgesTo[$j] as [$i, $w, $baseCost]) {
                     if ($dp[$i] === INF) {
                         continue;
                     }
-                    $wLen       = max(1, $j - $i);
-                    $normalized = $rawWeight / $maxWeight;
-                    $baseCost   = ($normalized > 0 ? -log($normalized) : self::UNKNOWN_WORD_COST) / $wLen;
+                    $wLen = max(1, $j - $i);
 
                     // Apply bigram collocation bonus if bigram model is present
                     if ($this->bigramModel !== null && $word[$i] !== '') {
@@ -226,7 +240,7 @@ class WeightedTokenizer
                 for ($i = $j - 1; $i >= 0; $i--) {
                     if ($dp[$i] < INF && $validPos[$i]) {
                         $unknownWord = implode('', array_slice($chars, $i, $j - $i));
-                        $newCost     = $dp[$i] + self::UNKNOWN_WORD_COST;
+                        $newCost     = $dp[$i] + self::UNKNOWN_COST_FACTOR * $rareCost;
                         $dp[$j]      = $newCost;
                         $from[$j]    = $i;
                         $word[$j]    = $unknownWord;

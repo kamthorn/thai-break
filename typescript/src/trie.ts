@@ -11,9 +11,16 @@ export interface PrefixMatch {
 export class ThaiTrie {
   private prefixes: Map<string, number> = new Map();
   private _maxWeight: number = 1.0;
+  /** Sum of the weights of all full words (the unigram normalizer). */
+  private _totalWeight: number = 0.0;
 
   get maxWeight(): number {
     return this._maxWeight;
+  }
+
+  /** Sum of the weights of all words; word probabilities are weight / totalWeight. */
+  get totalWeight(): number {
+    return this._totalWeight;
   }
 
   get size(): number {
@@ -42,8 +49,11 @@ export class ThaiTrie {
     }
 
     // Register full word
-    const existing = this.prefixes.get(word);
-    if (existing === undefined || weight > existing) {
+    const existing = this.prefixes.get(word) ?? 0.0;
+    if (weight > existing) {
+      this.prefixes.set(word, weight);
+      this._totalWeight += weight - existing;
+    } else if (!this.prefixes.has(word)) {
       this.prefixes.set(word, weight);
     }
   }

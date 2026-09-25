@@ -9,6 +9,7 @@
             <file>php/tests/LaravelIntegrationTest.php</file>
             <file>php/tests/Uax14Test.php</file>
             <file>php/tests/LineBreakerTest.php</file>
+            <file>php/tests/SegmentationTest.php</file>
         </testsuite>
     </testsuites>
     <source>
