@@ -152,3 +152,6 @@ jobs:
         run: |
           cd python
           python3 -m unittest discover tests
+
+      - name: Run Benchmark Tool Tests
+        run: python3 -m unittest discover tools/tests
