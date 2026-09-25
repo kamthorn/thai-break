@@ -227,6 +227,18 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 		return lbNoBreak
 	}
 	A, B = cls(a), cls(b)
+	// LB11: × WJ, WJ ×
+	if A == lbWJ || B == lbWJ {
+		return lbNoBreak
+	}
+	// LB12: GL ×
+	if A == lbGL {
+		return lbNoBreak
+	}
+	// LB12a: [^SP BA HY] × GL
+	if B == lbGL && !lbIsOneOf(A, lbSP, lbBA, lbHY) {
+		return lbNoBreak
+	}
 	// LB13: × CL, × CP, × EX, × SY
 	if lbIsOneOf(B, lbCL, lbCP, lbEX, lbSY) {
 		return lbNoBreak
@@ -251,6 +263,14 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if B == lbIS {
 		return lbNoBreak
 	}
+	// LB16: (CL | CP) SP* × NS
+	if B == lbNS && (K == lbCL || K == lbCP) {
+		return lbNoBreak
+	}
+	// LB17: B2 SP* × B2
+	if B == lbB2 && K == lbB2 {
+		return lbNoBreak
+	}
 	// LB18: SP ÷
 	if A == lbSP {
 		return lbAllowed
@@ -265,6 +285,10 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	}
 	if lbIsQuote(A) && (!units[b].ea || a == 0 || !units[a-1].ea) {
 		return lbNoBreak
+	}
+	// LB20: ÷ CB, CB ÷
+	if A == lbCB || B == lbCB {
+		return lbAllowed
 	}
 	// LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
 	if (A == lbHY || units[a].cp == hyphen) && B == lbAL &&
@@ -281,6 +305,10 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	}
 	// LB21b: SY × HL
 	if A == lbSY && B == lbHL {
+		return lbNoBreak
+	}
+	// LB22: × IN
+	if B == lbIN {
 		return lbNoBreak
 	}
 	// LB23: (AL | HL) × NU, NU × (AL | HL)
@@ -325,6 +353,12 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 			return lbNoBreak
 		}
 	}
+	// LB26: Korean syllable blocks
+	if (A == lbJL && lbIsOneOf(B, lbJL, lbJV, lbH2, lbH3)) ||
+		((A == lbJV || A == lbH2) && (B == lbJV || B == lbJT)) ||
+		((A == lbJT || A == lbH3) && B == lbJT) {
+		return lbNoBreak
+	}
 	// LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
 	if (lbIsHangul(A) && B == lbPO) || (A == lbPR && lbIsHangul(B)) {
 		return lbNoBreak
@@ -344,6 +378,20 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	// LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
 	if ((lbIsAlpha(A) || A == lbNU) && B == lbOP && !units[b].ea) ||
 		(A == lbCP && !units[a].ea && (lbIsAlpha(B) || B == lbNU)) {
+		return lbNoBreak
+	}
+	// LB30a: break between pairs of regional indicators only
+	if A == lbRI && B == lbRI {
+		run := 0
+		for j := a; j >= 0 && units[j].cls == lbRI; j-- {
+			run++
+		}
+		if run%2 == 1 {
+			return lbNoBreak
+		}
+	}
+	// LB30b: EB × EM, [\p{Extended_Pictographic}&\p{Cn}] × EM
+	if B == lbEM && (A == lbEB || units[a].xp) {
 		return lbNoBreak
 	}
 	// LB31: ÷

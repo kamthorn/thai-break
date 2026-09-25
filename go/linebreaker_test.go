@@ -34,6 +34,11 @@ var lineBreakCases = []struct{ name, input, want string }{
 	{"LB19 no break around quotation marks", "ไทย‘คำ’ไทย", "ไทย‘คำ’ไทย"},
 	{"LB19a no break around guillemets outside East Asian text", "«ไทย»ไทย", "«ไทย»ไทย"},
 	{"LB15a/LB15b quotes stay with the quoted text", "เขาพูดว่า “สวัสดี” แล้ว", "เขา|พูด|ว่า “สวัสดี” แล้ว"},
+	{"LB12 no break around a no-break space", "ราคา 100 บาท", "ราคา 100 บาท"},
+	{"LB11 no break at a word joiner", "ไทย⁠ไทย", "ไทย⁠ไทย"},
+	{"LB30b emoji modifier stays with its base", "ดี👍🏽มาก", "ดี|👍🏽|มาก"},
+	{"LB30a regional indicators pair into flags", "🇹🇭🇯🇵", "🇹🇭|🇯🇵"},
+	{"LB24 backslash (PR) behaves the same in every port", "A\\B", "A\\B"},
 }
 
 func TestInsertLineBreaksUAX14(t *testing.T) {
@@ -56,6 +61,7 @@ var wrapCases = []struct {
 	{"an opening quote never ends a line", "สวัสดีครับ “ท่านผู้ชม”", 11, []string{"สวัสดีครับ", "“ท่านผู้ชม”"}},
 	{"indentation that does not fit is dropped", "  ย่อหน้า ใหม่ ครับ", 6, []string{"ย่อหน้า", "ใหม่", "ครับ"}},
 	{"LB14 no break after an opening parenthesis, even after spaces", "ข้อความ ( ไทย ) ต่อ", 8, []string{"ข้อความ", "( ไทย )", "ต่อ"}},
+	{"mai yamok never starts a line, even after a space", "เด็ก ๆ เล่น", 4, []string{"เด็ก ๆ", "เล่น"}},
 }
 
 func TestWrapUAX14(t *testing.T) {

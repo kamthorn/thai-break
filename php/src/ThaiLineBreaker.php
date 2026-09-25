@@ -36,12 +36,6 @@ class ThaiLineBreaker
     /** Default break opportunity marker: Zero-Width Space (U+200B) */
     public const DEFAULT_MARKER = "\u{200B}";
 
-    /**
-     * Tokens that must NOT start a line (never break BEFORE these).
-     * Thai postfixes (ๆ, ฯ, ฯลฯ).
-     */
-    private const PAT_NO_BREAK_BEFORE = '/^(?:[ๆฯ]|ฯลฯ)$/u';
-
     /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
     private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';
 
@@ -166,21 +160,7 @@ class ThaiLineBreaker
             return false;
         }
 
-        return Uax14::breakOpportunities($cps, $dict)[$at] === Uax14::ALLOWED
-            && self::passesTypographicRules($left, $right);
-    }
-
-    /**
-     * Legacy token-level rules that are not yet expressed as UAX #14 rules.
-     */
-    private static function passesTypographicRules(string $left, string $right): bool
-    {
-        // Right token must not start a line (ๆ, ฯ, ฯลฯ)
-        if (preg_match(self::PAT_NO_BREAK_BEFORE, $right)) {
-            return false;
-        }
-
-        return true;
+        return Uax14::breakOpportunities($cps, $dict)[$at] === Uax14::ALLOWED;
     }
 
     /**
@@ -253,8 +233,7 @@ class ThaiLineBreaker
         $cur      = '';
         for ($i = 0; $i < $n; $i++) {
             $cur .= $tokens[$i];
-            if ($i + 1 < $n && $actions[$ends[$i]] === Uax14::ALLOWED
-                && self::passesTypographicRules($tokens[$i], $tokens[$i + 1])) {
+            if ($i + 1 < $n && $actions[$ends[$i]] === Uax14::ALLOWED) {
                 $segments[] = $cur;
                 $cur        = '';
             }

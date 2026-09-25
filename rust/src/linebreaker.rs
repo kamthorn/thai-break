@@ -6,15 +6,6 @@ use crate::uax14;
 
 pub const DEFAULT_BREAK_MARKER: &str = "\u{200B}";
 
-static PAT_NO_BREAK_AFTER: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^[\\]$"#).expect("Failed to compile PAT_NO_BREAK_AFTER")
-});
-
-static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^(?:[\\ๆฯ]|ฯลฯ)$"#)
-        .expect("Failed to compile PAT_NO_BREAK_BEFORE")
-});
-
 static PAT_HTML_TAGS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))")
         .expect("Failed to compile PAT_HTML_TAGS")
@@ -45,22 +36,6 @@ pub fn can_break_between(left: &str, right: &str) -> bool {
     }
 
     uax14::break_opportunities(&cps, Some(&dict))[at] == uax14::ALLOWED
-        && passes_typographic_rules(left, right)
-}
-
-/// Legacy token-level rules that are not yet expressed as UAX #14 rules.
-fn passes_typographic_rules(left: &str, right: &str) -> bool {
-    // No break after a backslash
-    if PAT_NO_BREAK_AFTER.is_match(left) {
-        return false;
-    }
-
-    // No break before a backslash or postfixes (ๆ, ฯ)
-    if PAT_NO_BREAK_BEFORE.is_match(right) {
-        return false;
-    }
-
-    true
 }
 
 pub fn thai_display_width(text: &str) -> usize {
@@ -149,10 +124,7 @@ impl LineBreaker {
         let mut cur = String::new();
         for i in 0..n {
             cur.push_str(&tokens[i]);
-            if i + 1 < n
-                && actions[ends[i]] == uax14::ALLOWED
-                && passes_typographic_rules(&tokens[i], &tokens[i + 1])
-            {
+            if i + 1 < n && actions[ends[i]] == uax14::ALLOWED {
                 segments.push(std::mem::take(&mut cur));
             }
         }

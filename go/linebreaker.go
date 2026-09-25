@@ -13,8 +13,6 @@ const (
 )
 
 var (
-	reNoBreakAfter  = regexp.MustCompile(`^[\\]$`)
-	reNoBreakBefore = regexp.MustCompile(`^(?:[\\ๆฯ]|ฯลฯ)$`)
 	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))`)
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
 )
@@ -47,23 +45,7 @@ func CanBreakBetween(left, right string) bool {
 		return false
 	}
 
-	return lbBreakOpportunities(cps, dict)[at] == lbAllowed && passesTypographicRules(left, right)
-}
-
-// passesTypographicRules applies legacy token-level rules that are not yet
-// expressed as UAX #14 rules.
-func passesTypographicRules(left, right string) bool {
-	// No break after a backslash
-	if reNoBreakAfter.MatchString(left) {
-		return false
-	}
-
-	// No break before a backslash or postfixes (ๆ, ฯ)
-	if reNoBreakBefore.MatchString(right) {
-		return false
-	}
-
-	return true
+	return lbBreakOpportunities(cps, dict)[at] == lbAllowed
 }
 
 // ThaiDisplayWidth calculates the visual terminal/column width for Thai text.
@@ -142,7 +124,7 @@ func (b *LineBreaker) breakSegments(text string) []string {
 	var cur strings.Builder
 	for i := 0; i < n; i++ {
 		cur.WriteString(tokens[i])
-		if i+1 < n && actions[ends[i]] == lbAllowed && passesTypographicRules(tokens[i], tokens[i+1]) {
+		if i+1 < n && actions[ends[i]] == lbAllowed {
 			segments = append(segments, cur.String())
 			cur.Reset()
 		}

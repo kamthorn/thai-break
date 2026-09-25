@@ -9,6 +9,7 @@
 phpunit.xml export-ignore
 .gitignore export-ignore
 /tools export-ignore
+/testdata export-ignore
 
 # Generated Unicode Line_Break tables (tools/generate-linebreak-data.php)
 /php/src/LineBreakData.php linguist-generated
