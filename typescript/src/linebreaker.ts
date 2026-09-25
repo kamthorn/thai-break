@@ -3,7 +3,9 @@ import { ALLOWED, breakOpportunities } from './uax14.js';
 
 export const DEFAULT_BREAK_MARKER = '\u200B';
 
-const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/gi;
+const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<[a-zA-Z/!?][^>]*>|&[a-zA-Z0-9#]+;)/gi;
+/** Detects HTML markup: a tag starts with a letter, "/", "!" or "?" right after "<". */
+const PAT_HTML_DETECT = /<[a-zA-Z/!?][^>]*>/;
 const RE_THAI_COMBINING = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]/g;
 
 
@@ -74,7 +76,7 @@ export class LineBreaker {
   ): string {
     if (!text) return '';
 
-    if (isHtml || (text.includes('<') && text.includes('>'))) {
+    if (isHtml || PAT_HTML_DETECT.test(text)) {
       return this.processHtml(text, marker);
     }
     return this.processPlain(text, marker);
