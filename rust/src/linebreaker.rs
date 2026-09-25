@@ -155,29 +155,54 @@ impl LineBreaker {
         let mut wrapped_paragraphs = Vec::new();
 
         for para in broken.lines() {
-            let units: Vec<&str> = para.split(DEFAULT_BREAK_MARKER).collect();
             let mut cur_line = String::new();
             let mut cur_width = 0;
             let mut lines = Vec::new();
 
-            for unit in units {
-                let u_width = thai_display_width(unit);
-                if cur_width + u_width > width && !cur_line.is_empty() {
-                    lines.push(cur_line.clone());
+            for unit in split_break_units(para) {
+                // Trailing spaces may hang past the margin, so only the visible part must fit.
+                let visible_width = thai_display_width(unit.trim_end());
+                if cur_width + visible_width > width && !cur_line.is_empty() {
+                    lines.push(cur_line.trim_end().to_string());
                     cur_line.clear();
                     cur_line.push_str(unit);
-                    cur_width = u_width;
+                    cur_width = thai_display_width(unit);
                 } else {
                     cur_line.push_str(unit);
-                    cur_width += u_width;
+                    cur_width += thai_display_width(unit);
                 }
             }
             if !cur_line.is_empty() {
-                lines.push(cur_line);
+                lines.push(cur_line.trim_end().to_string());
             }
             wrapped_paragraphs.push(lines.join("\n"));
         }
 
         wrapped_paragraphs.join("\n")
     }
+}
+
+/// Split a paragraph into unbreakable units. A unit ends at a break marker or
+/// after a run of whitespace (spaces are break opportunities too, but markers
+/// are never inserted next to them).
+fn split_break_units(para: &str) -> Vec<&str> {
+    let mut units = Vec::new();
+    let mut start = 0;
+    let mut prev_space = false;
+    for (i, ch) in para.char_indices() {
+        if ch == '\u{200B}' {
+            units.push(&para[start..i]);
+            start = i + ch.len_utf8();
+            prev_space = false;
+            continue;
+        }
+        let is_space = ch.is_whitespace();
+        if prev_space && !is_space && i > start {
+            units.push(&para[start..i]);
+            start = i;
+        }
+        prev_space = is_space;
+    }
+    units.push(&para[start..]);
+    units
 }

@@ -127,24 +127,27 @@ export class LineBreaker {
     const wrappedParagraphs: string[] = [];
 
     for (const para of paragraphs) {
-      const units = para.split(DEFAULT_BREAK_MARKER);
+      // Break units end at a marker or after a run of spaces (spaces are break
+      // opportunities too, but markers are never inserted next to them).
+      const units = para.split(/\u200B|(?<=\s)(?=\S)/);
       let curLine = '';
       let curWidth = 0;
       const lines: string[] = [];
 
       for (const unit of units) {
-        const uWidth = thaiDisplayWidth(unit);
-        if (curWidth + uWidth > width && curLine.length > 0) {
-          lines.push(curLine);
+        // Trailing spaces may hang past the margin, so only the visible part must fit.
+        const visibleWidth = thaiDisplayWidth(unit.trimEnd());
+        if (curWidth + visibleWidth > width && curLine.length > 0) {
+          lines.push(curLine.trimEnd());
           curLine = unit;
-          curWidth = uWidth;
+          curWidth = thaiDisplayWidth(unit);
         } else {
           curLine += unit;
-          curWidth += uWidth;
+          curWidth += thaiDisplayWidth(unit);
         }
       }
       if (curLine.length > 0) {
-        lines.push(curLine);
+        lines.push(curLine.trimEnd());
       }
       wrappedParagraphs.push(lines.join('\n'));
     }
