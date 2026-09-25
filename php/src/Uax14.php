@@ -10,7 +10,8 @@ namespace ThaiBreak;
  * Classes are resolved as in LB1 (AI, SG, XX → AL; CJ → NS), except that
  * Complex_Context (SA) is kept as SA (letters) and SM (combining marks) so
  * Thai runs can be segmented with the dictionary. QU is split into QI
- * (\p{Pi}), QF (\p{Pf}) and plain QU for LB15a, LB15b and LB19.
+ * (\p{Pi}), QF (\p{Pf}) and plain QU for LB15a, LB15b and LB19. HH is not
+ * assigned to any code point in Unicode 16.0 (U+2010 is BA, see LB20a).
  *
  * License: Apache-2.0
  */
@@ -65,13 +66,29 @@ final class Uax14
     public const SA = 46;
     public const SM = 47;
 
+    /** Break actions returned by breakOpportunities() */
+    public const NO_BREAK = 0;
+    public const ALLOWED = 1;
+    public const MANDATORY = 2;
+
     private const CLASS_MASK = 0x3F;
     private const FLAG_EAST_ASIAN = 0x40;
     private const FLAG_EXT_PICT_UNASSIGNED = 0x80;
 
+    private const THAI_MAIYAMOK = 0x0E46;
+    private const THAI_PAIYANNOI = 0x0E2F;
+    private const HYPHEN = 0x2010;
+    private const DOTTED_CIRCLE = 0x25CC;
+
+    /** @var array<int, int> Memoized table values by code point */
+    private static array $valueCache = [];
+
     /** Packed table value (class id and flags) for a code point. */
     public static function value(int $cp): int
     {
+        if (isset(self::$valueCache[$cp])) {
+            return self::$valueCache[$cp];
+        }
         $starts = LineBreakData::STARTS;
         $lo = 0;
         $hi = count($starts) - 1;
@@ -83,7 +100,7 @@ final class Uax14
                 $hi = $mid - 1;
             }
         }
-        return LineBreakData::VALUES[$lo];
+        return self::$valueCache[$cp] = LineBreakData::VALUES[$lo];
     }
 
     /** Resolved Line_Break class id of a code point (one of the class constants). */
@@ -102,5 +119,160 @@ final class Uax14
     public static function isExtPictUnassigned(int $cp): bool
     {
         return (self::value($cp) & self::FLAG_EXT_PICT_UNASSIGNED) !== 0;
+    }
+
+    /**
+     * Compute the break action before every position of a code point sequence.
+     *
+     * Between two SA letters (Thai, Lao, Khmer, Myanmar) the dictionary decides:
+     * a break is allowed where $dictBreaks[$i] is true. As a Thai tailoring,
+     * there is never a break before ๆ (U+0E46) or ฯ (U+0E2F). When $dictBreaks
+     * is null, SA is resolved to AL as in LB1 and no tailoring is applied.
+     *
+     * @param  list<int>       $cps        Code points
+     * @param  list<bool>|null $dictBreaks Dictionary word boundaries indexed by position
+     * @return list<int> Action before each position 0 … n (NO_BREAK, ALLOWED or MANDATORY);
+     *                   position 0 is never a break (LB2), position n always is (LB3)
+     */
+    public static function breakOpportunities(array $cps, ?array $dictBreaks = null): array
+    {
+        $n = count($cps);
+        $actions = array_fill(0, $n + 1, self::NO_BREAK);
+        if ($n === 0) {
+            return $actions;
+        }
+        $actions[$n] = self::MANDATORY;
+
+        // LB9/LB10: group X (CM|ZWJ)* into units that take the class of X.
+        $units = [];
+        foreach ($cps as $i => $cp) {
+            $value = self::value($cp);
+            $cls   = $value & self::CLASS_MASK;
+            if ($cls === self::SM) {
+                $cls = self::CM;
+            }
+            if ($cls === self::CM || $cls === self::ZWJ) {
+                $last = count($units) - 1;
+                if ($last >= 0 && !in_array($units[$last]['cls'], [self::BK, self::CR, self::LF, self::NL, self::SP, self::ZW], true)) {
+                    $units[$last]['zwj'] = $cls === self::ZWJ;
+                    continue;
+                }
+            }
+            $units[] = [
+                'cls'   => match ($cls) {
+                    self::CM, self::ZWJ => self::AL,
+                    self::SA            => $dictBreaks === null ? self::AL : self::SA,
+                    default             => $cls,
+                },
+                'cp'    => $cp,
+                'start' => $i,
+                'ea'    => ($value & self::FLAG_EAST_ASIAN) !== 0,
+                'xp'    => ($value & self::FLAG_EXT_PICT_UNASSIGNED) !== 0,
+                'zwj'   => $cls === self::ZWJ,
+            ];
+        }
+
+        $count = count($units);
+        for ($u = 1; $u < $count; $u++) {
+            $actions[$units[$u]['start']] = self::pairAction($units, $u, $dictBreaks);
+        }
+
+        return $actions;
+    }
+
+    /**
+     * Apply rules LB4–LB31 in order to the boundary before unit $b.
+     *
+     * @param list<array{cls:int,cp:int,start:int,ea:bool,xp:bool,zwj:bool}> $units
+     * @param list<bool>|null $dictBreaks
+     */
+    private static function pairAction(array $units, int $b, ?array $dictBreaks): int
+    {
+        $a     = $b - 1;
+        $count = count($units);
+        $A     = $units[$a]['cls'];
+        $B     = $units[$b]['cls'];
+        $cls   = static fn(int $i): ?int => ($i >= 0 && $i < $count) ? ($units[$i]['cls'] === self::SA ? self::AL : $units[$i]['cls']) : null;
+
+        // LB4–LB6: mandatory breaks
+        if ($A === self::BK) {
+            return self::MANDATORY;
+        }
+        if ($A === self::CR && $B === self::LF) {
+            return self::NO_BREAK;
+        }
+        if ($A === self::CR || $A === self::LF || $A === self::NL) {
+            return self::MANDATORY;
+        }
+        if (in_array($B, [self::BK, self::CR, self::LF, self::NL], true)) {
+            return self::NO_BREAK;
+        }
+        // LB7: × SP, × ZW
+        if ($B === self::SP || $B === self::ZW) {
+            return self::NO_BREAK;
+        }
+        // Last unit before the boundary, skipping spaces (for the "X SP*" rules)
+        $k = $a;
+        while ($k > 0 && $units[$k]['cls'] === self::SP) {
+            $k--;
+        }
+        $K = $cls($k);
+        // LB8: ZW SP* ÷
+        if ($K === self::ZW) {
+            return self::ALLOWED;
+        }
+        // LB8a: ZWJ ×
+        if ($units[$a]['zwj']) {
+            return self::NO_BREAK;
+        }
+        // SA resolution (LB1), Thai tailoring: ๆ and ฯ never start a line, even after spaces
+        if ($dictBreaks !== null && ($units[$b]['cp'] === self::THAI_MAIYAMOK || $units[$b]['cp'] === self::THAI_PAIYANNOI)) {
+            return self::NO_BREAK;
+        }
+        // SA resolution (LB1): the dictionary decides inside SA runs
+        if ($A === self::SA && $B === self::SA) {
+            return ($dictBreaks[$units[$b]['start']] ?? false) ? self::ALLOWED : self::NO_BREAK;
+        }
+        $A = $cls($a);
+        $B = $cls($b);
+        // LB18: SP ÷
+        if ($A === self::SP) {
+            return self::ALLOWED;
+        }
+        // LB31: ÷
+        return self::ALLOWED;
+    }
+
+    /**
+     * LB28a for the boundary between units $a and $b.
+     *
+     * @param list<array{cls:int,cp:int,start:int,ea:bool,xp:bool,zwj:bool}> $units
+     * @param callable(int): ?int $cls
+     */
+    private static function inAksara(array $units, int $a, int $b, callable $cls): bool
+    {
+        $aksara = static fn(int $i): bool => in_array($cls($i), [self::AK, self::AS], true)
+            || (($units[$i]['cp'] ?? null) === self::DOTTED_CIRCLE);
+        $A = $cls($a);
+        $B = $cls($b);
+        return ($A === self::AP && $aksara($b))
+            || ($aksara($a) && ($B === self::VF || $B === self::VI))
+            || ($A === self::VI && $aksara($a - 1) && ($B === self::AK || $units[$b]['cp'] === self::DOTTED_CIRCLE))
+            || ($aksara($a) && $aksara($b) && $cls($b + 1) === self::VF);
+    }
+
+    private static function isAlpha(?int $cls): bool
+    {
+        return $cls === self::AL || $cls === self::HL;
+    }
+
+    private static function isQuote(?int $cls): bool
+    {
+        return $cls === self::QU || $cls === self::QI || $cls === self::QF;
+    }
+
+    private static function isHangul(?int $cls): bool
+    {
+        return in_array($cls, [self::JL, self::JV, self::JT, self::H2, self::H3], true);
     }
 }

@@ -8,6 +8,7 @@
             <file>php/tests/PHPUnitTokenizerTest.php</file>
             <file>php/tests/LaravelIntegrationTest.php</file>
             <file>php/tests/Uax14Test.php</file>
+            <file>php/tests/LineBreakerTest.php</file>
         </testsuite>
     </testsuites>
     <source>

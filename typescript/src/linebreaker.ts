@@ -1,4 +1,5 @@
 import { Tokenizer } from './tokenizer.js';
+import { ALLOWED, breakOpportunities } from './uax14.js';
 
 export const DEFAULT_BREAK_MARKER = '\u200B';
 
@@ -8,11 +9,26 @@ const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style
 const RE_THAI_COMBINING = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]/g;
 
 
+/**
+ * Whether a line break is permissible between two adjacent tokens. The tokens
+ * are treated as separate dictionary words, so a Thai|Thai junction is a word
+ * boundary.
+ */
 export function canBreakBetween(left: string, right: string): boolean {
   if (!left || !right) {
     return false;
   }
 
+  const cps = codePoints(left + right);
+  const at = codePoints(left).length;
+  const dict: boolean[] = new Array(cps.length + 1).fill(false);
+  dict[at] = true;
+
+  return breakOpportunities(cps, dict)[at] === ALLOWED && passesTypographicRules(left, right);
+}
+
+/** Legacy token-level rules that are not yet expressed as UAX #14 rules. */
+function passesTypographicRules(left: string, right: string): boolean {
   // Whitespace safety: never insert break adjacent to spaces
   if (/\s$/.test(left) || /^\s/.test(right)) {
     return false;
@@ -35,6 +51,10 @@ export function canBreakBetween(left: string, right: string): boolean {
   }
 
   return true;
+}
+
+function codePoints(text: string): number[] {
+  return Array.from(text, (ch) => ch.codePointAt(0) ?? 0);
 }
 
 /**
@@ -88,10 +108,23 @@ export class LineBreaker {
     const n = tokens.length;
     if (n <= 1) return text;
 
+    // Token ends are the dictionary word boundaries inside Thai runs
+    const cps: number[] = [];
+    const ends: number[] = [];
+    for (const tok of tokens) {
+      cps.push(...codePoints(tok));
+      ends.push(cps.length);
+    }
+    const dict: boolean[] = new Array(cps.length + 1).fill(false);
+    for (const end of ends) {
+      dict[end] = true;
+    }
+    const actions = breakOpportunities(cps, dict);
+
     let res = '';
     for (let i = 0; i < n; i++) {
       res += tokens[i];
-      if (i + 1 < n && canBreakBetween(tokens[i], tokens[i + 1])) {
+      if (i + 1 < n && actions[ends[i]] === ALLOWED && passesTypographicRules(tokens[i], tokens[i + 1])) {
         res += marker;
       }
     }

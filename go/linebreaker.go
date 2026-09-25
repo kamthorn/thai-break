@@ -29,11 +29,24 @@ func NewLineBreaker(tok *Tokenizer) *LineBreaker {
 }
 
 // CanBreakBetween checks if a break is permissible between left and right tokens.
+// The tokens are treated as separate dictionary words, so a Thai|Thai junction
+// is a word boundary.
 func CanBreakBetween(left, right string) bool {
 	if left == "" || right == "" {
 		return false
 	}
 
+	cps := []rune(left + right)
+	at := len([]rune(left))
+	dict := make([]bool, len(cps)+1)
+	dict[at] = true
+
+	return lbBreakOpportunities(cps, dict)[at] == lbAllowed && passesTypographicRules(left, right)
+}
+
+// passesTypographicRules applies legacy token-level rules that are not yet
+// expressed as UAX #14 rules.
+func passesTypographicRules(left, right string) bool {
 	leftRunes := []rune(left)
 	rightRunes := []rune(right)
 
@@ -102,10 +115,23 @@ func (b *LineBreaker) processPlain(text string, marker string) string {
 		return text
 	}
 
+	// Token ends are the dictionary word boundaries inside Thai runs
+	cps := make([]rune, 0, len(text))
+	ends := make([]int, n)
+	for i, tok := range tokens {
+		cps = append(cps, []rune(tok)...)
+		ends[i] = len(cps)
+	}
+	dict := make([]bool, len(cps)+1)
+	for _, end := range ends {
+		dict[end] = true
+	}
+	actions := lbBreakOpportunities(cps, dict)
+
 	var sb strings.Builder
 	for i := 0; i < n; i++ {
 		sb.WriteString(tokens[i])
-		if i+1 < n && CanBreakBetween(tokens[i], tokens[i+1]) {
+		if i+1 < n && actions[ends[i]] == lbAllowed && passesTypographicRules(tokens[i], tokens[i+1]) {
 			sb.WriteString(marker)
 		}
 	}
