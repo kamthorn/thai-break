@@ -242,23 +242,39 @@ class ThaiLineBreaker
     }
 
     /**
-     * Force-break text that is wider than a line into pieces of at most $width columns.
+     * Force-break text that is wider than a line into pieces of at most $width
+     * columns. Pieces end only between Thai character clusters (TCC) and never
+     * separate a character from its combining marks or a zero-width joiner.
      *
      * @return non-empty-list<string>
      */
     private static function cutToWidth(string $text, int $width): array
     {
+        $chars    = mb_str_split($text);
+        $tccValid = ThaiTCC::tccPosArray($chars);
+        $clusters = [];
+        $prevZwj  = false;
+        foreach ($chars as $i => $ch) {
+            $cls = Uax14::lineBreakClass(mb_ord($ch) ?: 0xFFFD);
+            if ($i > 0 && (!$tccValid[$i] || $prevZwj || in_array($cls, [Uax14::CM, Uax14::SM, Uax14::ZWJ], true))) {
+                $clusters[count($clusters) - 1] .= $ch;
+            } else {
+                $clusters[] = $ch;
+            }
+            $prevZwj = $cls === Uax14::ZWJ;
+        }
+
         $pieces = [];
         $part   = '';
         $partW  = 0;
-        foreach (preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [$text] as $ch) {
-            $cw = self::thaiDisplayWidth($ch);
+        foreach ($clusters as $cluster) {
+            $cw = self::thaiDisplayWidth($cluster);
             if ($partW + $cw > $width && $part !== '') {
                 $pieces[] = $part;
-                $part     = $ch;
+                $part     = $cluster;
                 $partW    = $cw;
             } else {
-                $part  .= $ch;
+                $part  .= $cluster;
                 $partW += $cw;
             }
         }
