@@ -12,6 +12,8 @@ fn init_test_dict() {
 /// (name, input, expected output with '|' as the break marker)
 const LINE_BREAK_CASES: &[(&str, &str, &str)] = &[
     ("LB9 combining mark stays with its base", "สวัสดี\u{0301}ครับ", "สวัสดี\u{0301}|ครับ"),
+    ("LB21 no break before a hyphen", "สี-ขาว", "สี-|ขาว"),
+    ("LB21 no break before an en dash (BA)", "ข้อความ–ข้อความ", "ข้อความ–|ข้อความ"),
 ];
 
 #[test]

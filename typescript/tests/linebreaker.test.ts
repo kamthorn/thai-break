@@ -10,6 +10,8 @@ init({ dictPath: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 /** [name, input, expected output with '|' as the break marker] */
 const LINE_BREAK_CASES: [string, string, string][] = [
   ['LB9 combining mark stays with its base', 'สวัสดี́ครับ', 'สวัสดี́|ครับ'],
+  ['LB21 no break before a hyphen', 'สี-ขาว', 'สี-|ขาว'],
+  ['LB21 no break before an en dash (BA)', 'ข้อความ–ข้อความ', 'ข้อความ–|ข้อความ'],
 ];
 
 test('insertLineBreaks follows UAX #14', () => {

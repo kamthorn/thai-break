@@ -231,6 +231,23 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if A == lbSP {
 		return lbAllowed
 	}
+	// LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
+	if (A == lbHY || units[a].cp == hyphen) && B == lbAL &&
+		(a == 0 || lbIsOneOf(cls(a-1), lbBK, lbCR, lbLF, lbNL, lbSP, lbZW, lbCB, lbGL)) {
+		return lbNoBreak
+	}
+	// LB21: × BA, × HY, × NS, BB ×
+	if lbIsOneOf(B, lbBA, lbHY, lbNS) || A == lbBB {
+		return lbNoBreak
+	}
+	// LB21a: HL (HY | [BA - $EastAsian]) × [^HL]
+	if (A == lbHY || (A == lbBA && !units[a].ea)) && cls(a-1) == lbHL && B != lbHL {
+		return lbNoBreak
+	}
+	// LB21b: SY × HL
+	if A == lbSY && B == lbHL {
+		return lbNoBreak
+	}
 	// LB31: ÷
 	return lbAllowed
 }
