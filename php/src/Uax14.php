@@ -235,6 +235,18 @@ final class Uax14
         }
         $A = $cls($a);
         $B = $cls($b);
+        // LB13: × CL, × CP, × EX, × SY
+        if (in_array($B, [self::CL, self::CP, self::EX, self::SY], true)) {
+            return self::NO_BREAK;
+        }
+        // LB15c: SP ÷ IS NU
+        if ($A === self::SP && $B === self::IS && $cls($b + 1) === self::NU) {
+            return self::ALLOWED;
+        }
+        // LB15d: × IS
+        if ($B === self::IS) {
+            return self::NO_BREAK;
+        }
         // LB18: SP ÷
         if ($A === self::SP) {
             return self::ALLOWED;

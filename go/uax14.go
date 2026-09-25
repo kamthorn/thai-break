@@ -227,6 +227,18 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 		return lbNoBreak
 	}
 	A, B = cls(a), cls(b)
+	// LB13: × CL, × CP, × EX, × SY
+	if lbIsOneOf(B, lbCL, lbCP, lbEX, lbSY) {
+		return lbNoBreak
+	}
+	// LB15c: SP ÷ IS NU
+	if A == lbSP && B == lbIS && cls(b+1) == lbNU {
+		return lbAllowed
+	}
+	// LB15d: × IS
+	if B == lbIS {
+		return lbNoBreak
+	}
 	// LB18: SP ÷
 	if A == lbSP {
 		return lbAllowed

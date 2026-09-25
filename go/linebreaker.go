@@ -14,7 +14,7 @@ const (
 
 var (
 	reNoBreakAfter  = regexp.MustCompile(`^[(\[{\\"“‘<«฿$€¥£#@（【《]$`)
-	reNoBreakBefore = regexp.MustCompile(`^(?:[)\]}\\"”’>»,.:;!?/ๆฯ๏）】》]|ฯลฯ)$`)
+	reNoBreakBefore = regexp.MustCompile(`^(?:[\\"”’>»ๆฯ๏]|ฯลฯ)$`)
 	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))`)
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
 )
@@ -61,7 +61,7 @@ func passesTypographicRules(left, right string) bool {
 		return false
 	}
 
-	// No break before closing symbols, the solidus (UAX #14 LB13), postfixes (ๆ, ฯ)
+	// No break before closing quotes and postfixes (ๆ, ฯ)
 	if reNoBreakBefore.MatchString(right) {
 		return false
 	}
