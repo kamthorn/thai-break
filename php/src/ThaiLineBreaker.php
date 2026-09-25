@@ -191,12 +191,6 @@ class ThaiLineBreaker
             return false;
         }
 
-        // 4. Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
-        if ((preg_match('/[A-Za-z]$/', $left) && preg_match('/^[0-9]/', $right)) ||
-            (preg_match('/[0-9]$/', $left) && preg_match('/^[A-Za-z]/', $right))) {
-            return false;
-        }
-
         return true;
     }
 

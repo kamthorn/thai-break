@@ -60,15 +60,6 @@ fn passes_typographic_rules(left: &str, right: &str) -> bool {
         return false;
     }
 
-    // Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
-    if let (Some(l), Some(r)) = (left.chars().last(), right.chars().next()) {
-        if (l.is_ascii_alphabetic() && r.is_ascii_digit())
-            || (l.is_ascii_digit() && r.is_ascii_alphabetic())
-        {
-            return false;
-        }
-    }
-
     true
 }
 

@@ -260,6 +260,14 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if A == lbSY && B == lbHL {
 		return lbNoBreak
 	}
+	// LB23: (AL | HL) × NU, NU × (AL | HL)
+	if (lbIsAlpha(A) && B == lbNU) || (A == lbNU && lbIsAlpha(B)) {
+		return lbNoBreak
+	}
+	// LB23a: PR × (ID | EB | EM), (ID | EB | EM) × PO
+	if (A == lbPR && lbIsOneOf(B, lbID, lbEB, lbEM)) || (lbIsOneOf(A, lbID, lbEB, lbEM) && B == lbPO) {
+		return lbNoBreak
+	}
 	// LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
 	if ((A == lbPR || A == lbPO) && lbIsAlpha(B)) || (lbIsAlpha(A) && (B == lbPR || B == lbPO)) {
 		return lbNoBreak
