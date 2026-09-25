@@ -56,6 +56,13 @@ class WeightedTokenizer
      */
     private const ABBR_LETTER_COST_FACTOR = 0.01;
 
+    /**
+     * Costs closer than this are a tie. Edges into a position are visited from
+     * the longest word to the shortest, so on a tie the later, shorter last word
+     * wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
+     */
+    private const TIE_EPSILON = 1e-9;
+
     /** Cost of an unknown-word fallback edge, relative to the cost of the rarest word */
     private const UNKNOWN_COST_FACTOR = 2.0;
 
@@ -226,7 +233,7 @@ class WeightedTokenizer
 
                     $newCost = $dp[$i] + $edgeCost;
 
-                    if ($newCost < $dp[$j]) {
+                    if ($newCost <= $dp[$j] + self::TIE_EPSILON) {
                         $dp[$j]    = $newCost;
                         $from[$j]  = $i;
                         $word[$j]  = $w;

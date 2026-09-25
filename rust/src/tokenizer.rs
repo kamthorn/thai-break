@@ -12,6 +12,10 @@ const ABBR_COST_FACTOR: f64 = 1.5;
 const ABBR_LETTER_COST_FACTOR: f64 = 0.01;
 /// Cost of an unknown-word fallback edge, relative to the cost of the rarest word.
 const UNKNOWN_COST_FACTOR: f64 = 2.0;
+/// Costs closer than this are a tie. Edges into a position are visited from
+/// the longest word to the shortest, so on a tie the later, shorter last word
+/// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
+const TIE_EPSILON: f64 = 1e-9;
 const MAX_EDGES: usize = 50000;
 
 static PAT_NONTHAI: Lazy<Regex> = Lazy::new(|| {
@@ -185,7 +189,7 @@ impl Tokenizer {
                 };
 
                 let new_cost = dp[i] + edge_cost;
-                if new_cost < dp[j] {
+                if new_cost <= dp[j] + TIE_EPSILON {
                     dp[j] = new_cost;
                     from[j] = i;
                     word[j] = edge.word.clone();
