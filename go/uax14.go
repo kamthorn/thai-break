@@ -298,6 +298,14 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if (lbIsHangul(A) && B == lbPO) || (A == lbPR && lbIsHangul(B)) {
 		return lbNoBreak
 	}
+	// LB28: (AL | HL) × (AL | HL)
+	if lbIsAlpha(A) && lbIsAlpha(B) {
+		return lbNoBreak
+	}
+	// LB28a: Brahmic orthographic syllables
+	if lbInAksara(units, a, b, cls) {
+		return lbNoBreak
+	}
 	// LB29: IS × (AL | HL)
 	if A == lbIS && lbIsAlpha(B) {
 		return lbNoBreak
