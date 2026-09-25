@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../src/ThaiTrie.php';
 require_once __DIR__ . '/../src/ThaiTCC.php';
+require_once __DIR__ . '/../src/LineBreakData.php';
+require_once __DIR__ . '/../src/Uax14.php';
 require_once __DIR__ . '/../src/BigramModel.php';
 require_once __DIR__ . '/../src/WeightedTokenizer.php';
 require_once __DIR__ . '/../src/DictionaryLoader.php';
