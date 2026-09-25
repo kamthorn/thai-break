@@ -47,7 +47,7 @@ class ThaiLineBreaker
      * Includes close brackets, quotes, sentence punctuation, the solidus (UAX #14
      * LB13: "ISO/IEC" must not become "ISO" + "/IEC"), and Thai postfixes (ๆ, ฯ, ฯลฯ).
      */
-    private const PAT_NO_BREAK_BEFORE = '/^(?:[)\\]}\"”’>»,.:;!?\/ๆฯ๏๚๛）】》]|ฯลฯ)$/u';
+    private const PAT_NO_BREAK_BEFORE = '/^(?:[)\\]}\"”’>»,.:;!?\/ๆฯ๏）】》]|ฯลฯ)$/u';
 
     /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
     private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';

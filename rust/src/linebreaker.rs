@@ -11,7 +11,7 @@ static PAT_NO_BREAK_AFTER: Lazy<Regex> = Lazy::new(|| {
 });
 
 static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^(?:[)\]}\\"”’>»,.:;!?/ๆฯ๏๚๛）】》]|ฯลฯ)$"#)
+    Regex::new(r#"^(?:[)\]}\\"”’>»,.:;!?/ๆฯ๏）】》]|ฯลฯ)$"#)
         .expect("Failed to compile PAT_NO_BREAK_BEFORE")
 });
 

@@ -177,6 +177,23 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if (A === LB.SP) {
     return ALLOWED;
   }
+  // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
+  if ((A === LB.HY || units[a].cp === HYPHEN) && B === LB.AL &&
+      (a === 0 || [LB.BK, LB.CR, LB.LF, LB.NL, LB.SP, LB.ZW, LB.CB, LB.GL].includes(cls(a - 1)))) {
+    return NO_BREAK;
+  }
+  // LB21: × BA, × HY, × NS, BB ×
+  if ([LB.BA, LB.HY, LB.NS].includes(B) || A === LB.BB) {
+    return NO_BREAK;
+  }
+  // LB21a: HL (HY | [BA - $EastAsian]) × [^HL]
+  if ((A === LB.HY || (A === LB.BA && !units[a].ea)) && cls(a - 1) === LB.HL && B !== LB.HL) {
+    return NO_BREAK;
+  }
+  // LB21b: SY × HL
+  if (A === LB.SY && B === LB.HL) {
+    return NO_BREAK;
+  }
   // LB31: ÷
   return ALLOWED;
 }

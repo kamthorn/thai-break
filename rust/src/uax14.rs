@@ -226,6 +226,24 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if A == SP {
         return ALLOWED;
     }
+    // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
+    if (A == HY || units[a].cp == HYPHEN) && B == AL
+        && (a == 0 || [BK, CR, LF, NL, SP, ZW, CB, GL].contains(&cls(ai - 1)))
+    {
+        return NO_BREAK;
+    }
+    // LB21: × BA, × HY, × NS, BB ×
+    if [BA, HY, NS].contains(&B) || A == BB {
+        return NO_BREAK;
+    }
+    // LB21a: HL (HY | [BA - $EastAsian]) × [^HL]
+    if (A == HY || (A == BA && !units[a].ea)) && cls(ai - 1) == HL && B != HL {
+        return NO_BREAK;
+    }
+    // LB21b: SY × HL
+    if A == SY && B == HL {
+        return NO_BREAK;
+    }
     // LB31: ÷
     ALLOWED
 }

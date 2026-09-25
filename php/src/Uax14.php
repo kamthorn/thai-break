@@ -239,6 +239,23 @@ final class Uax14
         if ($A === self::SP) {
             return self::ALLOWED;
         }
+        // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [\u2010]) × AL
+        if (($A === self::HY || $units[$a]['cp'] === self::HYPHEN) && $B === self::AL
+            && ($a === 0 || in_array($cls($a - 1), [self::BK, self::CR, self::LF, self::NL, self::SP, self::ZW, self::CB, self::GL], true))) {
+            return self::NO_BREAK;
+        }
+        // LB21: × BA, × HY, × NS, BB ×
+        if (in_array($B, [self::BA, self::HY, self::NS], true) || $A === self::BB) {
+            return self::NO_BREAK;
+        }
+        // LB21a: HL (HY | [BA - $EastAsian]) × [^HL]
+        if (($A === self::HY || ($A === self::BA && !$units[$a]['ea'])) && $cls($a - 1) === self::HL && $B !== self::HL) {
+            return self::NO_BREAK;
+        }
+        // LB21b: SY × HL
+        if ($A === self::SY && $B === self::HL) {
+            return self::NO_BREAK;
+        }
         // LB31: ÷
         return self::ALLOWED;
     }
