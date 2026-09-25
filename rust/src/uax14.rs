@@ -256,6 +256,41 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if A == SY && B == HL {
         return NO_BREAK;
     }
+    // LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
+    if ((A == PR || A == PO) && is_alpha(B)) || (is_alpha(A) && (B == PR || B == PO)) {
+        return NO_BREAK;
+    }
+    // LB25: numbers
+    if B == PO || B == PR {
+        // NU (SY | IS)* (CL | CP)? × (PO | PR)
+        let mut j = if A == CL || A == CP { ai - 1 } else { ai };
+        while cls(j) == SY || cls(j) == IS {
+            j -= 1;
+        }
+        if cls(j) == NU {
+            return NO_BREAK;
+        }
+    }
+    if (A == PO || A == PR) && B == OP && (cls(bi + 1) == NU || (cls(bi + 1) == IS && cls(bi + 2) == NU)) {
+        return NO_BREAK; // (PO | PR) × OP IS? NU
+    }
+    if B == NU && [PO, PR, HY, IS].contains(&A) {
+        return NO_BREAK; // (PO | PR | HY | IS) × NU
+    }
+    if B == NU {
+        // NU (SY | IS)* × NU
+        let mut j = ai;
+        while cls(j) == SY || cls(j) == IS {
+            j -= 1;
+        }
+        if cls(j) == NU {
+            return NO_BREAK;
+        }
+    }
+    // LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
+    if (is_hangul(A) && B == PO) || (A == PR && is_hangul(B)) {
+        return NO_BREAK;
+    }
     // LB31: ÷
     ALLOWED
 }

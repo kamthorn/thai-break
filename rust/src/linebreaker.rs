@@ -7,7 +7,7 @@ use crate::uax14;
 pub const DEFAULT_BREAK_MARKER: &str = "\u{200B}";
 
 static PAT_NO_BREAK_AFTER: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^[(\[{\\"“‘<«฿$€¥£#@（【《]$"#).expect("Failed to compile PAT_NO_BREAK_AFTER")
+    Regex::new(r#"^[(\[{\\"“‘<«#@（【《]$"#).expect("Failed to compile PAT_NO_BREAK_AFTER")
 });
 
 static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {

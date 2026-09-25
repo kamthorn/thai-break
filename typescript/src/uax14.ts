@@ -206,6 +206,37 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if (A === LB.SY && B === LB.HL) {
     return NO_BREAK;
   }
+  // LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
+  if (((A === LB.PR || A === LB.PO) && isAlpha(B)) || (isAlpha(A) && (B === LB.PR || B === LB.PO))) {
+    return NO_BREAK;
+  }
+  // LB25: numbers
+  if (B === LB.PO || B === LB.PR) {
+    // NU (SY | IS)* (CL | CP)? × (PO | PR)
+    let j = A === LB.CL || A === LB.CP ? a - 1 : a;
+    while (cls(j) === LB.SY || cls(j) === LB.IS) j--;
+    if (cls(j) === LB.NU) {
+      return NO_BREAK;
+    }
+  }
+  if ((A === LB.PO || A === LB.PR) && B === LB.OP && (cls(b + 1) === LB.NU || (cls(b + 1) === LB.IS && cls(b + 2) === LB.NU))) {
+    return NO_BREAK; // (PO | PR) × OP IS? NU
+  }
+  if (B === LB.NU && [LB.PO, LB.PR, LB.HY, LB.IS].includes(A)) {
+    return NO_BREAK; // (PO | PR | HY | IS) × NU
+  }
+  if (B === LB.NU) {
+    // NU (SY | IS)* × NU
+    let j = a;
+    while (cls(j) === LB.SY || cls(j) === LB.IS) j--;
+    if (cls(j) === LB.NU) {
+      return NO_BREAK;
+    }
+  }
+  // LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
+  if ((isHangul(A) && B === LB.PO) || (A === LB.PR && isHangul(B))) {
+    return NO_BREAK;
+  }
   // LB31: ÷
   return ALLOWED;
 }
