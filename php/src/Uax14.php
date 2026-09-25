@@ -305,6 +305,10 @@ final class Uax14
         if ((self::isHangul($A) && $B === self::PO) || ($A === self::PR && self::isHangul($B))) {
             return self::NO_BREAK;
         }
+        // LB29: IS × (AL | HL)
+        if ($A === self::IS && self::isAlpha($B)) {
+            return self::NO_BREAK;
+        }
         // LB31: ÷
         return self::ALLOWED;
     }

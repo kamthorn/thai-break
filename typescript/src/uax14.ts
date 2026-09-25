@@ -237,6 +237,10 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if ((isHangul(A) && B === LB.PO) || (A === LB.PR && isHangul(B))) {
     return NO_BREAK;
   }
+  // LB29: IS × (AL | HL)
+  if (A === LB.IS && isAlpha(B)) {
+    return NO_BREAK;
+  }
   // LB31: ÷
   return ALLOWED;
 }
