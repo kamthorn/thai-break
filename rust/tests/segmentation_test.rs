@@ -21,6 +21,16 @@ const SEGMENTATION_CASES: &[(&str, &str, &str)] = &[
 ];
 
 #[test]
+fn test_long_text_is_segmented_to_the_end() {
+    // Longer than the 50,000-edge limit that used to leave the rest of the text as one token
+    init_test_dict();
+    let sentence = "การประชุมสามัญผู้ถือหุ้นประจำปีจัดขึ้นที่โรงแรมในกรุงเทพมหานคร";
+    let result = words(&sentence.repeat(2000));
+    assert_eq!(result.len(), 2000 * words(sentence).len());
+    assert!(result.iter().all(|w| w.chars().count() < 20));
+}
+
+#[test]
 fn test_segmentation() {
     init_test_dict();
     for (name, input, expected) in SEGMENTATION_CASES {

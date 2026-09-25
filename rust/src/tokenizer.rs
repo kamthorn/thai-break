@@ -16,7 +16,6 @@ const UNKNOWN_COST_FACTOR: f64 = 2.0;
 /// the longest word to the shortest, so on a tie the later, shorter last word
 /// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
 const TIE_EPSILON: f64 = 1e-9;
-const MAX_EDGES: usize = 50000;
 
 static PAT_NONTHAI: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
@@ -30,9 +29,10 @@ static PAT_ABBR: Lazy<Regex> = Lazy::new(|| {
         .expect("Failed to compile abbreviation regex")
 });
 
+/// An edge from the current position to `to`.
 #[derive(Clone, Debug)]
 struct DagEdge {
-    from: usize,
+    to: usize,
     word: String,
     cost: f64,
 }
@@ -92,34 +92,51 @@ impl Tokenizer {
         let normalizer = self.trie.total_weight() + 1.0;
         let rare_cost = normalizer.ln();
 
-        // Pass 1: Collect edges_to[j]
-        let mut edges_to: Vec<Vec<DagEdge>> = vec![Vec::new(); n + 1];
-        let mut edge_count = 0;
+        // Single-pass Viterbi DP. Positions are visited in order. When position
+        // i is reached, every edge into it has been relaxed, so dp[i] is final:
+        // an unreachable i gets an unknown-word edge, then the edges starting at
+        // i are relaxed right away. Edges are never stored, so memory stays O(n)
+        // for any text length.
+        let mut dp = vec![f64::INFINITY; n + 1];
+        let mut from = vec![usize::MAX; n + 1];
+        let mut word = vec![String::new(); n + 1];
+        let mut is_unk = vec![false; n + 1];
+        dp[0] = 0.0;
 
-        'collect_loop: for i in 0..n {
+        let mut edges: Vec<DagEdge> = Vec::new();
+
+        for i in 0..=n {
             if !valid_pos[i] {
                 continue;
             }
 
-            let byte_pos = char_byte_offsets[i];
-            let sub_text = &text[byte_pos..];
+            // Unknown-word fallback: connect to nearest reachable predecessor
+            if dp[i].is_infinite() {
+                if let Some(k) = (0..i).rev().find(|&k| !dp[k].is_infinite() && valid_pos[k]) {
+                    dp[i] = dp[k] + UNKNOWN_COST_FACTOR * rare_cost;
+                    from[i] = k;
+                    word[i] = chars[k..i].iter().collect();
+                    is_unk[i] = true;
+                }
+            }
+
+            if i == n {
+                break;
+            }
+
+            // Edges starting at i
+            edges.clear();
+            let sub_text = &text[char_byte_offsets[i]..];
 
             if is_thai_rune(chars[i]) {
                 // 1. Thai dictionary words starting at i
-                let matches = self.trie.prefixes_from_chars(&chars, i, 25);
-                for m in matches {
-                    let j = m.end;
-                    if j > n || !valid_pos[j] {
-                        continue;
-                    }
-                    edges_to[j].push(DagEdge {
-                        from: i,
-                        word: m.word,
-                        cost: (normalizer / m.weight).ln(),
-                    });
-                    edge_count += 1;
-                    if edge_count >= MAX_EDGES {
-                        break 'collect_loop;
+                for m in self.trie.prefixes_from_chars(&chars, i, 25) {
+                    if m.end <= n && valid_pos[m.end] {
+                        edges.push(DagEdge {
+                            to: m.end,
+                            word: m.word,
+                            cost: (normalizer / m.weight).ln(),
+                        });
                     }
                 }
 
@@ -130,85 +147,42 @@ impl Tokenizer {
                     let j = i + abbr_len;
                     if j <= n && valid_pos[j] {
                         let letters = abbr_len - m_str.matches('.').count();
-                        let cost = (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters as f64) * rare_cost;
-                        edges_to[j].push(DagEdge {
-                            from: i,
+                        edges.push(DagEdge {
+                            to: j,
                             word: m_str.to_string(),
-                            cost,
+                            cost: (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters as f64) * rare_cost,
                         });
                     }
                 }
-            } else {
+            } else if let Some(m) = PAT_NONTHAI.find(sub_text) {
                 // 3. Non-Thai tokens
-                if let Some(m) = PAT_NONTHAI.find(sub_text) {
-                    let m_str = m.as_str();
-                    let word_len = m_str.chars().count();
-                    let j = i + word_len;
-                    if j <= n {
-                        edges_to[j].push(DagEdge {
-                            from: i,
-                            word: m_str.to_string(),
-                            cost: rare_cost,
-                        });
-                    }
+                let j = i + m.as_str().chars().count();
+                if j <= n && valid_pos[j] {
+                    edges.push(DagEdge {
+                        to: j,
+                        word: m.as_str().to_string(),
+                        cost: rare_cost,
+                    });
                 }
             }
-        }
 
-        // Pass 2: Viterbi forward DP
-        let mut dp = vec![f64::INFINITY; n + 1];
-        let mut from = vec![usize::MAX; n + 1];
-        let mut word = vec![String::new(); n + 1];
-        let mut is_unk = vec![false; n + 1];
-
-        dp[0] = 0.0;
-
-        for j in 1..=n {
-            if !valid_pos[j] {
-                continue;
-            }
-
-            // Try all dictionary/pattern edges ending at j
-            for edge in &edges_to[j] {
-                let i = edge.from;
-                if dp[i].is_infinite() {
-                    continue;
-                }
-                let w_len = (j - i).max(1);
-                let base_cost = edge.cost;
-
-                let edge_cost = if let Some(ref bigrams) = self.bigram_model {
-                    if !word[i].is_empty() {
-                        let bonus = bigrams.get_bonus(&word[i], &edge.word, w_len);
-                        (base_cost - bonus).max(0.01)
-                    } else {
-                        base_cost
+            // Relax the edges
+            for edge in edges.drain(..) {
+                let j = edge.to;
+                let edge_cost = match &self.bigram_model {
+                    Some(bigrams) if !word[i].is_empty() => {
+                        (edge.cost - bigrams.get_bonus(&word[i], &edge.word, j - i)).max(0.01)
                     }
-                } else {
-                    base_cost
+                    _ => edge.cost,
                 };
 
+                // Ties go to the later start, i.e. the shorter last word (see TIE_EPSILON)
                 let new_cost = dp[i] + edge_cost;
                 if new_cost <= dp[j] + TIE_EPSILON {
                     dp[j] = new_cost;
                     from[j] = i;
-                    word[j] = edge.word.clone();
+                    word[j] = edge.word;
                     is_unk[j] = false;
-                }
-            }
-
-            // Unknown-word fallback: connect to nearest reachable predecessor
-            if dp[j].is_infinite() {
-                for i in (0..j).rev() {
-                    if !dp[i].is_infinite() && valid_pos[i] {
-                        let unknown_word: String = chars[i..j].iter().collect();
-                        let new_cost = dp[i] + UNKNOWN_COST_FACTOR * rare_cost;
-                        dp[j] = new_cost;
-                        from[j] = i;
-                        word[j] = unknown_word;
-                        is_unk[j] = true;
-                        break;
-                    }
                 }
             }
         }

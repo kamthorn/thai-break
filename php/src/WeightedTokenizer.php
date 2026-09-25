@@ -15,7 +15,7 @@ namespace ThaiBreak;
  *    - Non-Thai formatted tokens (English words, formatted numbers, percentages, whitespace,
  *      and individual punctuation symbols like _ ( ) " -).
  *
- * 2. Viterbi forward DP with Bigram Transitions:
+ * 2. Single-pass Viterbi forward DP with Bigram Transitions:
  *    - Each word costs -log P(w) with P(w) = weight / total weight of the
  *      dictionary (a unigram model). With equal weights this prefers the
  *      segmentation with the fewest words.
@@ -65,12 +65,6 @@ class WeightedTokenizer
 
     /** Cost of an unknown-word fallback edge, relative to the cost of the rarest word */
     private const UNKNOWN_COST_FACTOR = 2.0;
-
-    /**
-     * Maximum number of dict-word edges to collect per text.
-     * Prevents degenerate edge-collection on adversarial input.
-     */
-    private const MAX_EDGES = 50_000;
 
     private ThaiTrie     $trie;
     private ?BigramModel $bigramModel;
@@ -147,33 +141,55 @@ class WeightedTokenizer
         $normalizer = $this->trie->totalWeight() + 1.0;
         $rareCost   = log($normalizer);
 
-        // ── Pass 1: Collect all (from, to, word, cost) edges ───────────────
-        $edgesTo   = [];
-        $edgeCount = 0;
+        // ── Single-pass Viterbi DP ──────────────────────────────────────────
+        // dp[j]    — minimum accumulated cost to position j
+        // from[j]  — predecessor position
+        // word[j]  — word token on winning edge into j
+        // isUnk[j] — whether position j was reached via unknown fallback
+        //
+        // Positions are visited in order. When position i is reached, every
+        // edge into it has been relaxed, so dp[i] is final: an unreachable i
+        // gets an unknown-word edge, then the edges starting at i are relaxed
+        // right away. Edges are never stored, so memory stays O(n) for any
+        // text length.
+        $dp    = array_fill(0, $n + 1, INF);
+        $from  = array_fill(0, $n + 1, -1);
+        $word  = array_fill(0, $n + 1, '');
+        $isUnk = array_fill(0, $n + 1, false);
+        $dp[0] = 0.0;
 
-        for ($i = 0; $i < $n; $i++) {
+        for ($i = 0; $i <= $n; $i++) {
             if (!$validPos[$i]) {
                 continue;
             }
 
+            // ── Unknown-word fallback: connect to nearest reachable predecessor
+            if ($dp[$i] === INF) {
+                for ($k = $i - 1; $k >= 0; $k--) {
+                    if ($dp[$k] < INF && $validPos[$k]) {
+                        $dp[$i]    = $dp[$k] + self::UNKNOWN_COST_FACTOR * $rareCost;
+                        $from[$i]  = $k;
+                        $word[$i]  = implode('', array_slice($chars, $k, $i - $k));
+                        $isUnk[$i] = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($i === $n) {
+                break;
+            }
+
+            // ── Edges starting at i: [end position, word, cost]
+            $edges   = [];
             $bytePos = $charByteOffsets[$i];
 
             if ($this->isThai($chars[$i])) {
                 // ── 1. Thai dictionary words starting at position $i
                 foreach ($this->trie->prefixesFromChars($chars, $i) as $entry) {
-                    $word    = $entry['word'];
-                    $weight  = $entry['weight'];
-                    $wordLen = mb_strlen($word, 'UTF-8');
-                    $j       = $i + $wordLen;
-
-                    if ($j > $n || !$validPos[$j]) {
-                        continue;
-                    }
-
-                    $edgesTo[$j][] = [$i, $word, log($normalizer / $weight)];
-
-                    if (++$edgeCount >= self::MAX_EDGES) {
-                        break 2;
+                    $j = $i + mb_strlen($entry['word'], 'UTF-8');
+                    if ($j <= $n && $validPos[$j]) {
+                        $edges[] = [$j, $entry['word'], log($normalizer / $entry['weight'])];
                     }
                 }
 
@@ -182,78 +198,38 @@ class WeightedTokenizer
                     $abbrLen = mb_strlen($mAbbr[0], 'UTF-8');
                     $j       = $i + $abbrLen;
                     if ($j <= $n && $validPos[$j]) {
-                        $letters       = $abbrLen - substr_count($mAbbr[0], '.');
-                        $abbrCost      = (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost;
-                        $edgesTo[$j][] = [$i, $mAbbr[0], $abbrCost];
+                        $letters  = $abbrLen - substr_count($mAbbr[0], '.');
+                        $edges[]  = [$j, $mAbbr[0], (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost];
                     }
                 }
             } else {
                 // ── 3. Non-Thai tokens (English words, numbers, single symbols, spaces)
                 if (preg_match(self::PAT_NONTHAI, $text, $mNonThai, 0, $bytePos) && $mNonThai[0] !== '') {
-                    $wordLen = mb_strlen($mNonThai[0], 'UTF-8');
-                    $j       = $i + $wordLen;
-                    if ($j <= $n) {
-                        $edgesTo[$j][] = [$i, $mNonThai[0], $rareCost];
-                    }
-                }
-            }
-        }
-
-        // ── Pass 2: Viterbi forward DP ──────────────────────────────────────
-        // dp[j]    — minimum accumulated cost to position j
-        // from[j]  — predecessor position
-        // word[j]  — word token on winning edge into j
-        // isUnk[j] — whether position j was reached via unknown fallback
-        $dp    = array_fill(0, $n + 1, INF);
-        $from  = array_fill(0, $n + 1, -1);
-        $word  = array_fill(0, $n + 1, '');
-        $isUnk = array_fill(0, $n + 1, false);
-        $dp[0] = 0.0;
-
-        for ($j = 1; $j <= $n; $j++) {
-            if (!$validPos[$j]) {
-                continue;
-            }
-
-            // ── Try all dictionary / pattern edges ending at j
-            if (isset($edgesTo[$j])) {
-                foreach ($edgesTo[$j] as [$i, $w, $baseCost]) {
-                    if ($dp[$i] === INF) {
-                        continue;
-                    }
-                    $wLen = max(1, $j - $i);
-
-                    // Apply bigram collocation bonus if bigram model is present
-                    if ($this->bigramModel !== null && $word[$i] !== '') {
-                        $bonus = $this->bigramModel->getBonus($word[$i], $w, $wLen);
-                        $edgeCost = max(0.01, $baseCost - $bonus);
-                    } else {
-                        $edgeCost = $baseCost;
-                    }
-
-                    $newCost = $dp[$i] + $edgeCost;
-
-                    if ($newCost <= $dp[$j] + self::TIE_EPSILON) {
-                        $dp[$j]    = $newCost;
-                        $from[$j]  = $i;
-                        $word[$j]  = $w;
-                        $isUnk[$j] = false;
+                    $j = $i + mb_strlen($mNonThai[0], 'UTF-8');
+                    if ($j <= $n && $validPos[$j]) {
+                        $edges[] = [$j, $mNonThai[0], $rareCost];
                     }
                 }
             }
 
-            // ── Unknown-word fallback: connect to nearest reachable predecessor
-            if ($dp[$j] === INF) {
-                for ($i = $j - 1; $i >= 0; $i--) {
-                    if ($dp[$i] < INF && $validPos[$i]) {
-                        $unknownWord = implode('', array_slice($chars, $i, $j - $i));
-                        $newCost     = $dp[$i] + self::UNKNOWN_COST_FACTOR * $rareCost;
-                        $dp[$j]      = $newCost;
-                        $from[$j]    = $i;
-                        $word[$j]    = $unknownWord;
-                        $isUnk[$j]   = true;
-                        break;
-                    }
+            // ── Relax the edges
+            foreach ($edges as [$j, $w, $baseCost]) {
+                // Apply bigram collocation bonus if bigram model is present
+                if ($this->bigramModel !== null && $word[$i] !== '') {
+                    $bonus    = $this->bigramModel->getBonus($word[$i], $w, $j - $i);
+                    $edgeCost = max(0.01, $baseCost - $bonus);
+                } else {
+                    $edgeCost = $baseCost;
+                }
+
+                $newCost = $dp[$i] + $edgeCost;
+
+                // Ties go to the later start, i.e. the shorter last word (see TIE_EPSILON)
+                if ($newCost <= $dp[$j] + self::TIE_EPSILON) {
+                    $dp[$j]    = $newCost;
+                    $from[$j]  = $i;
+                    $word[$j]  = $w;
+                    $isUnk[$j] = false;
                 }
             }
         }

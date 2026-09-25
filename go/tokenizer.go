@@ -20,19 +20,12 @@ const (
 	// the longest word to the shortest, so on a tie the later, shorter last word
 	// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
 	tieEpsilon = 1e-9
-	maxEdges   = 50000
 )
 
 var (
 	patNonThai = regexp.MustCompile(`^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\x{0e00}-\x{0e7f}a-zA-Z0-9 \t\r\n])`)
 	patAbbr    = regexp.MustCompile(`^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+`)
 )
-
-type dagEdge struct {
-	from int
-	word string
-	cost float64
-}
 
 // Tokenizer performs weighted Thai word segmentation.
 type Tokenizer struct {
@@ -94,116 +87,95 @@ func (tok *Tokenizer) Tokenize(text string, keepWhitespace bool) []string {
 	normalizer := tok.trie.TotalWeight() + 1.0
 	rareCost := math.Log(normalizer)
 
-	// Pass 1: Collect edgesTo[j]
-	edgesTo := make([][]dagEdge, n+1)
-	edgeCount := 0
-
-CollectLoop:
-	for i := 0; i < n; i++ {
-		if !validPos[i] {
-			continue
-		}
-
-		bytePos := charByteOffsets[i]
-		subText := text[bytePos:]
-
-		if isThaiRune(runes[i]) {
-			// 1. Thai dictionary words starting at i
-			matches := tok.trie.Prefixes(runes, i, 25)
-			for _, m := range matches {
-				j := m.End
-				if j > n || !validPos[j] {
-					continue
-				}
-				word := string(runes[i:j])
-				edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: word, cost: math.Log(normalizer / m.Weight)})
-				edgeCount++
-				if edgeCount >= maxEdges {
-					break CollectLoop
-				}
-			}
-
-			// 2. Thai abbreviation patterns
-			if loc := patAbbr.FindStringIndex(subText); loc != nil && loc[0] == 0 {
-				mStr := subText[:loc[1]]
-				abbrLen := len([]rune(mStr))
-				j := i + abbrLen
-				if j <= n && validPos[j] {
-					letters := abbrLen - strings.Count(mStr, ".")
-					cost := (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost
-					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, cost: cost})
-				}
-			}
-		} else {
-			// 3. Non-Thai tokens
-			if loc := patNonThai.FindStringIndex(subText); loc != nil && loc[0] == 0 {
-				mStr := subText[:loc[1]]
-				wordLen := len([]rune(mStr))
-				j := i + wordLen
-				if j <= n {
-					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, cost: rareCost})
-				}
-			}
-		}
-	}
-
-	// Pass 2: Viterbi forward DP
+	// Single-pass Viterbi DP. Positions are visited in order. When position i
+	// is reached, every edge into it has been relaxed, so dp[i] is final: an
+	// unreachable i gets an unknown-word edge, then the edges starting at i are
+	// relaxed right away. Edges are never stored, so memory stays O(n) for any
+	// text length.
 	dp := make([]float64, n+1)
 	from := make([]int, n+1)
 	word := make([]string, n+1)
 	isUnk := make([]bool, n+1)
-
 	for i := range dp {
 		dp[i] = math.Inf(1)
 		from[i] = -1
 	}
 	dp[0] = 0.0
 
-	for j := 1; j <= n; j++ {
-		if !validPos[j] {
+	type outEdge struct {
+		to   int
+		word string
+		cost float64
+	}
+	var edges []outEdge
+
+	for i := 0; i <= n; i++ {
+		if !validPos[i] {
 			continue
 		}
 
-		// Try all dictionary/pattern edges ending at j
-		if len(edgesTo[j]) > 0 {
-			for _, e := range edgesTo[j] {
-				i := e.from
-				if math.IsInf(dp[i], 1) {
-					continue
-				}
-				wLen := j - i
-				if wLen < 1 {
-					wLen = 1
-				}
-				baseCost := e.cost
-				edgeCost := baseCost
-				if tok.bigrams != nil && word[i] != "" {
-					bonus := tok.bigrams.GetBonus(word[i], e.word, wLen)
-					edgeCost = math.Max(0.01, baseCost-bonus)
-				}
-
-				newCost := dp[i] + edgeCost
-				if newCost <= dp[j]+tieEpsilon {
-					dp[j] = newCost
-					from[j] = i
-					word[j] = e.word
-					isUnk[j] = false
+		// Unknown-word fallback: connect to nearest reachable predecessor
+		if math.IsInf(dp[i], 1) {
+			for k := i - 1; k >= 0; k-- {
+				if !math.IsInf(dp[k], 1) && validPos[k] {
+					dp[i] = dp[k] + unknownCostFactor*rareCost
+					from[i] = k
+					word[i] = string(runes[k:i])
+					isUnk[i] = true
+					break
 				}
 			}
 		}
 
-		// Unknown-word fallback: connect to nearest reachable predecessor
-		if math.IsInf(dp[j], 1) {
-			for i := j - 1; i >= 0; i-- {
-				if !math.IsInf(dp[i], 1) && validPos[i] {
-					unknownWord := string(runes[i:j])
-					newCost := dp[i] + unknownCostFactor*rareCost
-					dp[j] = newCost
-					from[j] = i
-					word[j] = unknownWord
-					isUnk[j] = true
-					break
+		if i == n {
+			break
+		}
+
+		// Edges starting at i
+		edges = edges[:0]
+		subText := text[charByteOffsets[i]:]
+
+		if isThaiRune(runes[i]) {
+			// 1. Thai dictionary words starting at i
+			for _, m := range tok.trie.Prefixes(runes, i, 25) {
+				if j := m.End; j <= n && validPos[j] {
+					edges = append(edges, outEdge{j, string(runes[i:j]), math.Log(normalizer / m.Weight)})
 				}
+			}
+
+			// 2. Thai abbreviation patterns
+			if loc := patAbbr.FindStringIndex(subText); loc != nil && loc[0] == 0 {
+				mStr := subText[:loc[1]]
+				abbrLen := utf8.RuneCountInString(mStr)
+				if j := i + abbrLen; j <= n && validPos[j] {
+					letters := abbrLen - strings.Count(mStr, ".")
+					edges = append(edges, outEdge{j, mStr, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost})
+				}
+			}
+		} else {
+			// 3. Non-Thai tokens
+			if loc := patNonThai.FindStringIndex(subText); loc != nil && loc[0] == 0 {
+				mStr := subText[:loc[1]]
+				if j := i + utf8.RuneCountInString(mStr); j <= n && validPos[j] {
+					edges = append(edges, outEdge{j, mStr, rareCost})
+				}
+			}
+		}
+
+		// Relax the edges
+		for _, e := range edges {
+			edgeCost := e.cost
+			if tok.bigrams != nil && word[i] != "" {
+				bonus := tok.bigrams.GetBonus(word[i], e.word, e.to-i)
+				edgeCost = math.Max(0.01, e.cost-bonus)
+			}
+
+			// Ties go to the later start, i.e. the shorter last word (see tieEpsilon)
+			if newCost := dp[i] + edgeCost; newCost <= dp[e.to]+tieEpsilon {
+				dp[e.to] = newCost
+				from[e.to] = i
+				word[e.to] = e.word
+				isUnk[e.to] = false
 			}
 		}
 	}

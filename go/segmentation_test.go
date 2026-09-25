@@ -16,6 +16,20 @@ var segmentationCases = []struct{ name, input, want string }{
 	{"ties keep the earlier word whole (2)", "ลาออกจากรองประธาน", "ลาออก|จาก|รอง|ประธาน"},
 }
 
+func TestLongTextIsSegmentedToTheEnd(t *testing.T) {
+	// Longer than the 50,000-edge limit that used to leave the rest of the text as one token
+	sentence := "การประชุมสามัญผู้ถือหุ้นประจำปีจัดขึ้นที่โรงแรมในกรุงเทพมหานคร"
+	words := Words(strings.Repeat(sentence, 2000))
+	if want := 2000 * len(Words(sentence)); len(words) != want {
+		t.Fatalf("got %d words, want %d", len(words), want)
+	}
+	for _, w := range words {
+		if len([]rune(w)) >= 20 {
+			t.Fatalf("unexpected long token of %d characters", len([]rune(w)))
+		}
+	}
+}
+
 func TestSegmentation(t *testing.T) {
 	for _, c := range segmentationCases {
 		if got := strings.Join(Words(c.input), "|"); got != c.want {

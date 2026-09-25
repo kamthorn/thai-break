@@ -23,6 +23,15 @@ class SegmentationTest extends TestCase
         ];
     }
 
+    public function testLongTextIsSegmentedToTheEnd(): void
+    {
+        // Longer than the 50,000-edge limit that used to leave the rest of the text as one token
+        $sentence = 'การประชุมสามัญผู้ถือหุ้นประจำปีจัดขึ้นที่โรงแรมในกรุงเทพมหานคร';
+        $words    = ThaiTokenizer::getDefault()->tokenize(str_repeat($sentence, 2000));
+        $this->assertCount(2000 * count(ThaiTokenizer::getDefault()->tokenize($sentence)), $words);
+        $this->assertLessThan(20, max(array_map('mb_strlen', $words)));
+    }
+
     #[DataProvider('segmentationCases')]
     public function testTokenize(string $input, string $expected): void
     {
