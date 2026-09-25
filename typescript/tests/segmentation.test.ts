@@ -17,6 +17,14 @@ const SEGMENTATION_CASES: [string, string, string][] = [
   ['ties keep the earlier word whole (2)', 'ลาออกจากรองประธาน', 'ลาออก|จาก|รอง|ประธาน'],
 ];
 
+test('long text is segmented to the end', () => {
+  // Longer than the 50,000-edge limit that used to leave the rest of the text as one token
+  const sentence = 'การประชุมสามัญผู้ถือหุ้นประจำปีจัดขึ้นที่โรงแรมในกรุงเทพมหานคร';
+  const result = words(sentence.repeat(2000));
+  assert.strictEqual(result.length, 2000 * words(sentence).length);
+  assert.ok(result.every((w) => Array.from(w).length < 20));
+});
+
 test('segmentation', () => {
   for (const [name, input, expected] of SEGMENTATION_CASES) {
     assert.strictEqual(words(input).join('|'), expected, name);
