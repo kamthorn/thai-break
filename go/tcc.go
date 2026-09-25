@@ -26,12 +26,12 @@ func initTCCRegex() {
 			"เc็ck",
 			"เcctาะk",
 			"เccีtยะk",
-			"เcc็ck",
+			"เ(?:c[รลว]|หc)็ck",
 			"เcิc์ck",
 			"เcิtck",
 			"เcีtยะ?k",
 			"เcืtอะk",
-			"เcื",
+			"เcืtอ?k",
 			"เctา?ะ?k",
 			"c[ึื]tck",
 			"c[ะ-ู]tk",
@@ -42,7 +42,7 @@ func initTCCRegex() {
 			"แc็ck",
 			"แcc์k",
 			"แctะk",
-			"แcc็ck",
+			"แ(?:c[รลว]|หc)็ck",
 			"แccc์k",
 			"โctะk",
 			"[เ-ไ]ctk",
@@ -134,7 +134,7 @@ func TCCPosArray(runes []rune) []bool {
 
 		// Second, test general rules
 		if loc := tccGeneralPattern.FindStringIndex(sub); loc != nil && loc[1] > 0 {
-			bytePos += loc[1]
+			bytePos += clusterLen(sub[:loc[1]], sub[loc[1]:])
 			if idx, ok := byteToRune[bytePos]; ok {
 				valid[idx] = true
 			}
@@ -157,5 +157,30 @@ func TCCPosArray(runes []rune) []bool {
 		}
 	}
 
+	// Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
+	for i := 1; i < n; i++ {
+		if isDependentThai(runes[i]) {
+			valid[i] = false
+		}
+	}
+
 	return valid
+}
+
+// clusterLen returns the byte length of a matched cluster. A final consonant
+// followed by a dependent vowel or mark starts the next cluster instead:
+// "รึยัง" is "รึ" + "ยัง", not "รึย" + "ัง". Except ว before ะ, which is part
+// of the vowel -ัวะ ("ผัวะ").
+func clusterLen(match, rest string) int {
+	last, size := utf8.DecodeLastRuneInString(match)
+	next, _ := utf8.DecodeRuneInString(rest)
+	if utf8.RuneCountInString(match) > 1 && last >= 'ก' && last <= 'ฮ' && isDependentThai(next) && !(last == 'ว' && next == 'ะ') {
+		return len(match) - size
+	}
+	return len(match)
+}
+
+// isDependentThai reports whether r can never start a cluster: ะ ั า ำ ิ–ฺ ๅ ็–๎.
+func isDependentThai(r rune) bool {
+	return (r >= 0x0E30 && r <= 0x0E3A) || r == 0x0E45 || (r >= 0x0E47 && r <= 0x0E4E)
 }

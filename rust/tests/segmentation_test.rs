@@ -1,5 +1,5 @@
 use std::path::Path;
-use thaibreak::{set_default, words, ThaiTrie, Tokenizer};
+use thaibreak::{set_default, tcc_pos_array, words, ThaiTrie, Tokenizer};
 
 fn init_test_dict() {
     let dict_path = "../data/words.txt";
@@ -18,6 +18,8 @@ const SEGMENTATION_CASES: &[(&str, &str, &str)] = &[
     ("an abbreviation after a word that ends like one", "ในเดือนพ.ย.", "ใน|เดือน|พ.ย."),
     ("ties keep the earlier word whole", "บอกว่าอึดอัด", "บอก|ว่า|อึดอัด"),
     ("ties keep the earlier word whole (2)", "ลาออกจากรองประธาน", "ลาออก|จาก|รอง|ประธาน"),
+    ("ก็ is not swallowed by the cluster before it", "ทะเลก็สวย", "ทะเล|ก็|สวย"),
+    ("a final consonant before a vowel starts the next cluster", "รึยัง", "รึ|ยัง"),
 ];
 
 #[test]
@@ -28,6 +30,18 @@ fn test_long_text_is_segmented_to_the_end() {
     let result = words(&sentence.repeat(2000));
     assert_eq!(result.len(), 2000 * words(sentence).len());
     assert!(result.iter().all(|w| w.chars().count() < 20));
+}
+
+#[test]
+fn test_tcc_never_splits_before_a_vowel_or_tone_mark() {
+    for word in ["เมื่อ", "เนื้อ", "เบื่อ", "ต้น", "เกล็ด", "เหม็น", "ลั๊วะ"] {
+        let chars: Vec<char> = word.chars().collect();
+        let valid = tcc_pos_array(&chars);
+        for i in 1..chars.len() {
+            let dependent = matches!(chars[i] as u32, 0x0E30..=0x0E3A | 0x0E45 | 0x0E47..=0x0E4E);
+            assert!(!(dependent && valid[i]), "boundary before {} in {}", chars[i], word);
+        }
+    }
 }
 
 #[test]
