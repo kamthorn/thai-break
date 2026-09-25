@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -41,6 +42,11 @@ func CanBreakBetween(left, right string) bool {
 	dict := make([]bool, len(cps)+1)
 	dict[at] = true
 
+	// Whitespace safety: never insert break adjacent to spaces
+	if unicode.IsSpace(cps[at-1]) || unicode.IsSpace(cps[at]) {
+		return false
+	}
+
 	return lbBreakOpportunities(cps, dict)[at] == lbAllowed && passesTypographicRules(left, right)
 }
 
@@ -49,11 +55,6 @@ func CanBreakBetween(left, right string) bool {
 func passesTypographicRules(left, right string) bool {
 	leftRunes := []rune(left)
 	rightRunes := []rune(right)
-
-	// Whitespace safety
-	if unicode.IsSpace(leftRunes[len(leftRunes)-1]) || unicode.IsSpace(rightRunes[0]) {
-		return false
-	}
 
 	// No break after opening symbols
 	if reNoBreakAfter.MatchString(left) {
@@ -109,10 +110,32 @@ func (b *LineBreaker) InsertLineBreaks(text string, marker string, isHtml bool) 
 }
 
 func (b *LineBreaker) processPlain(text string, marker string) string {
+	var sb strings.Builder
+	prev := ""
+	for _, seg := range b.breakSegments(text) {
+		// Breaks after spaces and ZWSP are already implicit: never put a marker next to them
+		if prev != "" {
+			if last, _ := utf8.DecodeLastRuneInString(prev); !unicode.IsSpace(last) && last != '\u200B' {
+				sb.WriteString(marker)
+			}
+		}
+		sb.WriteString(seg)
+		prev = seg
+	}
+	return sb.String()
+}
+
+// breakSegments splits plain text into segments that must not be broken
+// internally. A line may break between any two segments; spaces stay at the
+// end of the segment they follow.
+func (b *LineBreaker) breakSegments(text string) []string {
 	tokens := b.tokenizer.Tokenize(text, true)
 	n := len(tokens)
 	if n <= 1 {
-		return text
+		if text == "" {
+			return nil
+		}
+		return []string{text}
 	}
 
 	// Token ends are the dictionary word boundaries inside Thai runs
@@ -128,14 +151,16 @@ func (b *LineBreaker) processPlain(text string, marker string) string {
 	}
 	actions := lbBreakOpportunities(cps, dict)
 
-	var sb strings.Builder
+	var segments []string
+	var cur strings.Builder
 	for i := 0; i < n; i++ {
-		sb.WriteString(tokens[i])
+		cur.WriteString(tokens[i])
 		if i+1 < n && actions[ends[i]] == lbAllowed && passesTypographicRules(tokens[i], tokens[i+1]) {
-			sb.WriteString(marker)
+			segments = append(segments, cur.String())
+			cur.Reset()
 		}
 	}
-	return sb.String()
+	return append(segments, cur.String())
 }
 
 func (b *LineBreaker) processHtml(html string, marker string) string {
@@ -155,6 +180,10 @@ func (b *LineBreaker) processHtml(html string, marker string) string {
 }
 
 // Wrap soft-wraps Thai text to fit within `width` visual columns.
+//
+// Lines break only at the same break opportunities that InsertLineBreaks
+// marks, or after spaces. Trailing spaces are trimmed. With cutLongWords, a
+// segment wider than a line is force-broken.
 func (b *LineBreaker) Wrap(text string, width int, breakSep string, cutLongWords bool) string {
 	if text == "" || width <= 0 {
 		return text
@@ -164,59 +193,36 @@ func (b *LineBreaker) Wrap(text string, width int, breakSep string, cutLongWords
 	}
 
 	paragraphs := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
-	var wrappedParagraphs []string
+	wrappedParagraphs := make([]string, 0, len(paragraphs))
 
 	for _, para := range paragraphs {
-		if para == "" {
-			wrappedParagraphs = append(wrappedParagraphs, "")
-			continue
-		}
-
-		tokens := b.tokenizer.Tokenize(para, true)
 		var lines []string
 		curLine := ""
 		curWidth := 0
 
-		for _, tok := range tokens {
-			if tok == "" {
-				continue
-			}
+		for _, seg := range b.breakSegments(para) {
+			// Trailing spaces may hang past the margin, so only the visible part must fit
+			visible := strings.TrimRightFunc(seg, unicode.IsSpace)
+			visibleWidth := ThaiDisplayWidth(visible)
 
-			w := ThaiDisplayWidth(tok)
-
-			// Skip leading whitespace on new line
-			if curLine == "" && strings.TrimSpace(tok) == "" {
-				continue
-			}
-
-			if curWidth+w <= width {
-				curLine += tok
-				curWidth += w
-			} else {
-				if curLine != "" {
-					// Hanging punctuation rule
-					if reNoBreakBefore.MatchString(tok) && curWidth+w <= width+3 {
-						curLine += tok
-						curWidth += w
-						continue
-					}
-
-					lines = append(lines, strings.TrimRightFunc(curLine, unicode.IsSpace))
-
-					if strings.TrimSpace(tok) == "" {
-						curLine = ""
-						curWidth = 0
-						continue
-					}
-
-					curLine = tok
-					curWidth = w
-				} else {
-					lines = append(lines, tok)
-					curLine = ""
-					curWidth = 0
+			if curLine != "" && curWidth+visibleWidth > width {
+				// Indentation that does not fit is dropped rather than left as an empty line
+				if trimmed := strings.TrimRightFunc(curLine, unicode.IsSpace); trimmed != "" {
+					lines = append(lines, trimmed)
 				}
+				curLine = ""
+				curWidth = 0
 			}
+
+			// A single segment wider than the line
+			if curLine == "" && cutLongWords && visibleWidth > width {
+				pieces := cutToWidth(visible, width)
+				lines = append(lines, pieces[:len(pieces)-1]...)
+				seg = pieces[len(pieces)-1] + seg[len(visible):]
+			}
+
+			curLine += seg
+			curWidth += ThaiDisplayWidth(seg)
 		}
 
 		if curLine != "" {
@@ -227,4 +233,24 @@ func (b *LineBreaker) Wrap(text string, width int, breakSep string, cutLongWords
 	}
 
 	return strings.Join(wrappedParagraphs, breakSep)
+}
+
+// cutToWidth force-breaks text that is wider than a line into pieces of at
+// most width columns.
+func cutToWidth(text string, width int) []string {
+	var pieces []string
+	part := ""
+	partW := 0
+	for _, ch := range text {
+		cw := ThaiDisplayWidth(string(ch))
+		if partW+cw > width && part != "" {
+			pieces = append(pieces, part)
+			part = string(ch)
+			partW = cw
+		} else {
+			part += string(ch)
+			partW += cw
+		}
+	}
+	return append(pieces, part)
 }

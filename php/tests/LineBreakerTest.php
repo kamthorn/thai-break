@@ -26,6 +26,25 @@ class LineBreakerTest extends TestCase
         $this->assertSame($expected, ThaiTokenizer::getDefault()->insertLineBreaks($input, '|'));
     }
 
+    /** @return array<string, array{string, int, list<string>}> Input, width and expected lines */
+    public static function wrapCases(): array
+    {
+        return [
+            'an opening bracket never ends a line' => ['ประชาชน (ทั่วประเทศ) ไป', 9, ['ประชาชน', '(ทั่ว', 'ประเทศ)', 'ไป']],
+            'a dash never starts a line' => ['ภาษาไทย–อังกฤษ', 7, ['ภาษา', 'ไทย–', 'อังกฤษ']],
+            'mai yamok never starts a line' => ['ทดสอบเด็กๆๆๆๆๆๆ', 5, ['ทดสอบ', 'เด็กๆๆๆๆๆๆ']],
+            'an opening quote never ends a line' => ['สวัสดีครับ “ท่านผู้ชม”', 11, ['สวัสดีครับ', '“ท่านผู้ชม”']],
+            'indentation that does not fit is dropped' => ['  ย่อหน้า ใหม่ ครับ', 6, ['ย่อหน้า', 'ใหม่', 'ครับ']],
+        ];
+    }
+
+    /** @param list<string> $expected */
+    #[DataProvider('wrapCases')]
+    public function testWrap(string $input, int $width, array $expected): void
+    {
+        $this->assertSame($expected, explode("\n", ThaiTokenizer::getDefault()->wrap($input, $width)));
+    }
+
     public function testMandatoryBreaks(): void
     {
         $cps = array_map('mb_ord', mb_str_split("a\r\nb"));
