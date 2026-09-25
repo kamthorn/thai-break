@@ -24,16 +24,16 @@ export function canBreakBetween(left: string, right: string): boolean {
   const dict: boolean[] = new Array(cps.length + 1).fill(false);
   dict[at] = true;
 
-  return breakOpportunities(cps, dict)[at] === ALLOWED && passesTypographicRules(left, right);
-}
-
-/** Legacy token-level rules that are not yet expressed as UAX #14 rules. */
-function passesTypographicRules(left: string, right: string): boolean {
   // Whitespace safety: never insert break adjacent to spaces
   if (/\s$/.test(left) || /^\s/.test(right)) {
     return false;
   }
 
+  return breakOpportunities(cps, dict)[at] === ALLOWED && passesTypographicRules(left, right);
+}
+
+/** Legacy token-level rules that are not yet expressed as UAX #14 rules. */
+function passesTypographicRules(left: string, right: string): boolean {
   // No break after opening symbols
   if (PAT_NO_BREAK_AFTER.test(left)) {
     return false;
@@ -104,9 +104,28 @@ export class LineBreaker {
   }
 
   private processPlain(text: string, marker: string): string {
+    let res = '';
+    let prev = '';
+    for (const seg of this.breakSegments(text)) {
+      // Breaks after spaces and ZWSP are already implicit: never put a marker next to them
+      if (prev && !/[\s\u200B]$/.test(prev)) {
+        res += marker;
+      }
+      res += seg;
+      prev = seg;
+    }
+    return res;
+  }
+
+  /**
+   * Split plain text into segments that must not be broken internally. A line
+   * may break between any two segments; spaces stay at the end of the segment
+   * they follow.
+   */
+  private breakSegments(text: string): string[] {
     const tokens = this.tokenizer.tokenize(text, true);
     const n = tokens.length;
-    if (n <= 1) return text;
+    if (n <= 1) return text ? [text] : [];
 
     // Token ends are the dictionary word boundaries inside Thai runs
     const cps: number[] = [];
@@ -121,14 +140,17 @@ export class LineBreaker {
     }
     const actions = breakOpportunities(cps, dict);
 
-    let res = '';
+    const segments: string[] = [];
+    let cur = '';
     for (let i = 0; i < n; i++) {
-      res += tokens[i];
+      cur += tokens[i];
       if (i + 1 < n && actions[ends[i]] === ALLOWED && passesTypographicRules(tokens[i], tokens[i + 1])) {
-        res += marker;
+        segments.push(cur);
+        cur = '';
       }
     }
-    return res;
+    segments.push(cur);
+    return segments;
   }
 
   private processHtml(html: string, marker: string): string {
@@ -150,41 +172,47 @@ export class LineBreaker {
   }
 
   /**
-   * Hard-wrap text into lines with maximum visual display width.
+   * Hard-wrap text into lines with maximum visual display width, breaking only
+   * at the same opportunities that insertLineBreaks() marks or after spaces.
+   * Trailing spaces are trimmed.
    */
   wrap(text: string, width: number, isHtml: boolean = false): string {
     if (!text || width <= 0) return text;
 
-    const broken = this.insertLineBreaks(text, DEFAULT_BREAK_MARKER, isHtml);
-    const paragraphs = broken.split(/\r?\n/);
     const wrappedParagraphs: string[] = [];
-
-    for (const para of paragraphs) {
-      // Break units end at a marker or after a run of spaces (spaces are break
-      // opportunities too, but markers are never inserted next to them).
-      const units = para.split(/\u200B|(?<=\s)(?=\S)/);
-      let curLine = '';
-      let curWidth = 0;
-      const lines: string[] = [];
-
-      for (const unit of units) {
-        // Trailing spaces may hang past the margin, so only the visible part must fit.
-        const visibleWidth = thaiDisplayWidth(unit.trimEnd());
-        if (curWidth + visibleWidth > width && curLine.length > 0) {
-          lines.push(curLine.trimEnd());
-          curLine = unit;
-          curWidth = thaiDisplayWidth(unit);
-        } else {
-          curLine += unit;
-          curWidth += thaiDisplayWidth(unit);
-        }
-      }
-      if (curLine.length > 0) {
-        lines.push(curLine.trimEnd());
-      }
-      wrappedParagraphs.push(lines.join('\n'));
+    for (const para of text.split(/\r?\n/)) {
+      // Tags stay intact in insertLineBreaks(): break at its markers and after spaces
+      const segments = isHtml
+        ? this.insertLineBreaks(para, DEFAULT_BREAK_MARKER, true).split(/\u200B|(?<=\s)(?=\S)/)
+        : this.breakSegments(para);
+      wrappedParagraphs.push(fillLines(segments, width).join('\n'));
     }
 
     return wrappedParagraphs.join('\n');
   }
+}
+
+/** Greedily fill lines of at most `width` display columns with unbreakable segments. */
+function fillLines(segments: string[], width: number): string[] {
+  const lines: string[] = [];
+  let curLine = '';
+  let curWidth = 0;
+  for (const seg of segments) {
+    // Trailing spaces may hang past the margin, so only the visible part must fit
+    const visibleWidth = thaiDisplayWidth(seg.trimEnd());
+    if (curLine && curWidth + visibleWidth > width) {
+      // Indentation that does not fit is dropped rather than left as an empty line
+      if (curLine.trimEnd()) {
+        lines.push(curLine.trimEnd());
+      }
+      curLine = '';
+      curWidth = 0;
+    }
+    curLine += seg;
+    curWidth += thaiDisplayWidth(seg);
+  }
+  if (curLine) {
+    lines.push(curLine.trimEnd());
+  }
+  return lines;
 }

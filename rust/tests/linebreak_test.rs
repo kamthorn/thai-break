@@ -1,5 +1,5 @@
 use std::path::Path;
-use thaibreak::{lines, set_default, ThaiTrie, Tokenizer};
+use thaibreak::{lines, set_default, wrap, ThaiTrie, Tokenizer};
 
 fn init_test_dict() {
     let dict_path = "../data/words.txt";
@@ -21,5 +21,22 @@ fn test_insert_line_breaks_uax14() {
     init_test_dict();
     for (name, input, expected) in LINE_BREAK_CASES {
         assert_eq!(lines(input, "|", false), *expected, "{name}");
+    }
+}
+
+/// (name, input, width, expected lines)
+const WRAP_CASES: &[(&str, &str, usize, &[&str])] = &[
+    ("an opening bracket never ends a line", "ประชาชน (ทั่วประเทศ) ไป", 9, &["ประชาชน", "(ทั่ว", "ประเทศ)", "ไป"]),
+    ("a dash never starts a line", "ภาษาไทย–อังกฤษ", 7, &["ภาษา", "ไทย–", "อังกฤษ"]),
+    ("mai yamok never starts a line", "ทดสอบเด็กๆๆๆๆๆๆ", 5, &["ทดสอบ", "เด็กๆๆๆๆๆๆ"]),
+    ("an opening quote never ends a line", "สวัสดีครับ “ท่านผู้ชม”", 11, &["สวัสดีครับ", "“ท่านผู้ชม”"]),
+    ("indentation that does not fit is dropped", "  ย่อหน้า ใหม่ ครับ", 6, &["ย่อหน้า", "ใหม่", "ครับ"]),
+];
+
+#[test]
+fn test_wrap_uax14() {
+    init_test_dict();
+    for (name, input, width, expected) in WRAP_CASES {
+        assert_eq!(wrap(input, *width, false).split('\n').collect::<Vec<_>>(), *expected, "{name}");
     }
 }

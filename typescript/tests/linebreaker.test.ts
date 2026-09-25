@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import * as assert from 'node:assert';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { init, lines } from '../dist/index.js';
+import { init, lines, wrap } from '../dist/index.js';
 import { breakOpportunities, NO_BREAK, MANDATORY } from '../dist/uax14.js';
 
 init({ dictPath: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/words.txt') });
@@ -17,6 +17,21 @@ const LINE_BREAK_CASES: [string, string, string][] = [
 test('insertLineBreaks follows UAX #14', () => {
   for (const [name, input, expected] of LINE_BREAK_CASES) {
     assert.strictEqual(lines(input, false, '|'), expected, name);
+  }
+});
+
+/** [name, input, width, expected lines] */
+const WRAP_CASES: [string, string, number, string[]][] = [
+  ['an opening bracket never ends a line', 'ประชาชน (ทั่วประเทศ) ไป', 9, ['ประชาชน', '(ทั่ว', 'ประเทศ)', 'ไป']],
+  ['a dash never starts a line', 'ภาษาไทย–อังกฤษ', 7, ['ภาษา', 'ไทย–', 'อังกฤษ']],
+  ['mai yamok never starts a line', 'ทดสอบเด็กๆๆๆๆๆๆ', 5, ['ทดสอบ', 'เด็กๆๆๆๆๆๆ']],
+  ['an opening quote never ends a line', 'สวัสดีครับ “ท่านผู้ชม”', 11, ['สวัสดีครับ', '“ท่านผู้ชม”']],
+  ['indentation that does not fit is dropped', '  ย่อหน้า ใหม่ ครับ', 6, ['ย่อหน้า', 'ใหม่', 'ครับ']],
+];
+
+test('wrap breaks only at UAX #14 opportunities', () => {
+  for (const [name, input, width, expected] of WRAP_CASES) {
+    assert.deepStrictEqual(wrap(input, width).split('\n'), expected, name);
   }
 });
 

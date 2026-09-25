@@ -89,8 +89,8 @@ class ThaiLineBreaker
      * Wrap Thai text into lines of at most `$width` display columns.
      *
      * Uses visual display width (where Thai combining vowels and tone marks
-     * take 0 columns), breaking only at valid word boundaries and adhering to
-     * line-start/line-end typographic constraints.
+     * take 0 columns) and breaks only at the same break opportunities that
+     * insertLineBreaks() marks, or after spaces. Trailing spaces are trimmed.
      *
      * @param  string $text          UTF-8 plain text
      * @param  int    $width         Maximum display width per line in columns
@@ -109,80 +109,33 @@ class ThaiLineBreaker
         $wrappedParagraphs = [];
 
         foreach ($paragraphs as $para) {
-            if ($para === '') {
-                $wrappedParagraphs[] = '';
-                continue;
-            }
-
-            $tokens = $this->tokenizer->tokenize($para, true);
-            $lines = [];
-            $curLine = '';
+            $lines    = [];
+            $curLine  = '';
             $curWidth = 0;
 
-            foreach ($tokens as $tok) {
-                if ($tok === '') {
-                    continue;
-                }
+            foreach ($this->breakSegments($para) as $seg) {
+                // Trailing spaces may hang past the margin, so only the visible part must fit
+                $visible      = rtrim($seg);
+                $visibleWidth = self::thaiDisplayWidth($visible);
 
-                $w = self::thaiDisplayWidth($tok);
-
-                // If leading whitespace on a fresh line, skip it
-                if ($curLine === '' && trim($tok) === '') {
-                    continue;
-                }
-
-                if ($curWidth + $w <= $width) {
-                    $curLine  .= $tok;
-                    $curWidth += $w;
-                } else {
-                    // Current line is full
-                    if ($curLine !== '') {
-                        // Check hanging punctuation rule: if $tok cannot start a line (e.g. ๆ or ))
-                        // and current line is not empty, allow hanging onto the current line
-                        if (preg_match(self::PAT_NO_BREAK_BEFORE, $tok) && $curWidth + $w <= $width + 3) {
-                            $curLine  .= $tok;
-                            $curWidth += $w;
-                            continue;
-                        }
-
+                if ($curLine !== '' && $curWidth + $visibleWidth > $width) {
+                    // Indentation that does not fit is dropped rather than left as an empty line
+                    if (rtrim($curLine) !== '') {
                         $lines[] = rtrim($curLine);
-
-                        // If the next token starting the new line is whitespace, skip it
-                        if (trim($tok) === '') {
-                            $curLine  = '';
-                            $curWidth = 0;
-                            continue;
-                        }
-
-                        $curLine  = $tok;
-                        $curWidth = $w;
-                    } else {
-                        // Single token exceeds line width
-                        if ($cutLongWords && $w > $width) {
-                            // Break long token by TCC/chars
-                            $chars = preg_split('//u', $tok, -1, PREG_SPLIT_NO_EMPTY) ?: [$tok];
-                            $part = '';
-                            $partW = 0;
-                            foreach ($chars as $ch) {
-                                $cw = self::thaiDisplayWidth($ch);
-                                if ($partW + $cw > $width && $part !== '') {
-                                    $lines[] = $part;
-                                    $part = $ch;
-                                    $partW = $cw;
-                                } else {
-                                    $part .= $ch;
-                                    $partW += $cw;
-                                }
-                            }
-                            $curLine  = $part;
-                            $curWidth = $partW;
-                        } else {
-                            $lines[]  = $tok;
-                            $curLine  = '';
-                            $curWidth = 0;
-                        }
                     }
+                    $curLine  = '';
+                    $curWidth = 0;
                 }
+
+                // A single segment wider than the line
+                if ($curLine === '' && $cutLongWords && $visibleWidth > $width) {
+                    $pieces = self::cutToWidth($visible, $width);
+                    $seg    = array_pop($pieces) . substr($seg, strlen($visible));
+                    array_push($lines, ...$pieces);
+                }
+
+                $curLine  .= $seg;
+                $curWidth += self::thaiDisplayWidth($seg);
             }
 
             if ($curLine !== '') {
@@ -215,6 +168,11 @@ class ThaiLineBreaker
         $dict = array_fill(0, count($cps) + 1, false);
         $dict[$at] = true;
 
+        // Whitespace safety: never insert break adjacent to spaces
+        if (preg_match('/\s$/u', $left) || preg_match('/^\s/u', $right)) {
+            return false;
+        }
+
         return Uax14::breakOpportunities($cps, $dict)[$at] === Uax14::ALLOWED
             && self::passesTypographicRules($left, $right);
     }
@@ -224,11 +182,6 @@ class ThaiLineBreaker
      */
     private static function passesTypographicRules(string $left, string $right): bool
     {
-        // 1. Whitespace safety: never insert break adjacent to spaces
-        if (preg_match('/\s$/u', $left) || preg_match('/^\s/u', $right)) {
-            return false;
-        }
-
         // 2. Left token must not end a line (open brackets, prefix currency/tags)
         if (preg_match(self::PAT_NO_BREAK_AFTER, $left)) {
             return false;
@@ -275,15 +228,38 @@ class ThaiLineBreaker
     // ──────────────────────────────────────────────────────────────────────
 
     /**
-     * Process plain text by tokenizing and inserting break markers where permitted.
+     * Process plain text by inserting break markers between break segments.
      */
     private function processPlainText(string $text, string $breakMarker): string
+    {
+        $out  = '';
+        $prev = '';
+        foreach ($this->breakSegments($text) as $seg) {
+            // Breaks after spaces and ZWSP are already implicit: never put a marker next to them
+            if ($prev !== '' && !preg_match('/[\s\x{200B}]$/u', $prev)) {
+                $out .= $breakMarker;
+            }
+            $out .= $seg;
+            $prev = $seg;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Split plain text into segments that must not be broken internally.
+     * A line may break between any two segments; spaces stay at the end of
+     * the segment they follow.
+     *
+     * @return list<string>
+     */
+    private function breakSegments(string $text): array
     {
         $tokens = $this->tokenizer->tokenize($text, true);
         $n      = count($tokens);
 
         if ($n <= 1) {
-            return $text;
+            return $text === '' ? [] : [$text];
         }
 
         // Token ends are the dictionary word boundaries inside Thai runs
@@ -299,16 +275,45 @@ class ThaiLineBreaker
         }
         $actions = Uax14::breakOpportunities($cps, $dict);
 
-        $out = '';
+        $segments = [];
+        $cur      = '';
         for ($i = 0; $i < $n; $i++) {
-            $out .= $tokens[$i];
+            $cur .= $tokens[$i];
             if ($i + 1 < $n && $actions[$ends[$i]] === Uax14::ALLOWED
                 && self::passesTypographicRules($tokens[$i], $tokens[$i + 1])) {
-                $out .= $breakMarker;
+                $segments[] = $cur;
+                $cur        = '';
             }
         }
+        $segments[] = $cur;
 
-        return $out;
+        return $segments;
+    }
+
+    /**
+     * Force-break text that is wider than a line into pieces of at most $width columns.
+     *
+     * @return non-empty-list<string>
+     */
+    private static function cutToWidth(string $text, int $width): array
+    {
+        $pieces = [];
+        $part   = '';
+        $partW  = 0;
+        foreach (preg_split('//u', $text, -1, PREG_SPLIT_NO_EMPTY) ?: [$text] as $ch) {
+            $cw = self::thaiDisplayWidth($ch);
+            if ($partW + $cw > $width && $part !== '') {
+                $pieces[] = $part;
+                $part     = $ch;
+                $partW    = $cw;
+            } else {
+                $part  .= $ch;
+                $partW += $cw;
+            }
+        }
+        $pieces[] = $part;
+
+        return $pieces;
     }
 
     /**

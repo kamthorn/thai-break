@@ -2,6 +2,7 @@ package thaibreak
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -16,6 +17,28 @@ func TestInsertLineBreaksUAX14(t *testing.T) {
 	for _, c := range lineBreakCases {
 		if got := GetDefaultLineBreaker().InsertLineBreaks(c.input, "|", false); got != c.want {
 			t.Errorf("%s: InsertLineBreaks(%q) = %q, want %q", c.name, c.input, got, c.want)
+		}
+	}
+}
+
+// wrapCases maps input and width to the expected lines.
+var wrapCases = []struct {
+	name, input string
+	width       int
+	want        []string
+}{
+	{"an opening bracket never ends a line", "ประชาชน (ทั่วประเทศ) ไป", 9, []string{"ประชาชน", "(ทั่ว", "ประเทศ)", "ไป"}},
+	{"a dash never starts a line", "ภาษาไทย–อังกฤษ", 7, []string{"ภาษา", "ไทย–", "อังกฤษ"}},
+	{"mai yamok never starts a line", "ทดสอบเด็กๆๆๆๆๆๆ", 5, []string{"ทดสอบ", "เด็กๆๆๆๆๆๆ"}},
+	{"an opening quote never ends a line", "สวัสดีครับ “ท่านผู้ชม”", 11, []string{"สวัสดีครับ", "“ท่านผู้ชม”"}},
+	{"indentation that does not fit is dropped", "  ย่อหน้า ใหม่ ครับ", 6, []string{"ย่อหน้า", "ใหม่", "ครับ"}},
+}
+
+func TestWrapUAX14(t *testing.T) {
+	for _, c := range wrapCases {
+		got := strings.Split(GetDefaultLineBreaker().Wrap(c.input, c.width, "\n", false), "\n")
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("%s: Wrap(%q, %d) = %q, want %q", c.name, c.input, c.width, got, c.want)
 		}
 	}
 }

@@ -39,17 +39,17 @@ pub fn can_break_between(left: &str, right: &str) -> bool {
     let mut dict = vec![false; cps.len() + 1];
     dict[at] = true;
 
+    // Whitespace safety: never insert break adjacent to spaces
+    if left.ends_with(char::is_whitespace) || right.starts_with(char::is_whitespace) {
+        return false;
+    }
+
     uax14::break_opportunities(&cps, Some(&dict))[at] == uax14::ALLOWED
         && passes_typographic_rules(left, right)
 }
 
 /// Legacy token-level rules that are not yet expressed as UAX #14 rules.
 fn passes_typographic_rules(left: &str, right: &str) -> bool {
-    // Whitespace safety
-    if left.ends_with(char::is_whitespace) || right.starts_with(char::is_whitespace) {
-        return false;
-    }
-
     // No break after opening symbols
     if PAT_NO_BREAK_AFTER.is_match(left) {
         return false;
@@ -118,10 +118,27 @@ impl LineBreaker {
     }
 
     fn process_plain(&self, text: &str, marker: &str) -> String {
+        let mut res = String::with_capacity(text.len() * 2);
+        let mut prev_ends_with_break = true;
+        for seg in self.break_segments(text) {
+            // Breaks after spaces and ZWSP are already implicit: never put a marker next to them
+            if !prev_ends_with_break {
+                res.push_str(marker);
+            }
+            prev_ends_with_break = seg.ends_with(|c: char| c.is_whitespace() || c == '\u{200B}');
+            res.push_str(&seg);
+        }
+        res
+    }
+
+    /// Split plain text into segments that must not be broken internally. A
+    /// line may break between any two segments; spaces stay at the end of the
+    /// segment they follow.
+    fn break_segments(&self, text: &str) -> Vec<String> {
         let tokens = self.tokenizer.tokenize(text, true);
         let n = tokens.len();
         if n <= 1 {
-            return text.to_string();
+            return if text.is_empty() { Vec::new() } else { vec![text.to_string()] };
         }
 
         // Token ends are the dictionary word boundaries inside Thai runs
@@ -137,17 +154,19 @@ impl LineBreaker {
         }
         let actions = uax14::break_opportunities(&cps, Some(&dict));
 
-        let mut res = String::with_capacity(text.len() + n * marker.len());
+        let mut segments = Vec::new();
+        let mut cur = String::new();
         for i in 0..n {
-            res.push_str(&tokens[i]);
+            cur.push_str(&tokens[i]);
             if i + 1 < n
                 && actions[ends[i]] == uax14::ALLOWED
                 && passes_typographic_rules(&tokens[i], &tokens[i + 1])
             {
-                res.push_str(marker);
+                segments.push(std::mem::take(&mut cur));
             }
         }
-        res
+        segments.push(cur);
+        segments
     }
 
     fn process_html(&self, html: &str, marker: &str) -> String {
@@ -177,40 +196,53 @@ impl LineBreaker {
         res
     }
 
+    /// Hard-wrap text into lines of at most `width` display columns, breaking
+    /// only at the same opportunities that `insert_line_breaks` marks or after
+    /// spaces. Trailing spaces are trimmed.
     pub fn wrap(&self, text: &str, width: usize, is_html: bool) -> String {
         if text.is_empty() || width == 0 {
             return text.to_string();
         }
 
-        let broken = self.insert_line_breaks(text, DEFAULT_BREAK_MARKER, is_html);
         let mut wrapped_paragraphs = Vec::new();
-
-        for para in broken.lines() {
-            let mut cur_line = String::new();
-            let mut cur_width = 0;
-            let mut lines = Vec::new();
-
-            for unit in split_break_units(para) {
-                // Trailing spaces may hang past the margin, so only the visible part must fit.
-                let visible_width = thai_display_width(unit.trim_end());
-                if cur_width + visible_width > width && !cur_line.is_empty() {
-                    lines.push(cur_line.trim_end().to_string());
-                    cur_line.clear();
-                    cur_line.push_str(unit);
-                    cur_width = thai_display_width(unit);
-                } else {
-                    cur_line.push_str(unit);
-                    cur_width += thai_display_width(unit);
-                }
-            }
-            if !cur_line.is_empty() {
-                lines.push(cur_line.trim_end().to_string());
-            }
-            wrapped_paragraphs.push(lines.join("\n"));
+        for para in text.lines() {
+            let segments: Vec<String> = if is_html {
+                // Tags stay intact in insert_line_breaks(): break at its markers and after spaces
+                let broken = self.insert_line_breaks(para, DEFAULT_BREAK_MARKER, true);
+                split_break_units(&broken).into_iter().map(str::to_string).collect()
+            } else {
+                self.break_segments(para)
+            };
+            wrapped_paragraphs.push(fill_lines(&segments, width).join("\n"));
         }
 
         wrapped_paragraphs.join("\n")
     }
+}
+
+/// Greedily fill lines of at most `width` display columns with unbreakable segments.
+fn fill_lines(segments: &[String], width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut cur_line = String::new();
+    let mut cur_width = 0;
+    for seg in segments {
+        // Trailing spaces may hang past the margin, so only the visible part must fit
+        let visible_width = thai_display_width(seg.trim_end());
+        if !cur_line.is_empty() && cur_width + visible_width > width {
+            // Indentation that does not fit is dropped rather than left as an empty line
+            if !cur_line.trim_end().is_empty() {
+                lines.push(cur_line.trim_end().to_string());
+            }
+            cur_line.clear();
+            cur_width = 0;
+        }
+        cur_line.push_str(seg);
+        cur_width += thai_display_width(seg);
+    }
+    if !cur_line.is_empty() {
+        lines.push(cur_line.trim_end().to_string());
+    }
+    lines
 }
 
 /// Split a paragraph into unbreakable units. A unit ends at a break marker or
