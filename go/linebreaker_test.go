@@ -11,6 +11,9 @@ var lineBreakCases = []struct{ name, input, want string }{
 	{"LB9 combining mark stays with its base", "สวัสดี́ครับ", "สวัสดี́|ครับ"},
 	{"LB21 no break before a hyphen", "สี-ขาว", "สี-|ขาว"},
 	{"LB21 no break before an en dash (BA)", "ข้อความ–ข้อความ", "ข้อความ–|ข้อความ"},
+	{"LB13 no break before CJK closing punctuation (CL)", "ไทย、ไทย", "ไทย、|ไทย"},
+	{"LB13 no break before ? (EX)", "ไปไหม?ไปสิ", "ไป|ไหม?|ไป|สิ"},
+	{"LB13 no break before a solidus (SY)", "ISO/IEC 29110", "ISO/|IEC 29110"},
 }
 
 func TestInsertLineBreaksUAX14(t *testing.T) {

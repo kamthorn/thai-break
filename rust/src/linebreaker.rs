@@ -11,7 +11,7 @@ static PAT_NO_BREAK_AFTER: Lazy<Regex> = Lazy::new(|| {
 });
 
 static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^(?:[)\]}\\"”’>»,.:;!?/ๆฯ๏）】》]|ฯลฯ)$"#)
+    Regex::new(r#"^(?:[\\"”’>»ๆฯ๏]|ฯลฯ)$"#)
         .expect("Failed to compile PAT_NO_BREAK_BEFORE")
 });
 
@@ -55,7 +55,7 @@ fn passes_typographic_rules(left: &str, right: &str) -> bool {
         return false;
     }
 
-    // No break before closing symbols or the solidus (UAX #14 LB13)
+    // No break before closing quotes and postfixes (ๆ, ฯ)
     if PAT_NO_BREAK_BEFORE.is_match(right) {
         return false;
     }

@@ -173,6 +173,18 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   }
   A = cls(a);
   B = cls(b);
+  // LB13: × CL, × CP, × EX, × SY
+  if ([LB.CL, LB.CP, LB.EX, LB.SY].includes(B)) {
+    return NO_BREAK;
+  }
+  // LB15c: SP ÷ IS NU
+  if (A === LB.SP && B === LB.IS && cls(b + 1) === LB.NU) {
+    return ALLOWED;
+  }
+  // LB15d: × IS
+  if (B === LB.IS) {
+    return NO_BREAK;
+  }
   // LB18: SP ÷
   if (A === LB.SP) {
     return ALLOWED;

@@ -44,10 +44,9 @@ class ThaiLineBreaker
 
     /**
      * Tokens that must NOT start a line (never break BEFORE these).
-     * Includes close brackets, quotes, sentence punctuation, the solidus (UAX #14
-     * LB13: "ISO/IEC" must not become "ISO" + "/IEC"), and Thai postfixes (ๆ, ฯ, ฯลฯ).
+     * Includes quotes and Thai postfixes (ๆ, ฯ, ฯลฯ).
      */
-    private const PAT_NO_BREAK_BEFORE = '/^(?:[)\\]}\"”’>»,.:;!?\/ๆฯ๏）】》]|ฯลฯ)$/u';
+    private const PAT_NO_BREAK_BEFORE = '/^(?:[\"”’>»ๆฯ๏]|ฯลฯ)$/u';
 
     /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
     private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';
@@ -187,7 +186,7 @@ class ThaiLineBreaker
             return false;
         }
 
-        // 3. Right token must not start a line (close brackets, commas, periods, ๆ, ฯ, ฯลฯ)
+        // 3. Right token must not start a line (quotes, ๆ, ฯ, ฯลฯ)
         if (preg_match(self::PAT_NO_BREAK_BEFORE, $right)) {
             return false;
         }

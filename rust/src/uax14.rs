@@ -222,6 +222,18 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     }
     A = cls(ai);
     B = cls(bi);
+    // LB13: × CL, × CP, × EX, × SY
+    if [CL, CP, EX, SY].contains(&B) {
+        return NO_BREAK;
+    }
+    // LB15c: SP ÷ IS NU
+    if A == SP && B == IS && cls(bi + 1) == NU {
+        return ALLOWED;
+    }
+    // LB15d: × IS
+    if B == IS {
+        return NO_BREAK;
+    }
     // LB18: SP ÷
     if A == SP {
         return ALLOWED;
