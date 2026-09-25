@@ -38,9 +38,9 @@ class ThaiLineBreaker
 
     /**
      * Tokens that must NOT end a line (never break AFTER these).
-     * Includes open brackets, quotes, and prefix currency/hashtag symbols.
+     * Includes open brackets, quotes, and hashtag/at symbols.
      */
-    private const PAT_NO_BREAK_AFTER = '/^[([{\"“‘<«฿$€¥£#@（【《]$/u';
+    private const PAT_NO_BREAK_AFTER = '/^[([{\"“‘<«#@（【《]$/u';
 
     /**
      * Tokens that must NOT start a line (never break BEFORE these).
@@ -181,7 +181,7 @@ class ThaiLineBreaker
      */
     private static function passesTypographicRules(string $left, string $right): bool
     {
-        // 2. Left token must not end a line (open brackets, prefix currency/tags)
+        // 2. Left token must not end a line (open brackets, quotes, tags)
         if (preg_match(self::PAT_NO_BREAK_AFTER, $left)) {
             return false;
         }
@@ -194,14 +194,6 @@ class ThaiLineBreaker
         // 4. Latin letters and digits (UAX #14 LB23): WP01, ISO29110, 3rd
         if ((preg_match('/[A-Za-z]$/', $left) && preg_match('/^[0-9]/', $right)) ||
             (preg_match('/[0-9]$/', $left) && preg_match('/^[A-Za-z]/', $right))) {
-            return false;
-        }
-
-        // 5. Numbers connected by hyphen, slash, colon, or period (e.g. 10-20, 1/2)
-        if (is_numeric($left) && in_array($right, ['-', '/', ':', '.', '%'], true)) {
-            return false;
-        }
-        if (in_array($left, ['-', '/', ':'], true) && is_numeric($right)) {
             return false;
         }
 

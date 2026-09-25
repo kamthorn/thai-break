@@ -268,6 +268,43 @@ final class Uax14
         if ($A === self::SY && $B === self::HL) {
             return self::NO_BREAK;
         }
+        // LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
+        if ((($A === self::PR || $A === self::PO) && self::isAlpha($B))
+            || (self::isAlpha($A) && ($B === self::PR || $B === self::PO))) {
+            return self::NO_BREAK;
+        }
+        // LB25: numbers
+        if ($B === self::PO || $B === self::PR) {
+            // NU (SY | IS)* (CL | CP)? × (PO | PR)
+            $j = ($A === self::CL || $A === self::CP) ? $a - 1 : $a;
+            while (in_array($cls($j), [self::SY, self::IS], true)) {
+                $j--;
+            }
+            if ($cls($j) === self::NU) {
+                return self::NO_BREAK;
+            }
+        }
+        if (($A === self::PO || $A === self::PR) && $B === self::OP
+            && ($cls($b + 1) === self::NU || ($cls($b + 1) === self::IS && $cls($b + 2) === self::NU))) {
+            return self::NO_BREAK; // (PO | PR) × OP IS? NU
+        }
+        if ($B === self::NU && in_array($A, [self::PO, self::PR, self::HY, self::IS], true)) {
+            return self::NO_BREAK; // (PO | PR | HY | IS) × NU
+        }
+        if ($B === self::NU) {
+            // NU (SY | IS)* × NU
+            $j = $a;
+            while (in_array($cls($j), [self::SY, self::IS], true)) {
+                $j--;
+            }
+            if ($cls($j) === self::NU) {
+                return self::NO_BREAK;
+            }
+        }
+        // LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
+        if ((self::isHangul($A) && $B === self::PO) || ($A === self::PR && self::isHangul($B))) {
+            return self::NO_BREAK;
+        }
         // LB31: ÷
         return self::ALLOWED;
     }

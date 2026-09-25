@@ -3,7 +3,7 @@ import { ALLOWED, breakOpportunities } from './uax14.js';
 
 export const DEFAULT_BREAK_MARKER = '\u200B';
 
-const PAT_NO_BREAK_AFTER = /^[([{"“‘<«฿$€¥£#@（【《]$/u;
+const PAT_NO_BREAK_AFTER = /^[([{"“‘<«#@（【《]$/u;
 const PAT_NO_BREAK_BEFORE = /^(?:["”’>»ๆฯ๏]|ฯลฯ)$/u;
 const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/gi;
 const RE_THAI_COMBINING = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]/g;

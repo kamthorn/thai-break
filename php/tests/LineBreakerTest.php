@@ -20,6 +20,11 @@ class LineBreakerTest extends TestCase
             'LB13 no break before CJK closing punctuation (CL)' => ['ไทย、ไทย', 'ไทย、|ไทย'],
             'LB13 no break before ? (EX)' => ['ไปไหม?ไปสิ', 'ไป|ไหม?|ไป|สิ'],
             'LB13 no break before a solidus (SY)' => ['ISO/IEC 29110', 'ISO/|IEC 29110'],
+            'LB25 no break inside a date' => ['วันที่ 1/2/2567 นะ', 'วัน|ที่ 1/2/2567 นะ'],
+            'LB25 no break inside a time' => ['เวลา 10:30 น.', 'เวลา 10:30 น.'],
+            'LB25 no break inside a range or a signed number' => ['ช่วง 10-20 คน ลบ -5 องศา', 'ช่วง 10-20 คน ลบ -5 องศา'],
+            'LB25 no break after a prefix or before a postfix' => ['ราคา $(5) ลด 40%', 'ราคา $(5) ลด 40%'],
+            'LB25 no break between IS and NU' => ['พ.ศ.2567', 'พ.ศ.2567'],
         ];
     }
 

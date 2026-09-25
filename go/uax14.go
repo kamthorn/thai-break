@@ -260,6 +260,44 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if A == lbSY && B == lbHL {
 		return lbNoBreak
 	}
+	// LB24: (PR | PO) × (AL | HL), (AL | HL) × (PR | PO)
+	if ((A == lbPR || A == lbPO) && lbIsAlpha(B)) || (lbIsAlpha(A) && (B == lbPR || B == lbPO)) {
+		return lbNoBreak
+	}
+	// LB25: numbers
+	if B == lbPO || B == lbPR {
+		// NU (SY | IS)* (CL | CP)? × (PO | PR)
+		j := a
+		if A == lbCL || A == lbCP {
+			j--
+		}
+		for cls(j) == lbSY || cls(j) == lbIS {
+			j--
+		}
+		if cls(j) == lbNU {
+			return lbNoBreak
+		}
+	}
+	if (A == lbPO || A == lbPR) && B == lbOP && (cls(b+1) == lbNU || (cls(b+1) == lbIS && cls(b+2) == lbNU)) {
+		return lbNoBreak // (PO | PR) × OP IS? NU
+	}
+	if B == lbNU && lbIsOneOf(A, lbPO, lbPR, lbHY, lbIS) {
+		return lbNoBreak // (PO | PR | HY | IS) × NU
+	}
+	if B == lbNU {
+		// NU (SY | IS)* × NU
+		j := a
+		for cls(j) == lbSY || cls(j) == lbIS {
+			j--
+		}
+		if cls(j) == lbNU {
+			return lbNoBreak
+		}
+	}
+	// LB27: (JL | JV | JT | H2 | H3) × PO, PR × (JL | JV | JT | H2 | H3)
+	if (lbIsHangul(A) && B == lbPO) || (A == lbPR && lbIsHangul(B)) {
+		return lbNoBreak
+	}
 	// LB31: ÷
 	return lbAllowed
 }
