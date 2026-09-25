@@ -8,3 +8,10 @@
 /php/examples export-ignore
 phpunit.xml export-ignore
 .gitignore export-ignore
+/tools export-ignore
+
+# Generated Unicode Line_Break tables (tools/generate-linebreak-data.php)
+/php/src/LineBreakData.php linguist-generated
+/go/linebreak_data.go linguist-generated
+/rust/src/linebreak_data.rs linguist-generated
+/typescript/src/linebreak-data.ts linguist-generated

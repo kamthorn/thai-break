@@ -1,8 +1,10 @@
 pub mod bigram;
+mod linebreak_data;
 pub mod linebreaker;
 pub mod tcc;
 pub mod tokenizer;
 pub mod trie;
+mod uax14;
 
 #[cfg(feature = "c-ffi")]
 pub mod c_ffi;
@@ -21,6 +23,7 @@ pub use linebreaker::{can_break_between, thai_display_width, LineBreaker, DEFAUL
 pub use tcc::tcc_pos_array;
 pub use tokenizer::Tokenizer;
 pub use trie::{PrefixMatch, ThaiTrie};
+pub use linebreak_data::UNICODE_VERSION;
 
 static DEFAULT_TOKENIZER: Lazy<RwLock<Option<Tokenizer>>> = Lazy::new(|| RwLock::new(None));
 static DEFAULT_BREAKER: Lazy<RwLock<Option<LineBreaker>>> = Lazy::new(|| RwLock::new(None));
