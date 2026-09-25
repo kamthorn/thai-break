@@ -107,7 +107,8 @@ class WeightedTokenizer
         $tokens = $this->segment($chars);
 
         if (!$keepWhitespace) {
-            $tokens = array_values(array_filter($tokens, fn($t) => trim($t) !== ''));
+            // Unicode whitespace (e.g. NBSP), as in the Go, Rust and TypeScript ports
+            $tokens = array_values(array_filter($tokens, fn($t) => !preg_match('/^\s*$/u', $t)));
         }
 
         return $tokens;
