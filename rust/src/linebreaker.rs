@@ -7,7 +7,7 @@ use crate::uax14;
 pub const DEFAULT_BREAK_MARKER: &str = "\u{200B}";
 
 static PAT_NO_BREAK_AFTER: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r#"^[(\[{\\"“‘«（【《]$"#).expect("Failed to compile PAT_NO_BREAK_AFTER")
+    Regex::new(r#"^[\\"“‘«]$"#).expect("Failed to compile PAT_NO_BREAK_AFTER")
 });
 
 static PAT_NO_BREAK_BEFORE: Lazy<Regex> = Lazy::new(|| {
@@ -50,7 +50,7 @@ pub fn can_break_between(left: &str, right: &str) -> bool {
 
 /// Legacy token-level rules that are not yet expressed as UAX #14 rules.
 fn passes_typographic_rules(left: &str, right: &str) -> bool {
-    // No break after opening symbols
+    // No break after opening quotes
     if PAT_NO_BREAK_AFTER.is_match(left) {
         return false;
     }

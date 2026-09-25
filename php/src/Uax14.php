@@ -239,6 +239,10 @@ final class Uax14
         if (in_array($B, [self::CL, self::CP, self::EX, self::SY], true)) {
             return self::NO_BREAK;
         }
+        // LB14: OP SP* ×
+        if ($K === self::OP) {
+            return self::NO_BREAK;
+        }
         // LB15c: SP ÷ IS NU
         if ($A === self::SP && $B === self::IS && $cls($b + 1) === self::NU) {
             return self::ALLOWED;
@@ -324,6 +328,11 @@ final class Uax14
         }
         // LB29: IS × (AL | HL)
         if ($A === self::IS && self::isAlpha($B)) {
+            return self::NO_BREAK;
+        }
+        // LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
+        if (((self::isAlpha($A) || $A === self::NU) && $B === self::OP && !$units[$b]['ea'])
+            || ($A === self::CP && !$units[$a]['ea'] && (self::isAlpha($B) || $B === self::NU))) {
             return self::NO_BREAK;
         }
         // LB31: ÷

@@ -226,6 +226,10 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if [CL, CP, EX, SY].contains(&B) {
         return NO_BREAK;
     }
+    // LB14: OP SP* ×
+    if K == OP {
+        return NO_BREAK;
+    }
     // LB15c: SP ÷ IS NU
     if A == SP && B == IS && cls(bi + 1) == NU {
         return ALLOWED;
@@ -309,6 +313,12 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     }
     // LB29: IS × (AL | HL)
     if A == IS && is_alpha(B) {
+        return NO_BREAK;
+    }
+    // LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
+    if ((is_alpha(A) || A == NU) && B == OP && !units[b].ea)
+        || (A == CP && !units[a].ea && (is_alpha(B) || B == NU))
+    {
         return NO_BREAK;
     }
     // LB31: ÷

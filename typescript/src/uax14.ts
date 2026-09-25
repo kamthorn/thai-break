@@ -177,6 +177,10 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if ([LB.CL, LB.CP, LB.EX, LB.SY].includes(B)) {
     return NO_BREAK;
   }
+  // LB14: OP SP* ×
+  if (K === LB.OP) {
+    return NO_BREAK;
+  }
   // LB15c: SP ÷ IS NU
   if (A === LB.SP && B === LB.IS && cls(b + 1) === LB.NU) {
     return ALLOWED;
@@ -255,6 +259,11 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   }
   // LB29: IS × (AL | HL)
   if (A === LB.IS && isAlpha(B)) {
+    return NO_BREAK;
+  }
+  // LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
+  if (((isAlpha(A) || A === LB.NU) && B === LB.OP && !units[b].ea) ||
+      (A === LB.CP && !units[a].ea && (isAlpha(B) || B === LB.NU))) {
     return NO_BREAK;
   }
   // LB31: ÷
