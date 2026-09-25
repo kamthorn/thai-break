@@ -13,7 +13,8 @@ const (
 )
 
 var (
-	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))`)
+	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[a-zA-Z/!?][^>]*>|&[a-zA-Z0-9#]+;))`)
+	reHtmlDetect    = regexp.MustCompile(`<[a-zA-Z/!?][^>]*>`) // a tag starts with a letter, "/", "!" or "?" after "<"
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
 )
 
@@ -72,7 +73,7 @@ func (b *LineBreaker) InsertLineBreaks(text string, marker string, isHtml bool) 
 		marker = DefaultBreakMarker
 	}
 
-	if isHtml || (strings.Contains(text, "<") && strings.Contains(text, ">")) {
+	if isHtml || reHtmlDetect.MatchString(text) {
 		return b.processHtml(text, marker)
 	}
 	return b.processPlain(text, marker)

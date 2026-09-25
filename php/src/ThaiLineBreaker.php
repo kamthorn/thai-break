@@ -37,7 +37,10 @@ class ThaiLineBreaker
     public const DEFAULT_MARKER = "\u{200B}";
 
     /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
-    private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';
+    private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[a-zA-Z\/!?][^>]*>|&[a-zA-Z0-9#]+;)/usi';
+
+    /** Pattern detecting HTML markup: a tag starts with a letter, "/", "!" or "?" right after "<" */
+    private const PAT_HTML_DETECT = '/<[a-zA-Z\/!?][^>]*>/u';
 
     private ThaiTokenizer $tokenizer;
 
@@ -65,7 +68,7 @@ class ThaiLineBreaker
         }
 
         // Auto-detect HTML if not explicitly specified
-        if ($isHtml || str_contains($text, '<') && str_contains($text, '>')) {
+        if ($isHtml || preg_match(self::PAT_HTML_DETECT, $text)) {
             return $this->processHtmlText($text, $breakMarker);
         }
 
