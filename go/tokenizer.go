@@ -8,9 +8,15 @@ import (
 )
 
 const (
-	unknownWordCost = 10.0
-	abbrWeight      = 60000.0
-	maxEdges        = 50000
+	// abbrCostFactor is the cost of an abbreviation pattern, relative to the cost of the rarest word.
+	abbrCostFactor = 1.5
+	// abbrLetterCostFactor is the extra cost per letter of an abbreviation
+	// pattern, so "เขต|จ." beats "เข|ตจ." (a pattern taking the last letter of
+	// the previous word).
+	abbrLetterCostFactor = 0.01
+	// unknownCostFactor is the cost of an unknown-word fallback edge, relative to the cost of the rarest word.
+	unknownCostFactor = 2.0
+	maxEdges          = 50000
 )
 
 var (
@@ -19,9 +25,9 @@ var (
 )
 
 type dagEdge struct {
-	from   int
-	word   string
-	weight float64
+	from int
+	word string
+	cost float64
 }
 
 // Tokenizer performs weighted Thai word segmentation.
@@ -77,9 +83,15 @@ func (tok *Tokenizer) Tokenize(text string, keepWhitespace bool) []string {
 	}
 	charByteOffsets[n] = b
 
+	// Unigram costs: -log(weight / total); a word of weight 1 costs rareCost.
+	// Non-Thai tokens cost rareCost, abbreviation patterns and unknown-word
+	// fallbacks more, so a dictionary word followed by "." beats a pattern such
+	// as "ว." that would cut the word.
+	normalizer := tok.trie.TotalWeight() + 1.0
+	rareCost := math.Log(normalizer)
+
 	// Pass 1: Collect edgesTo[j]
 	edgesTo := make([][]dagEdge, n+1)
-	maxWeight := 1.0
 	edgeCount := 0
 
 CollectLoop:
@@ -99,11 +111,8 @@ CollectLoop:
 				if j > n || !validPos[j] {
 					continue
 				}
-				if m.Weight > maxWeight {
-					maxWeight = m.Weight
-				}
 				word := string(runes[i:j])
-				edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: word, weight: m.Weight})
+				edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: word, cost: math.Log(normalizer / m.Weight)})
 				edgeCount++
 				if edgeCount >= maxEdges {
 					break CollectLoop
@@ -116,10 +125,9 @@ CollectLoop:
 				abbrLen := len([]rune(mStr))
 				j := i + abbrLen
 				if j <= n && validPos[j] {
-					if abbrWeight > maxWeight {
-						maxWeight = abbrWeight
-					}
-					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, weight: abbrWeight})
+					letters := abbrLen - strings.Count(mStr, ".")
+					cost := (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost
+					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, cost: cost})
 				}
 			}
 		} else {
@@ -129,10 +137,7 @@ CollectLoop:
 				wordLen := len([]rune(mStr))
 				j := i + wordLen
 				if j <= n {
-					if 1.0 > maxWeight {
-						maxWeight = 1.0
-					}
-					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, weight: 1.0})
+					edgesTo[j] = append(edgesTo[j], dagEdge{from: i, word: mStr, cost: rareCost})
 				}
 			}
 		}
@@ -166,12 +171,7 @@ CollectLoop:
 				if wLen < 1 {
 					wLen = 1
 				}
-				normalized := e.weight / maxWeight
-				baseCost := unknownWordCost / float64(wLen)
-				if normalized > 0 {
-					baseCost = -math.Log(normalized) / float64(wLen)
-				}
-
+				baseCost := e.cost
 				edgeCost := baseCost
 				if tok.bigrams != nil && word[i] != "" {
 					bonus := tok.bigrams.GetBonus(word[i], e.word, wLen)
@@ -193,7 +193,7 @@ CollectLoop:
 			for i := j - 1; i >= 0; i-- {
 				if !math.IsInf(dp[i], 1) && validPos[i] {
 					unknownWord := string(runes[i:j])
-					newCost := dp[i] + unknownWordCost
+					newCost := dp[i] + unknownCostFactor*rareCost
 					dp[j] = newCost
 					from[j] = i
 					word[j] = unknownWord

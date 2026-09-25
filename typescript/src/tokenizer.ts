@@ -2,8 +2,15 @@ import { tccPosArray } from './tcc.js';
 import { ThaiTrie } from './trie.js';
 import { BigramModel } from './bigram.js';
 
-const UNKNOWN_WORD_COST = 10.0;
-const ABBR_WEIGHT = 60000.0;
+/** Cost of an abbreviation pattern, relative to the cost of the rarest word. */
+const ABBR_COST_FACTOR = 1.5;
+/**
+ * Extra cost per letter of an abbreviation pattern, so "เขต|จ." beats "เข|ตจ."
+ * (a pattern taking the last letter of the previous word).
+ */
+const ABBR_LETTER_COST_FACTOR = 0.01;
+/** Cost of an unknown-word fallback edge, relative to the cost of the rarest word. */
+const UNKNOWN_COST_FACTOR = 2.0;
 const MAX_EDGES = 50000;
 
 const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
@@ -12,7 +19,7 @@ const PAT_ABBR = /^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่
 interface DagEdge {
   from: number;
   word: string;
-  weight: number;
+  cost: number;
 }
 
 function isThaiRune(code: number): boolean {
@@ -64,9 +71,15 @@ export class Tokenizer {
       charOffsets.push(offset);
     }
 
+    // Unigram costs: -log(weight / total); a word of weight 1 costs rareCost.
+    // Non-Thai tokens cost rareCost, abbreviation patterns and unknown-word
+    // fallbacks more, so a dictionary word followed by "." beats a pattern such
+    // as "ว." that would cut the word.
+    const normalizer = this.trie.totalWeight + 1.0;
+    const rareCost = Math.log(normalizer);
+
     // Pass 1: Collect edgesTo[j]
     const edgesTo: DagEdge[][] = Array.from({ length: n + 1 }, () => []);
-    let maxWeight = 1.0;
     let edgeCount = 0;
 
     collectLoop: for (let i = 0; i < n; i++) {
@@ -85,10 +98,7 @@ export class Tokenizer {
           if (j > n || !validPos[j]) {
             continue;
           }
-          if (m.weight > maxWeight) {
-            maxWeight = m.weight;
-          }
-          edgesTo[j].push({ from: i, word: m.word, weight: m.weight });
+          edgesTo[j].push({ from: i, word: m.word, cost: Math.log(normalizer / m.weight) });
           if (++edgeCount >= MAX_EDGES) {
             break collectLoop;
           }
@@ -101,10 +111,9 @@ export class Tokenizer {
           const abbrLen = Array.from(mStr).length;
           const j = i + abbrLen;
           if (j <= n && validPos[j]) {
-            if (ABBR_WEIGHT > maxWeight) {
-              maxWeight = ABBR_WEIGHT;
-            }
-            edgesTo[j].push({ from: i, word: mStr, weight: ABBR_WEIGHT });
+            const letters = abbrLen - mStr.split('.').length + 1;
+            const cost = (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost;
+            edgesTo[j].push({ from: i, word: mStr, cost });
           }
         }
       } else {
@@ -115,7 +124,7 @@ export class Tokenizer {
           const wordLen = Array.from(mStr).length;
           const j = i + wordLen;
           if (j <= n) {
-            edgesTo[j].push({ from: i, word: mStr, weight: 1.0 });
+            edgesTo[j].push({ from: i, word: mStr, cost: rareCost });
           }
         }
       }
@@ -143,11 +152,7 @@ export class Tokenizer {
             continue;
           }
           const wLen = Math.max(1, j - i);
-          const normalized = edge.weight / maxWeight;
-          const baseCost =
-            normalized > 0
-              ? -Math.log(normalized) / wLen
-              : UNKNOWN_WORD_COST / wLen;
+          const baseCost = edge.cost;
 
           let edgeCost = baseCost;
           if (this.bigramModel && word[i] !== '') {
@@ -170,7 +175,7 @@ export class Tokenizer {
         for (let i = j - 1; i >= 0; i--) {
           if (isFinite(dp[i]) && validPos[i]) {
             const unknownWord = chars.slice(i, j).join('');
-            const newCost = dp[i] + UNKNOWN_WORD_COST;
+            const newCost = dp[i] + UNKNOWN_COST_FACTOR * rareCost;
             dp[j] = newCost;
             from[j] = i;
             word[j] = unknownWord;

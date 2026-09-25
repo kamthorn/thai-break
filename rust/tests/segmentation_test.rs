@@ -1,0 +1,27 @@
+use std::path::Path;
+use thaibreak::{set_default, words, ThaiTrie, Tokenizer};
+
+fn init_test_dict() {
+    let dict_path = "../data/words.txt";
+    if Path::new(dict_path).exists() {
+        let trie = ThaiTrie::load_tsv_file(dict_path).expect("Failed to load wordlist");
+        set_default(Tokenizer::new(trie, None));
+    }
+}
+
+/// (name, input, expected words joined by '|')
+const SEGMENTATION_CASES: &[(&str, &str, &str)] = &[
+    ("a word before a full stop is not cut into an abbreviation", "เขากินข้าว.", "เขา|กิน|ข้าว|."),
+    ("a word before a full stop, then more text", "ฉันรักเธอ.ไปเที่ยวกัน", "ฉัน|รัก|เธอ|.|ไป|เที่ยว|กัน"),
+    ("abbreviations are still recognized", "เมื่อ 5 มิ.ย. ที่ จ.พิษณุโลก", "เมื่อ|5|มิ.ย.|ที่|จ.|พิษณุโลก"),
+    ("an abbreviation after a word keeps the word whole", "ในเขตจ.พิจิตร", "ใน|เขต|จ.|พิจิตร"),
+    ("an abbreviation after a word that ends like one", "ในเดือนพ.ย.", "ใน|เดือน|พ.ย."),
+];
+
+#[test]
+fn test_segmentation() {
+    init_test_dict();
+    for (name, input, expected) in SEGMENTATION_CASES {
+        assert_eq!(words(input).join("|"), *expected, "{name}");
+    }
+}

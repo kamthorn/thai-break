@@ -14,6 +14,8 @@ pub struct PrefixMatch {
 pub struct ThaiTrie {
     prefixes: HashMap<String, f64>,
     max_weight: f64,
+    /// Sum of the weights of all full words (the unigram normalizer).
+    total_weight: f64,
 }
 
 impl Default for ThaiTrie {
@@ -27,11 +29,17 @@ impl ThaiTrie {
         Self {
             prefixes: HashMap::new(),
             max_weight: 1.0,
+            total_weight: 0.0,
         }
     }
 
     pub fn max_weight(&self) -> f64 {
         self.max_weight
+    }
+
+    /// Sum of the weights of all words; word probabilities are weight / total_weight().
+    pub fn total_weight(&self) -> f64 {
+        self.total_weight
     }
 
     pub fn len(&self) -> usize {
@@ -60,8 +68,9 @@ impl ThaiTrie {
             self.prefixes.entry(p.clone()).or_insert(0.0);
         }
 
-        let entry = self.prefixes.entry(word.to_string()).or_insert(weight);
+        let entry = self.prefixes.entry(word.to_string()).or_insert(0.0);
         if weight > *entry {
+            self.total_weight += weight - *entry;
             *entry = weight;
         }
     }
