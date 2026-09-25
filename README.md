@@ -36,7 +36,7 @@
 ThaiBreak ได้รับการออกแบบสถาปัตยกรรมแบบ Monorepo เพื่อรองรับการใช้งานในทุก Stack โดยใช้คลังคำศัพท์มาตรฐาน (`data/words.txt`: 25,907 คำ) เป็น Single Source of Truth:
 
 ```
-PHPThaiNLP / ThaiBreak
+thai-break/
 ├── data/                 # Shared Dictionary (data/words.txt)
 ├── php/                  # Native PHP & Laravel Package (Composer: kamthorn/thai-break)
 │   ├── src/              # PHP Source & Laravel Integration
@@ -47,7 +47,8 @@ PHPThaiNLP / ThaiBreak
 ├── rust/                 # High-Performance Rust Core (Cargo: thaibreak)
 │   ├── include/          # C / C++ Header (thaibreak.h)
 │   └── src/              # Core Engine + C FFI + Python (PyO3) + Wasm (wasm-bindgen)
-└── python/               # Python Package (pip: thaibreak)
+├── python/               # Python Package (pip: thaibreak)
+└── tools/                # Dev tools: line-break table generator, CLI segmenter, accuracy benchmark
 ```
 
 ---
@@ -303,7 +304,7 @@ ThaiBreak ได้รับการออกแบบให้มีควา�
 
 ### 1. ความแม่นยำในการตัดคำ (Accuracy Benchmark)
 
-วัดด้วย `scripts/benchmark.py` ของ [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) โดยใช้พจนานุกรมเริ่มต้น `data/words.txt` (25,907 คำ) เพียงอย่างเดียว เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard):
+วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ โดยใช้พจนานุกรมเริ่มต้น `data/words.txt` (25,907 คำ) เพียงอย่างเดียว เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard):
 
 | ชุดทดสอบ | Word F1 | Boundary F1 |
 | :--- | :---: | :---: |
@@ -313,13 +314,13 @@ ThaiBreak ได้รับการออกแบบให้มีควา�
 | Wisesight-1000 (โซเชียลมีเดีย, CC0) | 83.0% | 90.3% |
 
 - **Word F1:** นับคำที่ตำแหน่งต้นและท้ายตรงกับคำตอบ **Boundary F1:** เทียบตำแหน่งจุดตัดระหว่างคำ ข้อความแบ่งเป็นท่อนที่ช่องว่างและขอบเขตประโยค และไม่นับช่องว่าง
-- **คำที่ตัดผิดส่วนใหญ่ไม่มีในพจนานุกรม:** บน LST20 eval ประมาณสองในสามของคำที่ตัดผิด เช่นคำประสมภาษาข่าวตามแนวทางของ LST20 (`มีการ`, `วันที่`, `ดังกล่าว`) การเพิ่มคำด้วย `addCustomWords()` หรือพจนานุกรมเสริมจึงมีผลมากที่สุด พจนานุกรมแบบ TSV ที่มีน้ำหนักความถี่ของคำจะถูกใช้เป็นความน่าจะเป็นของคำ (unigram) โดยตรง
-- **คลังข้อมูลไม่ได้รวมอยู่ในโปรเจกต์:** LST20 ต้องขอจาก NECTEC และใช้ได้ตามข้อตกลงการใช้งาน (งานวิจัย ไม่ใช่เชิงพาณิชย์ และโอเพนซอร์ส ห้ามแจกจ่ายต่อ) Blackboard Treebank มาจากแหล่งข่าวเดียวกัน ส่วน Wisesight-1000 มาจาก [PyThaiNLP/wisesight-sentiment](https://github.com/PyThaiNLP/wisesight-sentiment)
+- **คำที่ตัดผิดส่วนใหญ่ไม่มีในพจนานุกรม:** บน LST20 eval ประมาณสองในสามของคำที่ตัดผิด เช่นคำประสมภาษาข่าวตามแนวทางของ LST20 (`มีการ`, `วันที่`, `ดังกล่าว`) การเพิ่มคำด้วย `addCustomWords()` หรือพจนานุกรมเสริม (เช่นจากโปรเจกต์ [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ที่ยังไม่เผยแพร่) จึงมีผลมากที่สุด พจนานุกรมแบบ TSV ที่มีน้ำหนักความถี่ของคำจะถูกใช้เป็นความน่าจะเป็นของคำ (unigram) โดยตรง
+- **คลังข้อมูลไม่ได้รวมอยู่ในโปรเจกต์:** LST20 ต้องขอจาก NECTEC และใช้ได้ตามข้อตกลงการใช้งาน (งานวิจัย ไม่ใช่เชิงพาณิชย์ และโอเพนซอร์ส ห้ามแจกจ่ายต่อ) Blackboard Treebank มาจากแหล่งข่าวเดียวกัน ส่วน Wisesight-1000 มาจาก [PyThaiNLP/wisesight-sentiment](https://github.com/PyThaiNLP/wisesight-sentiment) — วางไว้เป็นโฟลเดอร์ข้าง `thai-break/` (เช่น `../LST20_Corpus`)
 
 ```bash
-# ในโฟลเดอร์ thai-break-dict-extra ที่อยู่ข้าง PHPThaiNLP
-python3 scripts/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
-    --dict ../PHPThaiNLP/data/words.txt --segmenter-cmd "php ../PHPThaiNLP/tools/segment.php {dict}"
+# รันจากโฟลเดอร์รากของ thai-break
+python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
+    --dict data/words.txt --segmenter-cmd "php tools/segment.php {dict}"
 ```
 
 > [!NOTE]
@@ -372,6 +373,9 @@ cd rust && cargo test && cargo build --release
 
 # 5. Python Tests
 cd python && python3 -m unittest tests/test_thaibreak.py
+
+# 6. Benchmark Tool Tests (synthetic data only, no corpus needed)
+python3 -m unittest discover tools/tests
 ```
 
 ---
