@@ -237,6 +237,14 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if ((isHangul(A) && B === LB.PO) || (A === LB.PR && isHangul(B))) {
     return NO_BREAK;
   }
+  // LB28: (AL | HL) × (AL | HL)
+  if (isAlpha(A) && isAlpha(B)) {
+    return NO_BREAK;
+  }
+  // LB28a: Brahmic orthographic syllables
+  if (inAksara(units, a, b, cls)) {
+    return NO_BREAK;
+  }
   // LB29: IS × (AL | HL)
   if (A === LB.IS && isAlpha(B)) {
     return NO_BREAK;

@@ -23,6 +23,10 @@ const LINE_BREAK_CASES: [string, string, string][] = [
   ['LB29 no break after a full stop before a letter', 'รพ.ศิริราช', 'รพ.ศิริราช'],
   ['LB29 no break inside an abbreviation', 'e.g.ไทย', 'e.g.ไทย'],
   ['LB29 no break after an ellipsis of full stops', 'ทดสอบ...ต่อ', 'ทด|สอบ...ต่อ'],
+  ['LB28 no break between Thai and Latin letters', 'ภาษาPHPเป็น', 'ภาษาPHPเป็น'],
+  ['LB28 no break inside an email address', 'ติดต่อ user@example.com ได้', 'ติดต่อ user@example.com ได้'],
+  ['LB28 no break around # (AL)', 'แท็ก#ไทยดี', 'แท็ก#ไทย|ดี'],
+  ['LB28 no break inside a Latin word with a combining mark', 'café́ ไทย', 'café́ ไทย'],
 ];
 
 test('insertLineBreaks follows UAX #14', () => {
