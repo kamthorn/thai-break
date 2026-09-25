@@ -230,6 +230,14 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if K == OP {
         return NO_BREAK;
     }
+    // LB15a: (sot | BK | CR | LF | NL | OP | QU | GL | SP | ZW) [\p{Pi}&QU] SP* ×
+    if K == QI && (k == 0 || [BK, CR, LF, NL, OP, QU, QI, QF, GL, SP, ZW].contains(&cls(k as isize - 1))) {
+        return NO_BREAK;
+    }
+    // LB15b: × [\p{Pf}&QU] (SP | GL | WJ | CL | QU | CP | EX | IS | SY | BK | CR | LF | NL | ZW | eot)
+    if B == QF && (b + 1 == count || [SP, GL, WJ, CL, QU, QI, QF, CP, EX, IS, SY, BK, CR, LF, NL, ZW].contains(&cls(bi + 1))) {
+        return NO_BREAK;
+    }
     // LB15c: SP ÷ IS NU
     if A == SP && B == IS && cls(bi + 1) == NU {
         return ALLOWED;
@@ -241,6 +249,17 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     // LB18: SP ÷
     if A == SP {
         return ALLOWED;
+    }
+    // LB19: × [QU - \p{Pi}], [QU - \p{Pf}] ×
+    if B == QU || B == QF || A == QU || A == QI {
+        return NO_BREAK;
+    }
+    // LB19a: quotation marks bind unless both neighbours are East Asian
+    if is_quote(B) && (!units[a].ea || b + 1 == count || !units[b + 1].ea) {
+        return NO_BREAK;
+    }
+    if is_quote(A) && (!units[b].ea || a == 0 || !units[a - 1].ea) {
+        return NO_BREAK;
     }
     // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
     if (A == HY || units[a].cp == HYPHEN) && B == AL

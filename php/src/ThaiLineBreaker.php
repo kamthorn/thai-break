@@ -37,16 +37,10 @@ class ThaiLineBreaker
     public const DEFAULT_MARKER = "\u{200B}";
 
     /**
-     * Tokens that must NOT end a line (never break AFTER these).
-     * Includes opening quotes.
-     */
-    private const PAT_NO_BREAK_AFTER = '/^[\"“‘«]$/u';
-
-    /**
      * Tokens that must NOT start a line (never break BEFORE these).
-     * Includes quotes and Thai postfixes (ๆ, ฯ, ฯลฯ).
+     * Thai postfixes (ๆ, ฯ, ฯลฯ).
      */
-    private const PAT_NO_BREAK_BEFORE = '/^(?:[\"”’»ๆฯ]|ฯลฯ)$/u';
+    private const PAT_NO_BREAK_BEFORE = '/^(?:[ๆฯ]|ฯลฯ)$/u';
 
     /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
     private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[^>]+>|&[a-zA-Z0-9#]+;)/usi';
@@ -181,12 +175,7 @@ class ThaiLineBreaker
      */
     private static function passesTypographicRules(string $left, string $right): bool
     {
-        // 2. Left token must not end a line (opening quotes)
-        if (preg_match(self::PAT_NO_BREAK_AFTER, $left)) {
-            return false;
-        }
-
-        // 3. Right token must not start a line (quotes, ๆ, ฯ, ฯลฯ)
+        // Right token must not start a line (ๆ, ฯ, ฯลฯ)
         if (preg_match(self::PAT_NO_BREAK_BEFORE, $right)) {
             return false;
         }

@@ -235,6 +235,14 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if K == lbOP {
 		return lbNoBreak
 	}
+	// LB15a: (sot | BK | CR | LF | NL | OP | QU | GL | SP | ZW) [\p{Pi}&QU] SP* ×
+	if K == lbQI && (k == 0 || lbIsOneOf(cls(k-1), lbBK, lbCR, lbLF, lbNL, lbOP, lbQU, lbQI, lbQF, lbGL, lbSP, lbZW)) {
+		return lbNoBreak
+	}
+	// LB15b: × [\p{Pf}&QU] (SP | GL | WJ | CL | QU | CP | EX | IS | SY | BK | CR | LF | NL | ZW | eot)
+	if B == lbQF && (b+1 == count || lbIsOneOf(cls(b+1), lbSP, lbGL, lbWJ, lbCL, lbQU, lbQI, lbQF, lbCP, lbEX, lbIS, lbSY, lbBK, lbCR, lbLF, lbNL, lbZW)) {
+		return lbNoBreak
+	}
 	// LB15c: SP ÷ IS NU
 	if A == lbSP && B == lbIS && cls(b+1) == lbNU {
 		return lbAllowed
@@ -246,6 +254,17 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	// LB18: SP ÷
 	if A == lbSP {
 		return lbAllowed
+	}
+	// LB19: × [QU - \p{Pi}], [QU - \p{Pf}] ×
+	if B == lbQU || B == lbQF || A == lbQU || A == lbQI {
+		return lbNoBreak
+	}
+	// LB19a: quotation marks bind unless both neighbours are East Asian
+	if lbIsQuote(B) && (!units[a].ea || b+1 == count || !units[b+1].ea) {
+		return lbNoBreak
+	}
+	if lbIsQuote(A) && (!units[b].ea || a == 0 || !units[a-1].ea) {
+		return lbNoBreak
 	}
 	// LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
 	if (A == lbHY || units[a].cp == hyphen) && B == lbAL &&

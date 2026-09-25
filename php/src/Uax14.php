@@ -243,6 +243,14 @@ final class Uax14
         if ($K === self::OP) {
             return self::NO_BREAK;
         }
+        // LB15a: (sot | BK | CR | LF | NL | OP | QU | GL | SP | ZW) [\p{Pi}&QU] SP* ×
+        if ($K === self::QI && ($k === 0 || in_array($cls($k - 1), [self::BK, self::CR, self::LF, self::NL, self::OP, self::QU, self::QI, self::QF, self::GL, self::SP, self::ZW], true))) {
+            return self::NO_BREAK;
+        }
+        // LB15b: × [\p{Pf}&QU] (SP | GL | WJ | CL | QU | CP | EX | IS | SY | BK | CR | LF | NL | ZW | eot)
+        if ($B === self::QF && ($b + 1 === $count || in_array($cls($b + 1), [self::SP, self::GL, self::WJ, self::CL, self::QU, self::QI, self::QF, self::CP, self::EX, self::IS, self::SY, self::BK, self::CR, self::LF, self::NL, self::ZW], true))) {
+            return self::NO_BREAK;
+        }
         // LB15c: SP ÷ IS NU
         if ($A === self::SP && $B === self::IS && $cls($b + 1) === self::NU) {
             return self::ALLOWED;
@@ -254,6 +262,17 @@ final class Uax14
         // LB18: SP ÷
         if ($A === self::SP) {
             return self::ALLOWED;
+        }
+        // LB19: × [QU - \p{Pi}], [QU - \p{Pf}] ×
+        if ($B === self::QU || $B === self::QF || $A === self::QU || $A === self::QI) {
+            return self::NO_BREAK;
+        }
+        // LB19a: quotation marks bind unless both neighbours are East Asian
+        if (self::isQuote($B) && (!$units[$a]['ea'] || $b + 1 === $count || !$units[$b + 1]['ea'])) {
+            return self::NO_BREAK;
+        }
+        if (self::isQuote($A) && (!$units[$b]['ea'] || $a === 0 || !$units[$a - 1]['ea'])) {
+            return self::NO_BREAK;
         }
         // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [\u2010]) × AL
         if (($A === self::HY || $units[$a]['cp'] === self::HYPHEN) && $B === self::AL
