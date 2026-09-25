@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["kamthorn"]
 description = "Fast, high-accuracy Thai word segmentation and typographic line breaker core engine"
 license = "Apache-2.0"
+readme = "README.md"
 repository = "https://github.com/kamthorn/thai-break"
 
 [lib]
