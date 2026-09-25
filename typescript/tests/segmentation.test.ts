@@ -13,6 +13,8 @@ const SEGMENTATION_CASES: [string, string, string][] = [
   ['abbreviations are still recognized', 'เมื่อ 5 มิ.ย. ที่ จ.พิษณุโลก', 'เมื่อ|5|มิ.ย.|ที่|จ.|พิษณุโลก'],
   ['an abbreviation after a word keeps the word whole', 'ในเขตจ.พิจิตร', 'ใน|เขต|จ.|พิจิตร'],
   ['an abbreviation after a word that ends like one', 'ในเดือนพ.ย.', 'ใน|เดือน|พ.ย.'],
+  ['ties keep the earlier word whole', 'บอกว่าอึดอัด', 'บอก|ว่า|อึดอัด'],
+  ['ties keep the earlier word whole (2)', 'ลาออกจากรองประธาน', 'ลาออก|จาก|รอง|ประธาน'],
 ];
 
 test('segmentation', () => {

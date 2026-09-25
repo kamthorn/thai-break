@@ -11,6 +11,12 @@ const ABBR_COST_FACTOR = 1.5;
 const ABBR_LETTER_COST_FACTOR = 0.01;
 /** Cost of an unknown-word fallback edge, relative to the cost of the rarest word. */
 const UNKNOWN_COST_FACTOR = 2.0;
+/**
+ * Costs closer than this are a tie. Edges into a position are visited from
+ * the longest word to the shortest, so on a tie the later, shorter last word
+ * wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
+ */
+const TIE_EPSILON = 1e-9;
 const MAX_EDGES = 50000;
 
 const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
@@ -161,7 +167,7 @@ export class Tokenizer {
           }
 
           const newCost = dp[i] + edgeCost;
-          if (newCost < dp[j]) {
+          if (newCost <= dp[j] + TIE_EPSILON) {
             dp[j] = newCost;
             from[j] = i;
             word[j] = edge.word;
