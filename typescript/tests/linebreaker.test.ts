@@ -40,6 +40,8 @@ const LINE_BREAK_CASES: [string, string, string][] = [
   ['LB30b emoji modifier stays with its base', 'ดี👍🏽มาก', 'ดี|👍🏽|มาก'],
   ['LB30a regional indicators pair into flags', '🇹🇭🇯🇵', '🇹🇭|🇯🇵'],
   ['LB24 backslash (PR) behaves the same in every port', 'A\\B', 'A\\B'],
+  ['LB21 break opportunity after a hyphen inside a word', 'state-of-the-art', 'state-|of-|the-|art'],
+  ['UAX #14 applies inside URLs', 'https://example.com/a-b?x=1', 'https://|example.com/|a-|b?|x=1'],
 ];
 
 test('insertLineBreaks follows UAX #14', () => {
@@ -57,6 +59,7 @@ const WRAP_CASES: [string, string, number, string[]][] = [
   ['indentation that does not fit is dropped', '  ย่อหน้า ใหม่ ครับ', 6, ['ย่อหน้า', 'ใหม่', 'ครับ']],
   ['LB14 no break after an opening parenthesis, even after spaces', 'ข้อความ ( ไทย ) ต่อ', 8, ['ข้อความ', '( ไทย )', 'ต่อ']],
   ['mai yamok never starts a line, even after a space', 'เด็ก ๆ เล่น', 4, ['เด็ก ๆ', 'เล่น']],
+  ['long hyphenated words wrap after a hyphen', 'state-of-the-art design', 10, ['state-of-', 'the-art', 'design']],
 ];
 
 test('wrap breaks only at UAX #14 opportunities', () => {

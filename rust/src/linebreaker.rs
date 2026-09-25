@@ -100,35 +100,33 @@ impl LineBreaker {
     /// Split plain text into segments that must not be broken internally. A
     /// line may break between any two segments; spaces stay at the end of the
     /// segment they follow.
+    ///
+    /// UAX #14 is evaluated at every position; the tokenizer only supplies the
+    /// word boundaries inside Thai runs.
     fn break_segments(&self, text: &str) -> Vec<String> {
-        let tokens = self.tokenizer.tokenize(text, true);
-        let n = tokens.len();
-        if n <= 1 {
-            return if text.is_empty() { Vec::new() } else { vec![text.to_string()] };
+        if text.is_empty() {
+            return Vec::new();
         }
 
-        // Token ends are the dictionary word boundaries inside Thai runs
-        let mut cps: Vec<char> = Vec::with_capacity(text.len());
-        let mut ends = Vec::with_capacity(n);
-        for tok in &tokens {
-            cps.extend(tok.chars());
-            ends.push(cps.len());
-        }
-        let mut dict = vec![false; cps.len() + 1];
-        for &end in &ends {
-            dict[end] = true;
+        let cps: Vec<char> = text.chars().collect();
+        let n = cps.len();
+        let mut dict = vec![false; n + 1];
+        let mut pos = 0;
+        for tok in self.tokenizer.tokenize(text, true) {
+            pos += tok.chars().count();
+            dict[pos.min(n)] = true;
         }
         let actions = uax14::break_opportunities(&cps, Some(&dict));
 
         let mut segments = Vec::new();
-        let mut cur = String::new();
-        for i in 0..n {
-            cur.push_str(&tokens[i]);
-            if i + 1 < n && actions[ends[i]] == uax14::ALLOWED {
-                segments.push(std::mem::take(&mut cur));
+        let mut start = 0;
+        for i in 1..n {
+            if actions[i] == uax14::ALLOWED {
+                segments.push(cps[start..i].iter().collect());
+                start = i;
             }
         }
-        segments.push(cur);
+        segments.push(cps[start..].iter().collect());
         segments
     }
 

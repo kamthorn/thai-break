@@ -97,39 +97,33 @@ func (b *LineBreaker) processPlain(text string, marker string) string {
 // breakSegments splits plain text into segments that must not be broken
 // internally. A line may break between any two segments; spaces stay at the
 // end of the segment they follow.
+//
+// UAX #14 is evaluated at every position; the tokenizer only supplies the
+// word boundaries inside Thai runs.
 func (b *LineBreaker) breakSegments(text string) []string {
-	tokens := b.tokenizer.Tokenize(text, true)
-	n := len(tokens)
-	if n <= 1 {
-		if text == "" {
-			return nil
-		}
-		return []string{text}
+	if text == "" {
+		return nil
 	}
 
-	// Token ends are the dictionary word boundaries inside Thai runs
-	cps := make([]rune, 0, len(text))
-	ends := make([]int, n)
-	for i, tok := range tokens {
-		cps = append(cps, []rune(tok)...)
-		ends[i] = len(cps)
-	}
-	dict := make([]bool, len(cps)+1)
-	for _, end := range ends {
-		dict[end] = true
+	cps := []rune(text)
+	n := len(cps)
+	dict := make([]bool, n+1)
+	pos := 0
+	for _, tok := range b.tokenizer.Tokenize(text, true) {
+		pos += utf8.RuneCountInString(tok)
+		dict[min(pos, n)] = true
 	}
 	actions := lbBreakOpportunities(cps, dict)
 
 	var segments []string
-	var cur strings.Builder
-	for i := 0; i < n; i++ {
-		cur.WriteString(tokens[i])
-		if i+1 < n && actions[ends[i]] == lbAllowed {
-			segments = append(segments, cur.String())
-			cur.Reset()
+	start := 0
+	for i := 1; i < n; i++ {
+		if actions[i] == lbAllowed {
+			segments = append(segments, string(cps[start:i]))
+			start = i
 		}
 	}
-	return append(segments, cur.String())
+	return append(segments, string(cps[start:]))
 }
 
 func (b *LineBreaker) processHtml(html string, marker string) string {

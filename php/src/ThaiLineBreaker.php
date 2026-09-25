@@ -205,40 +205,38 @@ class ThaiLineBreaker
      * A line may break between any two segments; spaces stay at the end of
      * the segment they follow.
      *
+     * UAX #14 is evaluated at every position; the tokenizer only supplies
+     * the word boundaries inside Thai runs.
+     *
      * @return list<string>
      */
     private function breakSegments(string $text): array
     {
-        $tokens = $this->tokenizer->tokenize($text, true);
-        $n      = count($tokens);
-
-        if ($n <= 1) {
-            return $text === '' ? [] : [$text];
+        if ($text === '') {
+            return [];
         }
 
-        // Token ends are the dictionary word boundaries inside Thai runs
-        $cps  = [];
-        $ends = [];
-        foreach ($tokens as $tok) {
-            array_push($cps, ...self::codePoints($tok));
-            $ends[] = count($cps);
-        }
-        $dict = array_fill(0, count($cps) + 1, false);
-        foreach ($ends as $end) {
-            $dict[$end] = true;
+        $chars = mb_str_split($text);
+        $cps   = array_map(static fn(string $ch): int => mb_ord($ch) ?: 0xFFFD, $chars);
+        $n     = count($chars);
+
+        $dict = array_fill(0, $n + 1, false);
+        $pos  = 0;
+        foreach ($this->tokenizer->tokenize($text, true) as $tok) {
+            $pos += mb_strlen($tok);
+            $dict[min($pos, $n)] = true;
         }
         $actions = Uax14::breakOpportunities($cps, $dict);
 
         $segments = [];
-        $cur      = '';
-        for ($i = 0; $i < $n; $i++) {
-            $cur .= $tokens[$i];
-            if ($i + 1 < $n && $actions[$ends[$i]] === Uax14::ALLOWED) {
-                $segments[] = $cur;
-                $cur        = '';
+        $start    = 0;
+        for ($i = 1; $i < $n; $i++) {
+            if ($actions[$i] === Uax14::ALLOWED) {
+                $segments[] = implode('', array_slice($chars, $start, $i - $start));
+                $start      = $i;
             }
         }
-        $segments[] = $cur;
+        $segments[] = implode('', array_slice($chars, $start));
 
         return $segments;
     }

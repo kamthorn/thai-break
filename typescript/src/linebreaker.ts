@@ -98,35 +98,33 @@ export class LineBreaker {
    * Split plain text into segments that must not be broken internally. A line
    * may break between any two segments; spaces stay at the end of the segment
    * they follow.
+   *
+   * UAX #14 is evaluated at every position; the tokenizer only supplies the
+   * word boundaries inside Thai runs.
    */
   private breakSegments(text: string): string[] {
-    const tokens = this.tokenizer.tokenize(text, true);
-    const n = tokens.length;
-    if (n <= 1) return text ? [text] : [];
+    if (!text) return [];
 
-    // Token ends are the dictionary word boundaries inside Thai runs
-    const cps: number[] = [];
-    const ends: number[] = [];
-    for (const tok of tokens) {
-      cps.push(...codePoints(tok));
-      ends.push(cps.length);
-    }
-    const dict: boolean[] = new Array(cps.length + 1).fill(false);
-    for (const end of ends) {
-      dict[end] = true;
+    const chars = Array.from(text);
+    const cps = chars.map((ch) => ch.codePointAt(0) ?? 0);
+    const n = chars.length;
+    const dict: boolean[] = new Array(n + 1).fill(false);
+    let pos = 0;
+    for (const tok of this.tokenizer.tokenize(text, true)) {
+      pos += Array.from(tok).length;
+      dict[Math.min(pos, n)] = true;
     }
     const actions = breakOpportunities(cps, dict);
 
     const segments: string[] = [];
-    let cur = '';
-    for (let i = 0; i < n; i++) {
-      cur += tokens[i];
-      if (i + 1 < n && actions[ends[i]] === ALLOWED) {
-        segments.push(cur);
-        cur = '';
+    let start = 0;
+    for (let i = 1; i < n; i++) {
+      if (actions[i] === ALLOWED) {
+        segments.push(chars.slice(start, i).join(''));
+        start = i;
       }
     }
-    segments.push(cur);
+    segments.push(chars.slice(start).join(''));
     return segments;
   }
 
