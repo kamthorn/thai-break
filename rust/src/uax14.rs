@@ -291,6 +291,10 @@ fn pair_action(units: &[Unit], b: usize, dict_breaks: Option<&[bool]>) -> u8 {
     if (is_hangul(A) && B == PO) || (A == PR && is_hangul(B)) {
         return NO_BREAK;
     }
+    // LB29: IS × (AL | HL)
+    if A == IS && is_alpha(B) {
+        return NO_BREAK;
+    }
     // LB31: ÷
     ALLOWED
 }

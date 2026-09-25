@@ -20,6 +20,9 @@ const LINE_BREAK_CASES: [string, string, string][] = [
   ['LB25 no break inside a range or a signed number', 'ช่วง 10-20 คน ลบ -5 องศา', 'ช่วง 10-20 คน ลบ -5 องศา'],
   ['LB25 no break after a prefix or before a postfix', 'ราคา $(5) ลด 40%', 'ราคา $(5) ลด 40%'],
   ['LB25 no break between IS and NU', 'พ.ศ.2567', 'พ.ศ.2567'],
+  ['LB29 no break after a full stop before a letter', 'รพ.ศิริราช', 'รพ.ศิริราช'],
+  ['LB29 no break inside an abbreviation', 'e.g.ไทย', 'e.g.ไทย'],
+  ['LB29 no break after an ellipsis of full stops', 'ทดสอบ...ต่อ', 'ทด|สอบ...ต่อ'],
 ];
 
 test('insertLineBreaks follows UAX #14', () => {
