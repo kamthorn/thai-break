@@ -31,6 +31,9 @@ var lineBreakCases = []struct{ name, input, want string }{
 	{"LB23 no break between Latin letters and digits", "เอกสารWP01ของ", "เอกสารWP01ของ"},
 	{"LB30 no break between a letter and an opening parenthesis", "ประเทศไทย(สยาม)เป็นประเทศ", "ประเทศ|ไทย(สยาม)เป็น|ประเทศ"},
 	{"LB30 no break between a closing bracket and a letter", "[หมายเหตุ]ข้อความ", "[หมายเหตุ]ข้อความ"},
+	{"LB19 no break around quotation marks", "ไทย‘คำ’ไทย", "ไทย‘คำ’ไทย"},
+	{"LB19a no break around guillemets outside East Asian text", "«ไทย»ไทย", "«ไทย»ไทย"},
+	{"LB15a/LB15b quotes stay with the quoted text", "เขาพูดว่า “สวัสดี” แล้ว", "เขา|พูด|ว่า “สวัสดี” แล้ว"},
 }
 
 func TestInsertLineBreaksUAX14(t *testing.T) {

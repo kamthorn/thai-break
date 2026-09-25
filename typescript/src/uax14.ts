@@ -181,6 +181,14 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   if (K === LB.OP) {
     return NO_BREAK;
   }
+  // LB15a: (sot | BK | CR | LF | NL | OP | QU | GL | SP | ZW) [\p{Pi}&QU] SP* ×
+  if (K === LB.QI && (k === 0 || [LB.BK, LB.CR, LB.LF, LB.NL, LB.OP, LB.QU, LB.QI, LB.QF, LB.GL, LB.SP, LB.ZW].includes(cls(k - 1)))) {
+    return NO_BREAK;
+  }
+  // LB15b: × [\p{Pf}&QU] (SP | GL | WJ | CL | QU | CP | EX | IS | SY | BK | CR | LF | NL | ZW | eot)
+  if (B === LB.QF && (b + 1 === count || [LB.SP, LB.GL, LB.WJ, LB.CL, LB.QU, LB.QI, LB.QF, LB.CP, LB.EX, LB.IS, LB.SY, LB.BK, LB.CR, LB.LF, LB.NL, LB.ZW].includes(cls(b + 1)))) {
+    return NO_BREAK;
+  }
   // LB15c: SP ÷ IS NU
   if (A === LB.SP && B === LB.IS && cls(b + 1) === LB.NU) {
     return ALLOWED;
@@ -192,6 +200,17 @@ function pairAction(units: Unit[], b: number, dictBreaks: boolean[] | null): num
   // LB18: SP ÷
   if (A === LB.SP) {
     return ALLOWED;
+  }
+  // LB19: × [QU - \p{Pi}], [QU - \p{Pf}] ×
+  if (B === LB.QU || B === LB.QF || A === LB.QU || A === LB.QI) {
+    return NO_BREAK;
+  }
+  // LB19a: quotation marks bind unless both neighbours are East Asian
+  if (isQuote(B) && (!units[a].ea || b + 1 === count || !units[b + 1].ea)) {
+    return NO_BREAK;
+  }
+  if (isQuote(A) && (!units[b].ea || a === 0 || !units[a - 1].ea)) {
+    return NO_BREAK;
   }
   // LB20a: (sot | BK | CR | LF | NL | SP | ZW | CB | GL) (HY | [‐]) × AL
   if ((A === LB.HY || units[a].cp === HYPHEN) && B === LB.AL &&
