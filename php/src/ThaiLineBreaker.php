@@ -10,24 +10,19 @@ namespace ThaiBreak;
  * Designed for PDF rendering engines (dompdf, mPDF, TCPDF), web browsers,
  * and console/receipt printer text layout.
  *
- * Implements line breaking rules aligned with:
- *   - W3C Requirements for Thai Text Layout (clreq/tlreq)
- *   - Unicode Standard Annex #14 (UAX #14: Line Breaking Algorithm)
- *   - Royal Society of Thailand (ราชบัณฑิตยสภา) typographic standards
- *
- * Key Rules:
- *   1. No Line-Start: Closing punctuation (), ], }, ”, ’, », etc.), sentence
- *      terminators (,, ., :, ;, !, ?), and Thai postfixes (ๆ ไม้ยมก, ฯ ไปยาลน้อย,
- *      ฯลฯ ไปยาลใหญ่) MUST NEVER appear at the beginning of a line.
- *   2. No Line-End: Opening punctuation ((, [, {, “, ‘, «, etc.) and prefix
- *      symbols (฿, $, #, @) MUST NEVER appear at the end of a line.
+ * Break opportunities follow the Unicode Line Breaking Algorithm (UAX #14,
+ * Unicode 16.0, all rules LB1–LB31; see Uax14):
+ *   1. Dictionary inside Thai runs: SA (Complex_Context) text is segmented
+ *      with the tokenizer; next to other characters Thai letters resolve to
+ *      AL, so "ราคา100บาท" and "ไทย(สยาม)" are not broken.
+ *   2. Thai tailoring (W3C tlreq): ๆ and ฯ (including ฯลฯ) never start a
+ *      line, even after a space.
  *   3. Whitespace Safety: Natural spaces are already line break opportunities;
  *      never insert zero-width break markers directly adjacent to spaces,
  *      preventing orphan spaces at the start of new lines.
- *   4. Numbers & Abbreviations: Never break inside numbers (10,000, 3.14, 40%)
- *      or Thai dotted abbreviations (พ.ศ., รพ., น., จ.).
- *   5. HTML Awareness: When processing HTML, tags (<...>) and entities (&...;)
- *      are preserved untouched — only text nodes receive break opportunities.
+ *   4. HTML Awareness: Text is treated as HTML only when it contains a real
+ *      tag; tags (<...>) and entities (&...;) are preserved untouched and
+ *      only text nodes receive break opportunities.
  *
  * License: Apache-2.0
  */

@@ -12,8 +12,10 @@
 - ⚡ **Microsecond-Level Latency:** ~30–45 µs per sentence in Go (>25,000 sentences/sec per core).
 - 🎯 **High Accuracy:** Viterbi dynamic programming on a Directed Acyclic Graph (DAG) with Bigram transition probabilities, scoring **96.88%** word-boundary F1-score on standard benchmarks.
 - 📐 **Unicode UAX #14 & W3C Typographic Rules:**
-  - **LB13:** Never break before punctuation, closing brackets, or solidus (`/`).
-  - **LB23:** Keep Latin letters and digits together (e.g., `WP01`, `ISO29110` never break mid-code).
+  - Implements every rule of the Unicode 16.0 Line Breaking Algorithm (LB1–LB31) and passes all 16,672 cases of the official `LineBreakTest.txt`.
+  - Uses the dictionary only inside Thai (SA) runs; next to other characters Thai letters are alphabetic, so `ราคา100บาท`, `ภาษาPHPเป็น` and `ไทย(สยาม)` stay together.
+  - Never breaks inside numbers, abbreviations or e-mail addresses (`1/2/2567`, `10:30`, `พ.ศ.2567`, `user@example.com`).
+  - Thai tailoring: `ๆ` and `ฯ` never start a line, even after a space.
   - Keeps leading vowels (`เ`, `แ`, `โ`, `ใ`, `ไ`) attached to their initial consonants.
 - 📏 **Thai Visual Display Width:** Accurately calculates visual column width by treating upper/lower combining vowels and tone marks as zero-width.
 - 🏷️ **HTML Preservation:** Safely inserts break markers in HTML content while ignoring tags, comments, and scripts (`<script>`, `<style>`).
