@@ -231,6 +231,10 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	if lbIsOneOf(B, lbCL, lbCP, lbEX, lbSY) {
 		return lbNoBreak
 	}
+	// LB14: OP SP* ×
+	if K == lbOP {
+		return lbNoBreak
+	}
 	// LB15c: SP ÷ IS NU
 	if A == lbSP && B == lbIS && cls(b+1) == lbNU {
 		return lbAllowed
@@ -316,6 +320,11 @@ func lbPairAction(units []lbUnit, b int, dictBreaks []bool) uint8 {
 	}
 	// LB29: IS × (AL | HL)
 	if A == lbIS && lbIsAlpha(B) {
+		return lbNoBreak
+	}
+	// LB30: (AL | HL | NU) × [OP - $EastAsian], [CP - $EastAsian] × (AL | HL | NU)
+	if ((lbIsAlpha(A) || A == lbNU) && B == lbOP && !units[b].ea) ||
+		(A == lbCP && !units[a].ea && (lbIsAlpha(B) || B == lbNU)) {
 		return lbNoBreak
 	}
 	// LB31: ÷

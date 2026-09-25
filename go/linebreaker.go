@@ -13,7 +13,7 @@ const (
 )
 
 var (
-	reNoBreakAfter  = regexp.MustCompile(`^[(\[{\\"“‘«（【《]$`)
+	reNoBreakAfter  = regexp.MustCompile(`^[\\"“‘«]$`)
 	reNoBreakBefore = regexp.MustCompile(`^(?:[\\"”’»ๆฯ]|ฯลฯ)$`)
 	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[^>]+>|&[a-zA-Z0-9#]+;))`)
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
@@ -53,7 +53,7 @@ func CanBreakBetween(left, right string) bool {
 // passesTypographicRules applies legacy token-level rules that are not yet
 // expressed as UAX #14 rules.
 func passesTypographicRules(left, right string) bool {
-	// No break after opening symbols
+	// No break after opening quotes
 	if reNoBreakAfter.MatchString(left) {
 		return false
 	}

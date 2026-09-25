@@ -29,6 +29,8 @@ var lineBreakCases = []struct{ name, input, want string }{
 	{"LB23 no break between Thai letters and digits", "ราคา100บาท", "ราคา100บาท"},
 	{"LB23 no break between Thai letters and Thai digits", "ปี๒๕๖๗นะ", "ปี๒๕๖๗นะ"},
 	{"LB23 no break between Latin letters and digits", "เอกสารWP01ของ", "เอกสารWP01ของ"},
+	{"LB30 no break between a letter and an opening parenthesis", "ประเทศไทย(สยาม)เป็นประเทศ", "ประเทศ|ไทย(สยาม)เป็น|ประเทศ"},
+	{"LB30 no break between a closing bracket and a letter", "[หมายเหตุ]ข้อความ", "[หมายเหตุ]ข้อความ"},
 }
 
 func TestInsertLineBreaksUAX14(t *testing.T) {
@@ -50,6 +52,7 @@ var wrapCases = []struct {
 	{"mai yamok never starts a line", "ทดสอบเด็กๆๆๆๆๆๆ", 5, []string{"ทดสอบ", "เด็กๆๆๆๆๆๆ"}},
 	{"an opening quote never ends a line", "สวัสดีครับ “ท่านผู้ชม”", 11, []string{"สวัสดีครับ", "“ท่านผู้ชม”"}},
 	{"indentation that does not fit is dropped", "  ย่อหน้า ใหม่ ครับ", 6, []string{"ย่อหน้า", "ใหม่", "ครับ"}},
+	{"LB14 no break after an opening parenthesis, even after spaces", "ข้อความ ( ไทย ) ต่อ", 8, []string{"ข้อความ", "( ไทย )", "ต่อ"}},
 }
 
 func TestWrapUAX14(t *testing.T) {
