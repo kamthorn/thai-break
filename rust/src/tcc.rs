@@ -14,12 +14,12 @@ static TCC_GENERAL_REGEX: Lazy<Regex> = Lazy::new(|| {
         "เc็ck",
         "เcctาะk",
         "เccีtยะk",
-        "เcc็ck",
+        "เ(?:c[รลว]|หc)็ck",
         "เcิc์ck",
         "เcิtck",
         "เcีtยะ?k",
         "เcืtอะk",
-        "เcื",
+        "เcืtอ?k",
         "เctา?ะ?k",
         "c[ึื]tck",
         "c[ะ-ู]tk",
@@ -30,7 +30,7 @@ static TCC_GENERAL_REGEX: Lazy<Regex> = Lazy::new(|| {
         "แc็ck",
         "แcc์k",
         "แctะk",
-        "แcc็ck",
+        "แ(?:c[รลว]|หc)็ck",
         "แccc์k",
         "โctะk",
         "[เ-ไ]ctk",
@@ -72,6 +72,28 @@ static TCC_LOOKAHEAD_REGEX: Lazy<Regex> = Lazy::new(|| {
 
     Regex::new(&format!("^(?:{})", patterns.join("|"))).expect("Failed to compile TCC lookahead regex")
 });
+
+/// Byte length of a matched cluster. A final consonant followed by a dependent
+/// vowel or mark starts the next cluster instead: "รึยัง" is "รึ" + "ยัง", not
+/// "รึย" + "ัง". Except ว before ะ, which is part of the vowel -ัวะ ("ผัวะ").
+fn cluster_len(matched: &str, rest: &str) -> usize {
+    let mut chars = matched.chars();
+    if let (Some(last), Some(next)) = (chars.next_back(), rest.chars().next()) {
+        if chars.next().is_some()
+            && ('ก'..='ฮ').contains(&last)
+            && is_dependent_thai(next)
+            && !(last == 'ว' && next == 'ะ')
+        {
+            return matched.len() - last.len_utf8();
+        }
+    }
+    matched.len()
+}
+
+/// Whether a character can never start a cluster: ะ ั า ำ ิ–ฺ ๅ ็–๎.
+fn is_dependent_thai(ch: char) -> bool {
+    matches!(ch as u32, 0x0E30..=0x0E3A | 0x0E45 | 0x0E47..=0x0E4E)
+}
 
 #[inline]
 fn is_followed_by_lookahead_char(rest: &str) -> bool {
@@ -133,7 +155,7 @@ pub fn tcc_pos_array(chars: &[char]) -> Vec<bool> {
 
         // Second, check general rules
         if let Some(m) = TCC_GENERAL_REGEX.find(sub) {
-            byte_pos += m.end();
+            byte_pos += cluster_len(m.as_str(), &sub[m.end()..]);
             if let Some(&idx) = byte_to_char_idx.get(&byte_pos) {
                 valid[idx] = true;
             }
@@ -153,6 +175,13 @@ pub fn tcc_pos_array(chars: &[char]) -> Vec<bool> {
         if cp < 0x0E00 || cp > 0x0E7F {
             valid[i] = true;
             valid[i + 1] = true;
+        }
+    }
+
+    // Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
+    for i in 1..n {
+        if is_dependent_thai(chars[i]) {
+            valid[i] = false;
         }
     }
 

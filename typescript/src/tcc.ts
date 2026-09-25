@@ -26,12 +26,12 @@ export function getTCCPattern(): RegExp {
     'เccีtยะk',
     'เccีtย(?=[เ-ไก-ฮ]|$|\\s)k',
     'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$|\\s)k',
-    'เcc็ck',
+    'เ(?:c[รลว]|หc)็ck',
     'เcิc์ck',
     'เcิtck',
     'เcีtยะ?k',
     'เcืtอะk',
-    'เcื',
+    'เcืtอ?k',
     'เctา?ะ?k',
     'c[ึื]tck',
     'c[ะ-ู]tk',
@@ -42,7 +42,7 @@ export function getTCCPattern(): RegExp {
     'แc็ck',
     'แcc์k',
     'แctะk',
-    'แcc็ck',
+    'แ(?:c[รลว]|หc)็ck',
     'แccc์k',
     'โctะk',
     '[เ-ไ]ctk',
@@ -102,7 +102,7 @@ export function tccPosArray(chars: string[]): boolean[] {
     const sub = text.slice(pos);
     const m = pattern.exec(sub);
     if (m && m[0].length > 0) {
-      pos += m[0].length;
+      pos += clusterLength(m[0], sub.slice(m[0].length));
       const idx = offsetToCharIdx.get(pos);
       if (idx !== undefined) {
         valid[idx] = true;
@@ -128,5 +128,29 @@ export function tccPosArray(chars: string[]): boolean[] {
     }
   }
 
+  // Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
+  for (let i = 1; i < n; i++) {
+    if (DEPENDENT.test(chars[i])) {
+      valid[i] = false;
+    }
+  }
+
   return valid;
+}
+
+/** Dependent vowels and marks that can never start a cluster: ะ ั า ำ ิ–ฺ ๅ ็–๎. */
+const DEPENDENT = /^[\u0e30-\u0e3a\u0e45\u0e47-\u0e4e]$/;
+
+/**
+ * Length of a matched cluster. A final consonant followed by a dependent vowel
+ * or mark starts the next cluster instead: "รึยัง" is "รึ" + "ยัง", not
+ * "รึย" + "ัง". Except ว before ะ, which is part of the vowel -ัวะ ("ผัวะ").
+ */
+function clusterLength(match: string, rest: string): number {
+  const last = match[match.length - 1];
+  const next = rest[0] ?? '';
+  if (match.length > 1 && last >= 'ก' && last <= 'ฮ' && DEPENDENT.test(next) && !(last === 'ว' && next === 'ะ')) {
+    return match.length - 1;
+  }
+  return match.length;
 }

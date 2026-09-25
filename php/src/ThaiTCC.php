@@ -21,6 +21,11 @@ namespace ThaiBreak;
 class ThaiTCC
 {
     /**
+     * Dependent vowels and marks that can never start a cluster: ะ ั า ำ ิ–ฺ ๅ ็–๎.
+     */
+    private const DEPENDENT = '[\x{0E30}-\x{0E3A}\x{0E45}\x{0E47}-\x{0E4E}]';
+
+    /**
      * Regex matching one Thai Character Cluster anchored with \G at the current byte offset.
      */
     private static ?string $tccPattern = null;
@@ -49,12 +54,12 @@ class ThaiTCC
             'เccีtยะk',
             'เccีtย(?=[เ-ไก-ฮ]|$)k',
             'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$)k',
-            'เcc็ck',
+            'เ(?:c[รลว]|หc)็ck',
             'เcิc์ck',
             'เcิtck',
             'เcีtยะ?k',
             'เcืtอะk',
-            'เcื',
+            'เcืtอ?k',
             'เctา?ะ?k',
             'c[ึื]tck',
             'c[ะ-ู]tk',
@@ -65,7 +70,7 @@ class ThaiTCC
             'แc็ck',
             'แcc์k',
             'แctะk',
-            'แcc็ck',
+            'แ(?:c[รลว]|หc)็ck',
             'แccc์k',
             'โctะk',
             '[เ-ไ]ctk',
@@ -132,7 +137,16 @@ class ThaiTCC
         $bytePos = 0;
         while ($bytePos < $totalBytes) {
             if (preg_match($pattern, $text, $match, 0, $bytePos) && $match[0] !== '') {
-                $bytePos += strlen($match[0]);
+                $matchLen = strlen($match[0]);
+                // A final consonant followed by a dependent vowel or mark starts the
+                // next cluster instead: "รึยัง" is "รึ" + "ยัง", not "รึย" + "ัง".
+                // Except ว before ะ, which is part of the vowel -ัวะ ("ผัวะ").
+                if (mb_strlen($match[0], 'UTF-8') > 1 && preg_match('/[ก-ฮ]$/u', $match[0])
+                    && preg_match('/\G' . self::DEPENDENT . '/u', $text, $next, 0, $bytePos + $matchLen)
+                    && !(str_ends_with($match[0], 'ว') && $next[0] === 'ะ')) {
+                    $matchLen -= strlen('ก');
+                }
+                $bytePos += $matchLen;
                 if (isset($byteToChar[$bytePos])) {
                     $valid[$byteToChar[$bytePos]] = true;
                 }
@@ -153,6 +167,15 @@ class ThaiTCC
             if (!preg_match('/[\x{0E00}-\x{0E7F}]/u', $ch)) {
                 $valid[$i]     = true;
                 $valid[$i + 1] = true;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
+        // ------------------------------------------------------------------
+        for ($i = 1; $i < $len; $i++) {
+            if (preg_match('/^' . self::DEPENDENT . '$/u', $chars[$i])) {
+                $valid[$i] = false;
             }
         }
 

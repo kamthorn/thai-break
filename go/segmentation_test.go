@@ -14,6 +14,8 @@ var segmentationCases = []struct{ name, input, want string }{
 	{"an abbreviation after a word that ends like one", "ในเดือนพ.ย.", "ใน|เดือน|พ.ย."},
 	{"ties keep the earlier word whole", "บอกว่าอึดอัด", "บอก|ว่า|อึดอัด"},
 	{"ties keep the earlier word whole (2)", "ลาออกจากรองประธาน", "ลาออก|จาก|รอง|ประธาน"},
+	{"ก็ is not swallowed by the cluster before it", "ทะเลก็สวย", "ทะเล|ก็|สวย"},
+	{"a final consonant before a vowel starts the next cluster", "รึยัง", "รึ|ยัง"},
 }
 
 func TestLongTextIsSegmentedToTheEnd(t *testing.T) {
@@ -26,6 +28,18 @@ func TestLongTextIsSegmentedToTheEnd(t *testing.T) {
 	for _, w := range words {
 		if len([]rune(w)) >= 20 {
 			t.Fatalf("unexpected long token of %d characters", len([]rune(w)))
+		}
+	}
+}
+
+func TestTCCNeverSplitsBeforeAVowelOrToneMark(t *testing.T) {
+	for _, word := range []string{"เมื่อ", "เนื้อ", "เบื่อ", "ต้น", "เกล็ด", "เหม็น", "ลั๊วะ"} {
+		runes := []rune(word)
+		valid := TCCPosArray(runes)
+		for i := 1; i < len(runes); i++ {
+			if isDependentThai(runes[i]) && valid[i] {
+				t.Errorf("boundary before %q in %q", runes[i], word)
+			}
 		}
 	}
 }
