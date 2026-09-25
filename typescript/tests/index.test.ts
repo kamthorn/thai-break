@@ -91,3 +91,14 @@ test('Line wrapping', () => {
     );
   }
 });
+
+test('Line wrapping breaks at spaces', () => {
+  const wrapped = wrap('the quick brown fox jumps over the lazy dog', 10);
+  assert.deepStrictEqual(wrapped.split('\n'), [
+    'the quick',
+    'brown fox',
+    'jumps over',
+    'the lazy',
+    'dog',
+  ]);
+});

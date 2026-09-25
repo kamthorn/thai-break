@@ -105,3 +105,13 @@ fn test_no_break_before_solidus() {
     let broken = lines("ISO/IEC 29110 กำหนดให้มี", "|", false);
     assert!(!broken.contains("|/"), "{}", broken);
 }
+
+#[test]
+fn test_wrapping_breaks_at_spaces() {
+    init_test_dict();
+    let wrapped = wrap("the quick brown fox jumps over the lazy dog", 10, false);
+    assert_eq!(
+        wrapped.lines().collect::<Vec<_>>(),
+        vec!["the quick", "brown fox", "jumps over", "the lazy", "dog"]
+    );
+}
