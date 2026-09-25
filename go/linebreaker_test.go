@@ -76,6 +76,22 @@ func TestWrapUAX14(t *testing.T) {
 	}
 }
 
+func TestCutLongWordsKeepsThaiCharacterClusters(t *testing.T) {
+	cases := []struct {
+		input string
+		width int
+		want  []string
+	}{
+		{"กรุงเทพมหานคร", 4, []string{"กรุง", "เทพ", "มหา", "นคร"}},
+	}
+	for _, c := range cases {
+		got := strings.Split(GetDefaultLineBreaker().Wrap(c.input, c.width, "\n", true), "\n")
+		if !reflect.DeepEqual(got, c.want) {
+			t.Errorf("Wrap(%q, %d, cut) = %q, want %q", c.input, c.width, got, c.want)
+		}
+	}
+}
+
 func TestMandatoryBreaks(t *testing.T) {
 	got := lbBreakOpportunities([]rune("a\r\nb"), nil)
 	want := []uint8{lbNoBreak, lbNoBreak, lbNoBreak, lbMandatory, lbMandatory}

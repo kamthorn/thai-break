@@ -199,19 +199,35 @@ func (b *LineBreaker) Wrap(text string, width int, breakSep string, cutLongWords
 }
 
 // cutToWidth force-breaks text that is wider than a line into pieces of at
-// most width columns.
+// most width columns. Pieces end only between Thai character clusters (TCC)
+// and never separate a character from its combining marks or a zero-width
+// joiner.
 func cutToWidth(text string, width int) []string {
+	runes := []rune(text)
+	tccValid := TCCPosArray(runes)
+	var clusters []string
+	prevZwj := false
+	for i, r := range runes {
+		cls := lbClass(r)
+		if i > 0 && (!tccValid[i] || prevZwj || cls == lbCM || cls == lbSM || cls == lbZWJ) {
+			clusters[len(clusters)-1] += string(r)
+		} else {
+			clusters = append(clusters, string(r))
+		}
+		prevZwj = cls == lbZWJ
+	}
+
 	var pieces []string
 	part := ""
 	partW := 0
-	for _, ch := range text {
-		cw := ThaiDisplayWidth(string(ch))
+	for _, cluster := range clusters {
+		cw := ThaiDisplayWidth(cluster)
 		if partW+cw > width && part != "" {
 			pieces = append(pieces, part)
-			part = string(ch)
+			part = cluster
 			partW = cw
 		} else {
-			part += string(ch)
+			part += cluster
 			partW += cw
 		}
 	}

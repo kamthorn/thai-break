@@ -78,6 +78,12 @@ class LineBreakerTest extends TestCase
         $this->assertSame($expected, explode("\n", ThaiTokenizer::getDefault()->wrap($input, $width)));
     }
 
+    public function testCutLongWordsKeepsThaiCharacterClusters(): void
+    {
+        $wrapped = ThaiTokenizer::getDefault()->wrap('กรุงเทพมหานคร', 4, "\n", true);
+        $this->assertSame(['กรุง', 'เทพ', 'มหา', 'นคร'], explode("\n", $wrapped));
+    }
+
     public function testMandatoryBreaks(): void
     {
         $cps = array_map('mb_ord', mb_str_split("a\r\nb"));
