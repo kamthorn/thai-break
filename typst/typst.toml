@@ -1,0 +1,12 @@
+[package]
+name = "thaibreak"
+version = "0.1.0"
+entrypoint = "lib.typ"
+authors = ["Kamthorn Krairuks"]
+license = "Apache-2.0"
+description = "Natural Thai word segmentation and line breaking for Typst using thai-break dictionary trie."
+repository = "https://github.com/kamthorn/thai-break"
+keywords = ["thai", "line-breaking", "segmentation", "i18n", "typography"]
+categories = ["text", "layout"]
+compiler = "0.13.0"
+exclude = ["example.typ"]

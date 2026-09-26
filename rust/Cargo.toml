@@ -18,12 +18,14 @@ once_cell = "1.19"
 libc = { version = "0.2", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 pyo3 = { version = "0.23", optional = true, features = ["extension-module"] }
+wasm-minimal-protocol = { version = "0.1", optional = true }
 
 [features]
 default = ["c-ffi"]
 c-ffi = ["dep:libc"]
 wasm = ["dep:wasm-bindgen"]
 python = ["dep:pyo3"]
+typst-plugin = ["dep:wasm-minimal-protocol"]
 
 [profile.release]
 opt-level = 3
