@@ -106,6 +106,24 @@ $pdf   = Str::thaiWrap($text, 40);
 @thaiwrap($report->summary, 40)
 ```
 
+### การกำหนดพจนานุกรมเพิ่มเติม (Custom Dictionary)
+```php
+use ThaiBreak\DictionaryLoader;
+use ThaiBreak\ThaiTokenizer;
+
+// ตัวเลือกที่ 1: Compact DAWG 167 KB (แนะนำ - โหลดใน 0.3 ms แรม < 0.5 MB)
+$trie = DictionaryLoader::fromDawgFile('data/words.dawg');
+
+// ตัวเลือกที่ 2: OPcache Preload (0.00 ms โหลด แรม 0 MB ต่อ worker)
+// $trie = DictionaryLoader::fromPhpFile('data/words.php');
+
+// เพิ่มคำศัพท์ใหม่แบบ Dynamic ได้ทันที
+$trie->add('คำศัพท์เฉพาะทาง', 10.0);
+
+$tokenizer = new ThaiTokenizer($trie);
+$words = $tokenizer->tokenize('ข้อความ...');
+```
+
 ---
 
 ## 2. Go (Golang) — Native Implementation
@@ -206,8 +224,8 @@ fn main() {
 #include "thaibreak.h"
 
 int main() {
-    // โหลดพจนานุกรม
-    thaibreak_init("data/words.txt", NULL);
+    // โหลดพจนานุกรม FST (เร็วขึ้น 70x และประหยัดแรม) หรือส่ง NULL เพื่อโหลดอัตโนมัติ
+    thaibreak_init("data/words.fst", NULL);
 
     // ตัดคำ
     size_t count = 0;
@@ -242,8 +260,8 @@ pip install ./python
 ```python
 import thaibreak
 
-# เริ่มต้นด้วยพจนานุกรม
-thaibreak.init("data/words.txt")
+# เริ่มต้นด้วยพจนานุกรม FST (หรือเรียก thaibreak.init() เปล่าๆ เพื่อโหลด data/words.fst อัตโนมัติ)
+thaibreak.init("data/words.fst")
 
 # ตัดคำ
 tokens = thaibreak.words("ฉันรักภาษาไทย")

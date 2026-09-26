@@ -68,7 +68,8 @@ pub unsafe extern "C" fn thaibreak_init(
 ) -> c_int {
     std::panic::catch_unwind(|| {
         if dict_path.is_null() {
-            return -1;
+            ensure_initialized();
+            return 0;
         }
 
         let dict_str = match CStr::from_ptr(dict_path).to_str() {

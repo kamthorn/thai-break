@@ -52,11 +52,11 @@ def _find_lib():
         _lib.thaibreak_free_string.restype = None
     return _lib
 
-def init(dict_path: str, bigram_path: Optional[str] = None) -> bool:
+def init(dict_path: Optional[str] = None, bigram_path: Optional[str] = None) -> bool:
     lib = _find_lib()
     if not lib:
         return False
-    b_dict = dict_path.encode("utf-8")
+    b_dict = dict_path.encode("utf-8") if dict_path else None
     b_bigram = bigram_path.encode("utf-8") if bigram_path else None
     return lib.thaibreak_init(b_dict, b_bigram) == 0
 
