@@ -15,6 +15,9 @@ pub mod wasm;
 #[cfg(feature = "python")]
 pub mod python;
 
+#[cfg(feature = "typst-plugin")]
+pub mod typst_plugin;
+
 use std::sync::RwLock;
 use once_cell::sync::Lazy;
 
@@ -61,6 +64,14 @@ fn ensure_default_loaded() {
                 bigrams = Some(b);
             }
             break;
+        }
+    }
+
+    #[cfg(feature = "typst-plugin")]
+    if trie.is_empty() {
+        static EMBEDDED_WORDS: &str = include_str!("../../data/words.txt");
+        if let Ok(t) = ThaiTrie::load_tsv(EMBEDDED_WORDS.as_bytes()) {
+            trie = t;
         }
     }
 
