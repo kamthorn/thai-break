@@ -79,6 +79,21 @@ const wrapped = wrap('ฉันรักภาษาไทยมากที่�
 console.log(wrapped);
 ```
 
+### 4. Custom Dictionary & Initialization
+
+By default, ThaiBreak loads the bundled 167 KB `words.dawg` dictionary automatically. You can also customize the dictionary:
+
+```typescript
+import { init } from 'thai-break';
+import * as fs from 'fs';
+
+// Option A: Load custom binary DAWG (recommended)
+init({ dictBinary: fs.readFileSync('path/to/words.dawg') });
+
+// Option B: Load custom TSV text
+// init({ dictTsv: 'คำที่หนึ่ง\t1.0\nคำที่สอง\t1.0' });
+```
+
 ---
 
 ## API Reference

@@ -78,10 +78,15 @@ func main() {
 
 ## Custom Dictionary & Tokenizer
 
-You can load a custom wordlist or bigram model:
+You can load a custom wordlist or binary DAWG dictionary:
 
 ```go
-trie, err := thaibreak.LoadTsvFile("path/to/custom_words.txt")
+// Option A: Ultra-fast Compact DAWG dictionary (recommended, 167 KB)
+trie, err := thaibreak.LoadDawgFile("data/words.dawg")
+
+// Option B: Plain text TSV dictionary (word<TAB>weight)
+// trie, err := thaibreak.LoadTsvFile("path/to/custom_words.txt")
+
 if err != nil {
 	log.Fatal(err)
 }
