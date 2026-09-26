@@ -391,6 +391,35 @@ python3 -m unittest discover tools/tests
 
 ---
 
+## OpenSearch / Elasticsearch Integration
+
+สำหรับการใช้งาน ThaiBreak engine บน **OpenSearch** หรือ **Elasticsearch** ผ่าน Plugin สำเร็จรูป ดูที่:
+
+### opensearch-analysis-thaibreak v1.0.0
+
+[![Release](https://img.shields.io/github/v/release/kamthorn/opensearch-analysis-thaibreak?color=blue)](https://github.com/kamthorn/opensearch-analysis-thaibreak/releases)
+
+Plugin OpenSearch ที่ใช้ Viterbi+TCC engine เดียวกัน พร้อม Token Filters ครบชุด:
+
+| Token Filter | คำอธิบาย |
+|---|---|
+| `thai_tone` | ลบวรรณยุกต์และไม้ไต่คู้เพื่อค้นหาแบบ Loose |
+| `thai_soundex` | Phonetic matching ด้วย Udom83 Algorithm |
+| `thai_keyboard` | แปลง Kedmanee ↔ QWERTY สำหรับ mis-type |
+| `thai_number` | แปลงเลขไทย (๐-๙) และคำอ่านตัวเลขเป็นอารบิก |
+
+```bash
+# ติดตั้งสำหรับ OpenSearch 2.18.0
+bin/opensearch-plugin install \
+  https://github.com/kamthorn/opensearch-analysis-thaibreak/releases/download/v1.0.0/analysis-thaibreak-2.18.0.0.zip
+```
+
+รองรับ OpenSearch: `2.11.1` · `2.15.0` · `2.17.1` · `2.18.0` · `2.19.0` · `3.8.0`
+
+🔗 [github.com/kamthorn/opensearch-analysis-thaibreak](https://github.com/kamthorn/opensearch-analysis-thaibreak)
+
+---
+
 ## เอกสารอ้างอิง
 
 - **Royal Institute Dictionary:** พจนานุกรมฉบับราชบัณฑิตยสถาน (Public Domain Standard Thai Wordlist)
