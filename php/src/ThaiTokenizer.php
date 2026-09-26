@@ -54,6 +54,12 @@ class ThaiTokenizer
         $path = $dictPath;
         if ($path === null) {
             $candidates = [
+                __DIR__ . '/../../data/words.php',
+                __DIR__ . '/../data/words.php',
+                'data/words.php',
+                __DIR__ . '/../../data/words.dawg',
+                __DIR__ . '/../data/words.dawg',
+                'data/words.dawg',
                 __DIR__ . '/../../data/words.txt',
                 __DIR__ . '/../data/words.txt',
                 'data/words.txt',
@@ -67,9 +73,7 @@ class ThaiTokenizer
         }
 
         if ($path !== null && file_exists($path)) {
-            $trie = str_ends_with($path, '.tsv')
-                ? DictionaryLoader::fromTsvFile($path)
-                : DictionaryLoader::fromTextFile($path);
+            $trie = DictionaryLoader::fromFile($path);
         } else {
             $trie = new ThaiTrie();
         }

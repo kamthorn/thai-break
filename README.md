@@ -14,7 +14,7 @@
 
 🚀 **Zero External Corpus Dependency:** ไม่พึ่งพาคลังข้อความที่มีข้อจำกัดทางลิขสิทธิ์ เป็น Open Source Apache-2.0 แท้ 100% ใช้งานเชิงพาณิชย์ได้อย่างสบายใจ  
 ⚡ **ความเร็วสูงระดับไมโครวินาที:** ~30-45 µs ใน Go/Rust, ~0.3 ms ใน PHP/Node.js (~25,000 ประโยค/วินาทีต่อ core)  
-💾 **Ultra-Lightweight & Low Memory:** ใช้หน่วยความจำน้อยมากเพียง ~10-15 MB ขนาดพจนานุกรมเพียง ~500 KB  
+💾 **Ultra-Lightweight & Low Memory:** พจนานุกรมบีบอัดแบบ **Compact DAWG (167 KB)** และ **FST (289 KB)** ใช้ RAM ต่ำกว่า 0.2–0.5 MB (ลดลง 95%)  
 📄 **Typographic Line Breaker & Soft Wrapping:** ตัดแบ่งบรรทัดป้องกันสระลอย/ตกขอบ ตาม **Unicode UAX #14 (Unicode 16.0) ครบทุกกฎ** ผ่านชุดทดสอบทางการของ Unicode และ **W3C tlreq** สำหรับ PDF (dompdf, mPDF, TCPDF, Typst) และ Web  
 🔥 **พร้อมใช้งานกับ Laravel:** Auto-Discovery, Facade, Blade Directives (`@thaibreak`, `@thaiwrap`), `Str` Macros
 
@@ -24,7 +24,7 @@
 
 1. **Shortest Path Graph Viterbi Algorithm:** อัลกอริทึมค้นหาเส้นทางคำที่เหมาะสมที่สุดบนกราฟ ค้นหาคำที่ยาวและถูกต้องสมบูรณ์ตามธรรมชาติ
 2. **Theeramunkong et al. TCC Grammar (30 Rules):** คำนวณจุดตัดคลัสเตอร์ภาษาไทยระดับไบต์ออฟเซ็ต ป้องกันการตัดแยกสระ สระบน-ล่าง วรรณยุกต์ หรือพยัญชนะนำ 100%
-3. **Flat Prefix Hash Map Trie:** โครงสร้างข้อมูลแบบ Flat Hash Map ค้นหาคำได้เร็วกว่า Nested Tree 2 เท่า พร้อมประหยัด RAM ลงกว่า 80%
+3. **FST & Compact DAWG Dictionary Architecture (v1.1.0):** โครงสร้างข้อมูลพจนานุกรม Finite State Transducer / Minimal Acyclic DFA บีบอัดคลังคำ 25,907 คำเหลือเพียง 167 KB โหลดทันใจระดับไมโครวินาที (0.04 ms ใน Go, 0.7 ms ใน Node.js, 0.00 ms ใน Rust/OPcache) พร้อมรองรับ Dynamic Overlay เมื่อมีการเพิ่มคำใหม่ขณะรันไทม์
 4. **Smart OOV & Abbreviation Handling:** รู้จักคำย่อภาษาไทย (`รพ.`, `พ.ศ.`, `มิ.ย.`), ตัวเลขคั่นจุลภาค (`10,000`), ทศนิยม (`3.14`), เปอร์เซ็นต์ (`40%`)
 5. **ThaiLineBreaker (UAX #14 & W3C Thai Text Layout):** ตัดแบ่งบรรทัดสำหรับทำ PDF หรือเว็บด้วย Unicode Line Breaking Algorithm ครบทุกกฎ (LB1–LB31) ใช้พจนานุกรมตัดคำเฉพาะภายในช่วงอักษรไทย ไม่ตัดกลางคำ ตัวเลข คำย่อ หรืออีเมล ไม่ทิ้งวรรคไว้หน้าบรรทัดใหม่ ป้องกันเครื่องหมายตกค้าง (`ๆ`, `ฯ`, วงเล็บ, อัญประกาศ)
 6. **HTML / EPUB Safe:** รักษาแท็ก HTML (`<p>`, `<b>`, `<span>`) และ HTML Entities (`&amp;`, `&quot;`) ให้คงอยู่สมบูรณ์ ไม่แทรกสัญลักษณ์ตัดคำเข้าไปภายในแท็ก
@@ -37,7 +37,7 @@ ThaiBreak ได้รับการออกแบบสถาปัตยก�
 
 ```
 thai-break/
-├── data/                 # Shared Dictionary (data/words.txt)
+├── data/                 # Shared Dictionaries (words.dawg: 167 KB, words.fst: 289 KB, words.php, words.txt)
 ├── php/                  # Native PHP & Laravel Package (Composer: kamthorn/thai-break)
 │   ├── src/              # PHP Source & Laravel Integration
 │   ├── tests/            # PHPUnit & Integration Tests
@@ -334,10 +334,18 @@ python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
 
 ทดสอบการประมวลผลจริงบน **PHP 8.4 (Native In-Memory)** ด้วยการรันข้อความซ้ำ 1,000 รอบ:
 
-#### ก. การใช้หน่วยความจำและเวลาเตรียมระบบ (Footprint & Startup)
-- **เวลาในการโหลดพจนานุกรม (`data/words.txt` 25,907 คำ):** **~21.6 ms** (เสร็จสิ้นก่อนเริ่มรับ Request)
-- **หน่วยความจำ RAM ที่ใช้จัดเก็บ Trie โครงสร้างคำ:** **~7.0 MB** เท่านั้น (เบามาก ไม่เปลืองทรัพยากรเซิร์ฟเวอร์)
-- **การติดตั้งเสริม:** **ไม่ต้องใช้ APCu** หรือ C-Extension เสริมใดๆ ทำงานบน Pure PHP ได้ทันที
+#### ก. การใช้หน่วยความจำและเวลาเตรียมระบบ (Footprint & Startup per Language)
+
+| ภาษา / รูปแบบพจนานุกรม | ไฟล์จัดเก็บ | ขนาดไฟล์ | เวลาโหลด (Startup) | RAM Heap ต่อ Worker | Throughput ค้นหาคำ |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Rust** (Native FST) | `data/words.fst` | 289.8 KB | **~0.00 ms** (Zero-copy) | **0 Bytes** (Buffer) | **17.8 ล้าน lookups/s** |
+| **Go** (Compact DAWG) | `data/words.dawg` | **167.4 KB** | **0.04 ms** (48 µs) | **< 0.2 MB** | **24.5 ล้าน lookups/s** |
+| **TypeScript / Node** (Compact DAWG) | `data/words.dawg` | **167.4 KB** | **0.70 ms** | **< 0.3 MB** | **31.8 ล้าน lookups/s** |
+| **PHP** (Compact DAWG) | `data/words.dawg` | **167.4 KB** | **0.30 ms** | **< 0.5 MB** | **1.75 ล้าน lookups/s** |
+| **PHP** (OPcache Preload Array) | `data/words.php` | 2.5 MB | **0.00 ms** (Preload) | **0 MB** (Shared Memory) | **6.5 ล้าน lookups/s** |
+| **PHP** (Flat TSV Fallback) | `data/words.txt` | 492.5 KB | 21.6 ms | ~7.0 MB | 6.5 ล้าน lookups/s |
+
+- **การติดตั้งเสริมใน PHP:** **ไม่ต้องใช้ APCu** หรือ C-Extension เสริมใดๆ ทำงานบน Pure PHP ได้ทันทีผ่าน Compact DAWG หรือ OPcache Preloading
 
 #### ข. ความเร็วในการตัดคำและตัดบรรทัด (Throughput & Latency)
 

@@ -25,6 +25,11 @@ function tryLoadDefault(): void {
   if (typeof process !== 'undefined' && process?.versions?.node) {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const candidates = [
+      path.resolve(currentDir, 'data/words.dawg'),
+      path.resolve(currentDir, '../src/data/words.dawg'),
+      path.resolve(currentDir, '../data/words.dawg'),
+      path.resolve(currentDir, '../../data/words.dawg'),
+      path.resolve(process.cwd(), 'data/words.dawg'),
       path.resolve(currentDir, '../../data/words.txt'),
       path.resolve(currentDir, '../data/words.txt'),
       path.resolve(process.cwd(), 'data/words.txt'),
@@ -33,8 +38,13 @@ function tryLoadDefault(): void {
     for (const c of candidates) {
       try {
         if (fs.existsSync(c)) {
-          const content = fs.readFileSync(c, 'utf-8');
-          trie = ThaiTrie.fromTsv(content);
+          if (c.endsWith('.dawg')) {
+            const buf = fs.readFileSync(c);
+            trie = ThaiTrie.fromBinary(buf);
+          } else {
+            const content = fs.readFileSync(c, 'utf-8');
+            trie = ThaiTrie.fromTsv(content);
+          }
 
           const bigramFile = path.join(path.dirname(c), 'bigrams.tsv');
           if (fs.existsSync(bigramFile)) {
@@ -55,6 +65,7 @@ function tryLoadDefault(): void {
 
 export interface ThaiBreakInitOptions {
   dictTsv?: string;
+  dictBinary?: ArrayBuffer | Uint8Array;
   bigramsTsv?: string;
   dictPath?: string;
   bigramPath?: string;
@@ -74,11 +85,22 @@ export function init(options: ThaiBreakInitOptions): void {
   let trie = new ThaiTrie();
   let bigrams: BigramModel | undefined;
 
-  if (options.dictTsv) {
+  if (options.dictBinary) {
+    trie = ThaiTrie.fromBinary(options.dictBinary);
+  } else if (options.dictTsv) {
     trie = ThaiTrie.fromTsv(options.dictTsv);
   } else if (options.dictPath && typeof fs !== 'undefined') {
-    const content = fs.readFileSync(options.dictPath, 'utf-8');
-    trie = ThaiTrie.fromTsv(content);
+    if (options.dictPath.endsWith('.dawg')) {
+      const buf = fs.readFileSync(options.dictPath);
+      trie = ThaiTrie.fromBinary(buf);
+    } else {
+      const buf = fs.readFileSync(options.dictPath);
+      if (buf.length >= 4 && buf[0] === 0x54 && buf[1] === 0x42 && buf[2] === 0x44 && buf[3] === 0x31) {
+        trie = ThaiTrie.fromBinary(buf);
+      } else {
+        trie = ThaiTrie.fromTsv(buf.toString('utf-8'));
+      }
+    }
   }
 
   if (options.bigramsTsv) {

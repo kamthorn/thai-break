@@ -25,7 +25,7 @@ pub use bigram::BigramModel;
 pub use linebreaker::{can_break_between, thai_display_width, LineBreaker, DEFAULT_BREAK_MARKER};
 pub use tcc::tcc_pos_array;
 pub use tokenizer::Tokenizer;
-pub use trie::{PrefixMatch, ThaiTrie};
+pub use trie::{FlatTrie, FstTrie, PrefixMatch, ThaiTrie};
 pub use linebreak_data::UNICODE_VERSION;
 
 static DEFAULT_TOKENIZER: Lazy<RwLock<Option<Tokenizer>>> = Lazy::new(|| RwLock::new(None));
@@ -44,6 +44,9 @@ fn ensure_default_loaded() {
     }
 
     let candidates = [
+        "data/words.fst",
+        "../data/words.fst",
+        "../../data/words.fst",
         "data/words.txt",
         "../data/words.txt",
         "../../data/words.txt",
@@ -54,7 +57,7 @@ fn ensure_default_loaded() {
     let mut bigrams = None;
 
     for &c in &candidates {
-        if let Ok(t) = ThaiTrie::load_tsv_file(c) {
+        if let Ok(t) = ThaiTrie::load_file(c) {
             trie = t;
             let b_path = std::path::Path::new(c)
                 .parent()
@@ -69,9 +72,14 @@ fn ensure_default_loaded() {
 
     #[cfg(feature = "typst-plugin")]
     if trie.is_empty() {
-        static EMBEDDED_WORDS: &str = include_str!("../../data/words.txt");
-        if let Ok(t) = ThaiTrie::load_tsv(EMBEDDED_WORDS.as_bytes()) {
+        static EMBEDDED_FST: &[u8] = include_bytes!("../../data/words.fst");
+        if let Ok(t) = ThaiTrie::from_fst_bytes(EMBEDDED_FST.into()) {
             trie = t;
+        } else {
+            static EMBEDDED_WORDS: &str = include_str!("../../data/words.txt");
+            if let Ok(t) = ThaiTrie::load_tsv(EMBEDDED_WORDS.as_bytes()) {
+                trie = t;
+            }
         }
     }
 

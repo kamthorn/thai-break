@@ -24,6 +24,63 @@ namespace ThaiBreak;
 class DictionaryLoader
 {
     /**
+     * Load a binary DAWG dictionary file (.dawg).
+     *
+     * @param string $filePath Path to .dawg file
+     */
+    public static function fromDawgFile(string $filePath): ThaiTrie
+    {
+        self::assertFileReadable($filePath);
+        return ThaiTrie::fromDawgFile($filePath);
+    }
+
+    /**
+     * Load an OPcache-preloaded or pre-compiled PHP dictionary array file (.php).
+     *
+     * @param string $filePath Path to .php dictionary file
+     */
+    public static function fromPhpFile(string $filePath): ThaiTrie
+    {
+        self::assertFileReadable($filePath);
+        /** @var array{prefixes: array<string, float>, totalWeight: float} $data */
+        $data = require $filePath;
+        return ThaiTrie::fromPreloadedArray($data);
+    }
+
+    /**
+     * Auto-detect and load dictionary by file extension and magic header.
+     *
+     * @param string $filePath Path to dictionary file (.php, .dawg, .tsv, .txt)
+     */
+    public static function fromFile(string $filePath): ThaiTrie
+    {
+        self::assertFileReadable($filePath);
+
+        if (str_ends_with($filePath, '.php')) {
+            return self::fromPhpFile($filePath);
+        }
+        if (str_ends_with($filePath, '.dawg')) {
+            return self::fromDawgFile($filePath);
+        }
+
+        // Check if file starts with TBD1 magic
+        $fp = fopen($filePath, 'rb');
+        if ($fp !== false) {
+            $magic = fread($fp, 4);
+            fclose($fp);
+            if ($magic === 'TBD1') {
+                return self::fromDawgFile($filePath);
+            }
+        }
+
+        if (str_ends_with($filePath, '.tsv')) {
+            return self::fromTsvFile($filePath);
+        }
+
+        return self::fromTextFile($filePath);
+    }
+
+    /**
      * Load a plain text word list (one word per line).
      * All words get weight = 1.0.
      *

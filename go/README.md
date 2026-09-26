@@ -10,6 +10,7 @@
 ## Features
 
 - ⚡ **Microsecond-Level Latency:** ~30–45 µs per sentence in Go (>25,000 sentences/sec per core).
+- 💾 **Compact DAWG Dictionary (v1.1.0):** Embedded 167 KB minimal acyclic automaton (`words.dawg`) with zero external dependencies, 48 µs instant startup, < 0.2 MB memory footprint, and 24.5M lookups/sec.
 - 🎯 **Accuracy:** Viterbi dynamic programming with a unigram word model (optional bigram bonuses), scoring **92.6%** word-boundary F1 (85.2% word F1) on the LST20 test set with the default dictionary. See the main README for how it is measured.
 - 📐 **Unicode UAX #14 & W3C Typographic Rules:**
   - Implements every rule of the Unicode 16.0 Line Breaking Algorithm (LB1–LB31) and passes all 16,672 cases of the official `LineBreakTest.txt`.
