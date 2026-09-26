@@ -2,6 +2,8 @@ package thaibreak
 
 import (
 	"bufio"
+	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 	"os"
@@ -16,16 +18,53 @@ type PrefixMatch struct {
 	Weight float64 // Word weight
 }
 
-// ThaiTrie implements a Flat Prefix Hash Map for fast word lookups.
+// CompactDawg implements an ultra-compact Directed Acyclic Word Graph (DAWG) / Minimal DFA.
+type CompactDawg struct {
+	data      []byte
+	offsets   []uint32
+	numStates int
+	numWords  int
+}
+
+// NewCompactDawg parses a binary DAWG buffer.
+func NewCompactDawg(data []byte) (*CompactDawg, error) {
+	if len(data) < 12 || string(data[:4]) != "TBD1" {
+		return nil, fmt.Errorf("invalid DAWG header: expected TBD1 magic")
+	}
+	numStates := int(binary.LittleEndian.Uint32(data[4:8]))
+	numWords := int(binary.LittleEndian.Uint32(data[8:12]))
+
+	offsets := make([]uint32, numStates)
+	curr := 12
+	for i := 0; i < numStates; i++ {
+		if curr >= len(data) {
+			return nil, fmt.Errorf("corrupted DAWG data at state %d", i)
+		}
+		offsets[i] = uint32(curr)
+		numEdges := int(data[curr] & 0x7F)
+		curr += 1 + numEdges*4
+	}
+
+	return &CompactDawg{
+		data:      data,
+		offsets:   offsets,
+		numStates: numStates,
+		numWords:  numWords,
+	}, nil
+}
+
+// ThaiTrie implements word lookups via either an ultra-compact DAWG or a Flat Prefix Hash Map,
+// with support for runtime dynamic overlays.
 type ThaiTrie struct {
-	mu        sync.RWMutex
-	prefixes  map[string]float64
-	maxWeight float64
-	// totalWeight is the sum of the weights of all full words (the unigram normalizer).
+	mu          sync.RWMutex
+	dawg        *CompactDawg
+	overlay     map[string]float64
+	prefixes    map[string]float64
+	maxWeight   float64
 	totalWeight float64
 }
 
-// NewThaiTrie creates an empty ThaiTrie.
+// NewThaiTrie creates an empty ThaiTrie using the flat map backend.
 func NewThaiTrie() *ThaiTrie {
 	return &ThaiTrie{
 		prefixes:  make(map[string]float64),
@@ -33,7 +72,30 @@ func NewThaiTrie() *ThaiTrie {
 	}
 }
 
-// LoadTsv loads words and weights from a TSV reader.
+// LoadDawg loads dictionary from a pre-compiled binary DAWG byte slice.
+func LoadDawg(data []byte) (*ThaiTrie, error) {
+	dawg, err := NewCompactDawg(data)
+	if err != nil {
+		return nil, err
+	}
+	return &ThaiTrie{
+		dawg:        dawg,
+		overlay:     make(map[string]float64),
+		maxWeight:   1.0,
+		totalWeight: float64(dawg.numWords),
+	}, nil
+}
+
+// LoadDawgFile loads dictionary from a binary DAWG file path.
+func LoadDawgFile(path string) (*ThaiTrie, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return LoadDawg(data)
+}
+
+// LoadTsv loads words and weights from a TSV reader into a flat trie.
 func LoadTsv(r io.Reader) (*ThaiTrie, error) {
 	trie := NewThaiTrie()
 	scanner := bufio.NewScanner(r)
@@ -65,7 +127,25 @@ func LoadTsvFile(path string) (*ThaiTrie, error) {
 	return LoadTsv(f)
 }
 
-// Add inserts a word with its weight.
+// LoadFile loads dictionary, automatically choosing DAWG or TSV based on content/extension.
+func LoadFile(path string) (*ThaiTrie, error) {
+	if strings.HasSuffix(path, ".dawg") {
+		return LoadDawgFile(path)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	var magic [4]byte
+	n, _ := f.Read(magic[:])
+	f.Close()
+	if n == 4 && string(magic[:]) == "TBD1" {
+		return LoadDawgFile(path)
+	}
+	return LoadTsvFile(path)
+}
+
+// Add inserts a word with its weight. Works seamlessly with both flat and DAWG backends.
 func (t *ThaiTrie) Add(word string, weight float64) {
 	if word == "" {
 		return
@@ -80,18 +160,27 @@ func (t *ThaiTrie) Add(word string, weight float64) {
 	runes := []rune(word)
 	n := len(runes)
 
+	targetMap := t.prefixes
+	if t.dawg != nil {
+		if t.overlay == nil {
+			t.overlay = make(map[string]float64)
+		}
+		targetMap = t.overlay
+	}
+
 	for i := 1; i < n; i++ {
 		p := string(runes[:i])
-		if _, exists := t.prefixes[p]; !exists {
-			t.prefixes[p] = 0.0
+		if _, exists := targetMap[p]; !exists {
+			targetMap[p] = 0.0
 		}
 	}
 
-	if existing := t.prefixes[word]; weight > existing {
-		t.prefixes[word] = weight
+	if existing := targetMap[word]; weight > existing {
+		targetMap[word] = weight
 		t.totalWeight += weight - existing
-	} else if _, exists := t.prefixes[word]; !exists {
-		t.prefixes[word] = weight
+	} else if _, exists := targetMap[word]; !exists {
+		targetMap[word] = weight
+		t.totalWeight += weight
 	}
 }
 
@@ -128,8 +217,88 @@ func (t *ThaiTrie) Prefixes(runes []rune, start int, maxLen int) []PrefixMatch {
 	}
 
 	var matches []PrefixMatch
-	var sb strings.Builder
 
+	if t.dawg != nil {
+		state := 0
+		d := t.dawg
+
+		for idx := start; idx < limit; idx++ {
+			r := runes[idx]
+			if r > 0xFFFF {
+				break
+			}
+			ch := uint16(r)
+
+			off := int(d.offsets[state])
+			flags := d.data[off]
+			numEdges := int(flags & 0x7F)
+
+			// Binary search edges for transition on char
+			low, high := 0, numEdges-1
+			nextState := -1
+			base := off + 1
+
+			for low <= high {
+				mid := (low + high) / 2
+				edgeOff := base + mid*4
+				edgeChar := binary.LittleEndian.Uint16(d.data[edgeOff : edgeOff+2])
+				if edgeChar == ch {
+					nextState = int(binary.LittleEndian.Uint16(d.data[edgeOff+2 : edgeOff+4]))
+					break
+				} else if edgeChar < ch {
+					low = mid + 1
+				} else {
+					high = mid - 1
+				}
+			}
+
+			if nextState == -1 {
+				break
+			}
+
+			state = nextState
+			nextOff := int(d.offsets[state])
+			if (d.data[nextOff] & 0x80) != 0 {
+				matches = append(matches, PrefixMatch{
+					End:    idx + 1,
+					Weight: 1.0,
+				})
+			}
+		}
+
+		if len(t.overlay) > 0 {
+			var sb strings.Builder
+			for i := start; i < limit; i++ {
+				sb.WriteRune(runes[i])
+				sub := sb.String()
+				w, exists := t.overlay[sub]
+				if !exists {
+					break
+				}
+				if w > 0 {
+					found := false
+					for j := range matches {
+						if matches[j].End == i+1 {
+							matches[j].Weight = w
+							found = true
+							break
+						}
+					}
+					if !found {
+						matches = append(matches, PrefixMatch{
+							End:    i + 1,
+							Weight: w,
+						})
+					}
+				}
+			}
+		}
+
+		return matches
+	}
+
+	// Flat Hash Trie fallback
+	var sb strings.Builder
 	for i := start; i < limit; i++ {
 		sb.WriteRune(runes[i])
 		sub := sb.String()

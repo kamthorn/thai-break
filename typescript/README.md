@@ -12,7 +12,8 @@ It implements the **Unicode Line Breaking Algorithm (UAX #14)** and **W3C Thai L
 ## Features
 
 - ⚡ **Ultra Fast:** ~0.3 ms per sentence in Node.js (~25,000 sentences/sec per core).
-- 🎯 **High Accuracy:** Viterbi dynamic programming on a Directed Acyclic Graph (DAG) with Bigram transition scoring, achieving **96.88%** word-boundary F1-score.
+- 💾 **Compact DAWG Dictionary (v1.1.0):** 167 KB binary Directed Acyclic Word Graph (`words.dawg`), 0.7 ms instant load, < 0.3 MB RAM, and 31.8M lookups/sec with zero external dependencies.
+- 🎯 **High Accuracy:** Viterbi dynamic programming on a Directed Acyclic Graph (DAG) with Bigram transition scoring, achieving high word-boundary F1-score.
 - 📐 **Unicode UAX #14 Typographic Rules:**
   - **LB13:** Never break before punctuation, closing brackets, or solidus (`/`).
   - **LB23:** Keep Latin letters and numbers together (e.g. `WP01`, `ISO29110` never break mid-code).

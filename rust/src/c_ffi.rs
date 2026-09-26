@@ -26,6 +26,9 @@ fn ensure_initialized() {
 
     // Attempt default lookup locations
     let candidates = [
+        "data/words.fst",
+        "../data/words.fst",
+        "../../data/words.fst",
         "data/words.txt",
         "../data/words.txt",
         "../../data/words.txt",
@@ -34,7 +37,7 @@ fn ensure_initialized() {
     let mut bigrams = None;
 
     for &c in &candidates {
-        if let Ok(t) = ThaiTrie::load_tsv_file(c) {
+        if let Ok(t) = ThaiTrie::load_file(c) {
             trie = t;
             let bigram_path = std::path::Path::new(c)
                 .parent()
@@ -56,6 +59,7 @@ fn ensure_initialized() {
 
 /// Initialize ThaiBreak with custom dictionary and bigram file paths.
 /// Pass NULL for bigram_path if not using bigrams.
+/// Supports both .fst and .txt dictionary files.
 /// Returns 0 on success, -1 on error.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_init(
@@ -72,7 +76,7 @@ pub unsafe extern "C" fn thaibreak_init(
             Err(_) => return -1,
         };
 
-        let trie = match ThaiTrie::load_tsv_file(dict_str) {
+        let trie = match ThaiTrie::load_file(dict_str) {
             Ok(t) => t,
             Err(_) => return -1,
         };

@@ -1,14 +1,19 @@
 {
   "name": "thai-break",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "Fast, high-accuracy Thai word segmentation and typographic line breaker for JavaScript and TypeScript",
   "main": "dist/index.js",
   "type": "module",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"const fs = require('fs'); fs.mkdirSync('dist/data', { recursive: true }); fs.copyFileSync(fs.existsSync('../data/words.dawg') ? '../data/words.dawg' : 'src/data/words.dawg', 'dist/data/words.dawg');\"",
     "test": "node --test"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "thai",
     "word-break",

@@ -8,6 +8,9 @@ import (
 	"sync"
 )
 
+//go:embed data/words.dawg
+var defaultDawgData []byte
+
 //go:embed data/words.txt
 var defaultWordsData string
 
@@ -22,6 +25,9 @@ func initDefault() {
 	defaultInitOnce.Do(func() {
 		// Look for dictionary in common locations
 		candidates := []string{
+			"../data/words.dawg",
+			"data/words.dawg",
+			"../../data/words.dawg",
 			"../data/words.txt",
 			"data/words.txt",
 			"../../data/words.txt",
@@ -41,7 +47,11 @@ func initDefault() {
 
 		trie := NewThaiTrie()
 		if dictPath != "" {
-			if t, err := LoadTsvFile(dictPath); err == nil {
+			if t, err := LoadFile(dictPath); err == nil {
+				trie = t
+			}
+		} else if len(defaultDawgData) > 0 {
+			if t, err := LoadDawg(defaultDawgData); err == nil {
 				trie = t
 			}
 		} else if defaultWordsData != "" {
