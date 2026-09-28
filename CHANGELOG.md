@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Thai Text Normalizer (`rust/src/normalizer.rs`)**:
+  - Canonicalizes mis-typed vowels (`เเ` → `แ`, `ํา` → `ำ`), reorders
+    misplaced tones/vowels, collapses elongations (`มากกก` → `มาก`,
+    dictionary-verified for 2-char repeats), strips zero-width characters,
+    spaces before marks, and dangling non-base marks.
+  - `NormalizeOptions` for per-rule control; `normalize_text_with_dict`
+    consults the dictionary before de-elongation.
+  - `ThaiTrie::contains` and `Tokenizer::trie` accessors; `set_default_dual`
+    for separate words/lines engines.
+
 ## [1.1.0] - 2026-09-27
 
 ### Added

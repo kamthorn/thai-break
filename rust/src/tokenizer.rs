@@ -99,6 +99,10 @@ impl Tokenizer {
         self.bigram_model = model;
     }
 
+    pub fn trie(&self) -> &ThaiTrie {
+        &self.trie
+    }
+
     pub fn tokenize(&self, text: &str, keep_whitespace: bool) -> Vec<String> {
         if text.is_empty() {
             return Vec::new();
