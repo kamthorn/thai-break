@@ -424,6 +424,7 @@ python3 -m unittest discover tools/tests
 ### opensearch-analysis-thaibreak v1.0.0
 
 [![Release](https://img.shields.io/github/v/release/kamthorn/opensearch-analysis-thaibreak?color=blue)](https://github.com/kamthorn/opensearch-analysis-thaibreak/releases)
+[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://github.com/kamthorn/opensearch-analysis-thaibreak/pkgs/container/opensearch-thaibreak)
 
 Plugin OpenSearch ที่ใช้ Viterbi+TCC engine เดียวกัน พร้อม Token Filters ครบชุด:
 
@@ -434,6 +435,16 @@ Plugin OpenSearch ที่ใช้ Viterbi+TCC engine เดียวกัน
 | `thai_keyboard` | แปลง Kedmanee ↔ QWERTY สำหรับ mis-type |
 | `thai_number` | แปลงเลขไทย (๐-๙) และคำอ่านตัวเลขเป็นอารบิก |
 
+**รันผ่าน Docker Image สำเร็จรูป (GHCR):**
+```bash
+docker run -d -p 9200:9200 -p 9600:9600 \
+  -e "discovery.type=single-node" \
+  -e "plugins.security.disabled=true" \
+  --name opensearch-thaibreak \
+  ghcr.io/kamthorn/opensearch-thaibreak:2.18.0
+```
+
+**หรือติดตั้งลงใน OpenSearch เดิม:**
 ```bash
 # ติดตั้งสำหรับ OpenSearch 2.18.0
 bin/opensearch-plugin install \
