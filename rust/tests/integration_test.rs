@@ -5,12 +5,25 @@ use thaibreak::{
 };
 
 fn init_test_dict() {
-    let dict_path = "../data/words.txt";
-
-    if Path::new(dict_path).exists() {
-        let trie = ThaiTrie::load_tsv_file(dict_path).expect("Failed to load wordlist");
-        let tokenizer = Tokenizer::new(trie, None);
-        set_default(tokenizer);
+    let candidates = [
+        "../data/words.fst",
+        "../../data/words.fst",
+        "data/words.fst",
+        "../data/words.txt",
+        "../../data/words.txt",
+        "data/words.txt",
+    ];
+    for &path in &candidates {
+        if Path::new(path).exists() {
+            let trie = if path.ends_with(".fst") {
+                ThaiTrie::load_fst_file(path).expect("Failed to load fst")
+            } else {
+                ThaiTrie::load_tsv_file(path).expect("Failed to load wordlist")
+            };
+            let tokenizer = Tokenizer::new(trie, None);
+            set_default(tokenizer);
+            return;
+        }
     }
 }
 
@@ -114,4 +127,29 @@ fn test_wrapping_breaks_at_spaces() {
         wrapped.lines().collect::<Vec<_>>(),
         vec!["the quick", "brown fox", "jumps over", "the lazy", "dog"]
     );
+}
+
+#[test]
+fn test_dual_engine() {
+    use thaibreak::{LineBreaker, ThaiTrie, Tokenizer};
+
+    let mut words_trie = ThaiTrie::new();
+    words_trie.add("กรมการกงสุล", 1.0);
+    words_trie.add("ไป", 1.0);
+
+    let mut lines_trie = ThaiTrie::new();
+    lines_trie.add("กรม", 1.0);
+    lines_trie.add("การ", 1.0);
+    lines_trie.add("กงสุล", 1.0);
+    lines_trie.add("ไป", 1.0);
+
+    let words_tok = Tokenizer::new(words_trie, None);
+    let lines_tok = Tokenizer::new(lines_trie, None);
+    let breaker = LineBreaker::new(lines_tok);
+
+    let w = words_tok.tokenize("ไปกรมการกงสุล", false);
+    assert_eq!(w, vec!["ไป", "กรมการกงสุล"]);
+
+    let l = breaker.insert_line_breaks("ไปกรมการกงสุล", "|", false);
+    assert_eq!(l, "ไป|กรม|การ|กงสุล");
 }
