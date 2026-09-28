@@ -117,6 +117,11 @@ impl FlatTrie {
 
         matches
     }
+
+    #[inline]
+    pub fn contains(&self, word: &str) -> bool {
+        self.prefixes.get(word).copied().unwrap_or(0.0) > 0.0
+    }
 }
 
 /// High-performance Finite State Transducer (FST) Trie with optional dynamic overlay.
@@ -285,6 +290,14 @@ impl FstTrie {
 
         matches
     }
+
+    #[inline]
+    pub fn contains(&self, word: &str) -> bool {
+        if let Some(&w) = self.overlay.get(word) {
+            return w > 0.0;
+        }
+        self.map.contains_key(word)
+    }
 }
 
 /// Unified ThaiTrie supporting both Flat HashMap and FST engines.
@@ -339,6 +352,14 @@ impl ThaiTrie {
         match self {
             Self::Flat(t) => t.is_empty(),
             Self::Fst(t) => t.is_empty(),
+        }
+    }
+
+    #[inline]
+    pub fn contains(&self, word: &str) -> bool {
+        match self {
+            Self::Flat(t) => t.contains(word),
+            Self::Fst(t) => t.contains(word),
         }
     }
 

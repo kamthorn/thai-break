@@ -1,6 +1,7 @@
 pub mod bigram;
 mod linebreak_data;
 pub mod linebreaker;
+pub mod normalizer;
 pub mod tcc;
 pub mod tokenizer;
 pub mod trie;
@@ -23,6 +24,10 @@ use once_cell::sync::Lazy;
 
 pub use bigram::BigramModel;
 pub use linebreaker::{can_break_between, thai_display_width, LineBreaker, DEFAULT_BREAK_MARKER};
+pub use normalizer::{
+    normalize_text, normalize_text_with_dict, normalize_text_with_options,
+    normalize_text_with_options_dict, NormalizeOptions,
+};
 pub use tcc::tcc_pos_array;
 pub use tokenizer::Tokenizer;
 pub use trie::{FlatTrie, FstTrie, PrefixMatch, ThaiTrie};
@@ -94,6 +99,14 @@ fn ensure_default_loaded() {
 pub fn set_default(tokenizer: Tokenizer) {
     let breaker = LineBreaker::new(tokenizer.clone());
     *DEFAULT_TOKENIZER.write().unwrap() = Some(tokenizer);
+    *DEFAULT_BREAKER.write().unwrap() = Some(breaker);
+}
+
+/// Configure the default shared Tokenizer and LineBreaker with dual engines:
+/// `words_tokenizer` for `words()` and `lines_tokenizer` for `lines()` and `wrap()`.
+pub fn set_default_dual(words_tokenizer: Tokenizer, lines_tokenizer: Tokenizer) {
+    let breaker = LineBreaker::new(lines_tokenizer);
+    *DEFAULT_TOKENIZER.write().unwrap() = Some(words_tokenizer);
     *DEFAULT_BREAKER.write().unwrap() = Some(breaker);
 }
 
