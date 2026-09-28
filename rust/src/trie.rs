@@ -408,7 +408,7 @@ impl ThaiTrie {
     /// Load dictionary file, automatically detecting if it is FST or TSV/text.
     pub fn load_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let p = path.as_ref();
-        if p.extension().map_or(false, |ext| ext == "fst") {
+        if p.extension().is_some_and(|ext| ext == "fst") {
             return Self::load_fst_file(p);
         }
 
@@ -473,11 +473,11 @@ impl ThaiTrie {
             }
         }
 
-        let mut build = MapBuilder::new(writer).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        let mut build = MapBuilder::new(writer).map_err(io::Error::other)?;
         for (i, (word, _)) in entries.iter().enumerate() {
-            build.insert(word.as_bytes(), i as u64).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            build.insert(word.as_bytes(), i as u64).map_err(io::Error::other)?;
         }
-        build.finish().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        build.finish().map_err(io::Error::other)?;
 
         Ok(())
     }

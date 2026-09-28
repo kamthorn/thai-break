@@ -105,7 +105,7 @@ fn is_followed_by_lookahead_char(rest: &str) -> bool {
         if (0x0E01..=0x0E2E).contains(&cp) || (0x0E40..=0x0E44).contains(&cp) {
             return true;
         }
-        if cp < 0x0E00 || cp > 0x0E7F {
+        if !(0x0E00..=0x0E7F).contains(&cp) {
             return true;
         }
     }
@@ -172,7 +172,7 @@ pub fn tcc_pos_array(chars: &[char]) -> Vec<bool> {
     // Non-Thai characters are always valid boundaries
     for (i, &ch) in chars.iter().enumerate() {
         let cp = ch as u32;
-        if cp < 0x0E00 || cp > 0x0E7F {
+        if !(0x0E00..=0x0E7F).contains(&cp) {
             valid[i] = true;
             valid[i + 1] = true;
         }
