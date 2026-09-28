@@ -61,6 +61,13 @@ fn ensure_initialized() {
 /// Pass NULL for bigram_path if not using bigrams.
 /// Supports both .fst and .txt dictionary files.
 /// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// - `dict_path` must be either NULL or a pointer to a valid NUL-terminated
+///   C string containing UTF-8, valid for reads for the duration of the call.
+/// - `bigram_path` must be either NULL or a pointer to a valid NUL-terminated
+///   C string containing UTF-8, valid for reads for the duration of the call.
+/// - Invalid UTF-8 or unreadable files return -1 instead of aborting.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_init(
     dict_path: *const c_char,
@@ -106,6 +113,12 @@ pub unsafe extern "C" fn thaibreak_init(
 /// Tokenize UTF-8 Thai text.
 /// Returns an array of null-terminated strings, and writes the token count into `*count`.
 /// The returned array must be freed with `thaibreak_free_tokens`.
+///
+/// # Safety
+/// - `text` must be non-NULL and point to a valid NUL-terminated C string
+///   containing UTF-8, valid for reads for the duration of the call.
+/// - `count` must be non-NULL and point to writable `usize` storage.
+/// - NULL inputs or invalid UTF-8 return a NULL pointer instead of aborting.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_tokenize(
     text: *const c_char,
@@ -147,6 +160,13 @@ pub unsafe extern "C" fn thaibreak_tokenize(
 }
 
 /// Free token array allocated by `thaibreak_tokenize`.
+///
+/// # Safety
+/// - `tokens` must be either NULL (no-op) or an array previously returned by
+///   `thaibreak_tokenize`, with `count` exactly matching the count written
+///   into `*count` by that call. A mismatched count is undefined behavior.
+/// - Each element must be either NULL or a string allocated by that call.
+/// - The array must not be used after freeing (no double free).
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_free_tokens(tokens: *mut *mut c_char, count: usize) {
     let _ = std::panic::catch_unwind(|| {
@@ -166,6 +186,13 @@ pub unsafe extern "C" fn thaibreak_free_tokens(tokens: *mut *mut c_char, count: 
 /// Insert line break opportunities into UTF-8 text.
 /// If `marker` is NULL, defaults to ZWSP (U+200B).
 /// The returned string must be freed with `thaibreak_free_string`.
+///
+/// # Safety
+/// - `text` must be non-NULL and point to a valid NUL-terminated C string
+///   containing UTF-8, valid for reads for the duration of the call.
+/// - `marker` must be either NULL or a pointer to a valid NUL-terminated C
+///   string, valid for reads for the duration of the call.
+/// - NULL `text` or invalid UTF-8 returns a NULL pointer instead of aborting.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_lines(
     text: *const c_char,
@@ -205,6 +232,11 @@ pub unsafe extern "C" fn thaibreak_lines(
 
 /// Hard-wrap text to visual display width.
 /// The returned string must be freed with `thaibreak_free_string`.
+///
+/// # Safety
+/// - `text` must be non-NULL and point to a valid NUL-terminated C string
+///   containing UTF-8, valid for reads for the duration of the call.
+/// - NULL `text` or invalid UTF-8 returns a NULL pointer instead of aborting.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_wrap(
     text: *const c_char,
@@ -237,6 +269,11 @@ pub unsafe extern "C" fn thaibreak_wrap(
 }
 
 /// Calculate terminal / column visual display width for Thai text.
+///
+/// # Safety
+/// - `text` must be either NULL (returns 0) or point to a valid
+///   NUL-terminated C string containing UTF-8, valid for reads for the
+///   duration of the call. Invalid UTF-8 returns 0.
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_display_width(text: *const c_char) -> usize {
     std::panic::catch_unwind(|| {
@@ -252,6 +289,11 @@ pub unsafe extern "C" fn thaibreak_display_width(text: *const c_char) -> usize {
 }
 
 /// Free string allocated by `thaibreak_lines` or `thaibreak_wrap`.
+///
+/// # Safety
+/// - `s` must be either NULL (no-op) or a string previously returned by
+///   `thaibreak_lines` or `thaibreak_wrap`.
+/// - The string must not be used after freeing (no double free).
 #[no_mangle]
 pub unsafe extern "C" fn thaibreak_free_string(s: *mut c_char) {
     let _ = std::panic::catch_unwind(|| {
