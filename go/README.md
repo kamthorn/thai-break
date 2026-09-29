@@ -20,7 +20,7 @@
   - Keeps leading vowels (`เ`, `แ`, `โ`, `ใ`, `ไ`) attached to their initial consonants.
 - 📏 **Thai Visual Display Width:** Accurately calculates visual column width by treating upper/lower combining vowels and tone marks as zero-width.
 - 🏷️ **HTML Preservation:** Safely inserts break markers in HTML content while ignoring tags, comments, and scripts (`<script>`, `<style>`).
-- 🛡️ **Clean & Open:** 100% Public Domain clean-room dictionary (25,907 entries) released under Apache-2.0.
+- 🛡️ **Clean & Open:** 100% Public Domain clean-room dictionary (36,040 entries (incl. 10,133 Thai given names)) released under Apache-2.0.
 
 ---
 

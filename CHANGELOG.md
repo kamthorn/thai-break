@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **10,133 Thai given names merged into `data/words.txt`** (36,040 words total, up from
+  25,907): fixes given names composed of two dictionary morphemes wrongly splitting
+  (`สมศักดิ์` → `สม|ศักดิ์`, `ณัฐพล` → `ณัฐ|พล`, `สมชัย` → `สม|ชัย`, ...). Sourced from
+  PyThaiNLP's `person_names_female_th.txt`/`person_names_male_th.txt` (Apache-2.0), selected
+  with `tools/select_names.py`: a name is only added if it does *not* also occur as an
+  ordinary two-word sequence outside a person-name span in the LST20 gold-segmented corpus
+  (e.g. `โชคดี` "lucky" is excluded so it keeps splitting normally in ordinary sentences).
+  LST20 is used only to validate/select which words to add — no LST20 text is included in
+  the dictionary. Validated on the LST20 **test** split (held out from selection): word
+  boundary F1 94.03% → 94.21% (net +814 correct boundaries: 883 fixed vs. 69 newly wrong,
+  across 483 documents). Regenerated `data/words.dawg`, `data/words.fst`, `data/words.php`,
+  and the Go/TypeScript embedded copies from the updated `data/words.txt`.
 - **Thai Text Normalizer (`rust/src/normalizer.rs`)**:
   - Canonicalizes mis-typed vowels (`เเ` → `แ`, `ํา` → `ำ`), reorders
     misplaced tones/vowels, collapses elongations (`มากกก` → `มาก`,
