@@ -18,6 +18,8 @@
 📄 **Typographic Line Breaker & Soft Wrapping:** ตัดแบ่งบรรทัดป้องกันสระลอย/ตกขอบ ตาม **Unicode UAX #14 (Unicode 16.0) ครบทุกกฎ** ผ่านชุดทดสอบทางการของ Unicode และ **W3C tlreq** สำหรับ PDF (dompdf, mPDF, TCPDF, Typst) และ Web  
 🔥 **พร้อมใช้งานกับ Laravel:** Auto-Discovery, Facade, Blade Directives (`@thaibreak`, `@thaiwrap`), `Str` Macros
 
+🌐 **ลองใช้งานในเบราว์เซอร์:** [thai-break-demo](https://kamthorn.github.io/thai-break-demo/) ตัดคำ ตัดบรรทัด ใช้พจนานุกรมเสริม และอัปโหลดพจนานุกรมของคุณเองเพื่อทดสอบได้ ([ซอร์สโค้ด](https://github.com/kamthorn/thai-break-demo))
+
 ---
 
 ## คุณสมบัติเด่น
