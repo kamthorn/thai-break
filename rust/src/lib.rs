@@ -22,7 +22,7 @@ pub mod typst_plugin;
 use std::sync::RwLock;
 use once_cell::sync::Lazy;
 
-pub use bigram::BigramModel;
+pub use bigram::{BigramFormula, BigramModel};
 pub use linebreaker::{can_break_between, thai_display_width, LineBreaker, DEFAULT_BREAK_MARKER};
 pub use normalizer::{
     normalize_text, normalize_text_with_dict, normalize_text_with_options,
