@@ -10,7 +10,7 @@
 
 ระบบตัดคำและตัดแบ่งบรรทัดภาษาไทยประสิทธิภาพสูงแบบ **Multi-Language Engine** รองรับ **PHP / Laravel**, **Go**, **TypeScript / Node.js**, **Rust Core**, **C / C++**, **Python**, และ **WebAssembly**  
 
-ใช้อัลกอริทึม **Shortest Path Viterbi DAG** ร่วมกับ **Theeramunkong 30-Rule Thai Character Cluster (TCC)** บนพจนานุกรมมาตรฐานภาษาไทย (`data/words.txt` 36,040 คำ (รวม 10,133 ชื่อคนไทย))
+ใช้อัลกอริทึม **Shortest Path Viterbi DAG** ร่วมกับ **Theeramunkong 30-Rule Thai Character Cluster (TCC)** บนพจนานุกรมมาตรฐานภาษาไทย (`data/words.txt` 25,907 คำ)
 
 🚀 **Zero External Corpus Dependency:** ไม่พึ่งพาคลังข้อความที่มีข้อจำกัดทางลิขสิทธิ์ เป็น Open Source Apache-2.0 แท้ 100% ใช้งานเชิงพาณิชย์ได้อย่างสบายใจ  
 ⚡ **ความเร็วสูงระดับไมโครวินาที:** ~30-45 µs ใน Go/Rust, ~0.3 ms ใน PHP/Node.js (~25,000 ประโยค/วินาทีต่อ core)  
@@ -24,7 +24,7 @@
 
 1. **Shortest Path Graph Viterbi Algorithm:** อัลกอริทึมค้นหาเส้นทางคำที่เหมาะสมที่สุดบนกราฟ ค้นหาคำที่ยาวและถูกต้องสมบูรณ์ตามธรรมชาติ
 2. **Theeramunkong et al. TCC Grammar (30 Rules):** คำนวณจุดตัดคลัสเตอร์ภาษาไทยระดับไบต์ออฟเซ็ต ป้องกันการตัดแยกสระ สระบน-ล่าง วรรณยุกต์ หรือพยัญชนะนำ 100%
-3. **FST & Compact DAWG Dictionary Architecture (v1.1.0):** โครงสร้างข้อมูลพจนานุกรม Finite State Transducer / Minimal Acyclic DFA บีบอัดคลังคำ 36,040 คำ (รวม 10,133 ชื่อคนไทย) เหลือเพียง 226 KB โหลดทันใจระดับไมโครวินาที (0.04 ms ใน Go, 0.7 ms ใน Node.js, 0.00 ms ใน Rust/OPcache) พร้อมรองรับ Dynamic Overlay เมื่อมีการเพิ่มคำใหม่ขณะรันไทม์
+3. **FST & Compact DAWG Dictionary Architecture (v1.1.0):** โครงสร้างข้อมูลพจนานุกรม Finite State Transducer / Minimal Acyclic DFA บีบอัดคลังคำ 25,907 คำเหลือเพียง 167 KB โหลดทันใจระดับไมโครวินาที (0.04 ms ใน Go, 0.7 ms ใน Node.js, 0.00 ms ใน Rust/OPcache) พร้อมรองรับ Dynamic Overlay เมื่อมีการเพิ่มคำใหม่ขณะรันไทม์
 4. **Smart OOV & Abbreviation Handling:** รู้จักคำย่อภาษาไทย (`รพ.`, `พ.ศ.`, `มิ.ย.`), ตัวเลขคั่นจุลภาค (`10,000`), ทศนิยม (`3.14`), เปอร์เซ็นต์ (`40%`)
 5. **ThaiLineBreaker (UAX #14 & W3C Thai Text Layout):** ตัดแบ่งบรรทัดสำหรับทำ PDF หรือเว็บด้วย Unicode Line Breaking Algorithm ครบทุกกฎ (LB1–LB31) ใช้พจนานุกรมตัดคำเฉพาะภายในช่วงอักษรไทย ไม่ตัดกลางคำ ตัวเลข คำย่อ หรืออีเมล ไม่ทิ้งวรรคไว้หน้าบรรทัดใหม่ ป้องกันเครื่องหมายตกค้าง (`ๆ`, `ฯ`, วงเล็บ, อัญประกาศ)
 6. **HTML / EPUB Safe:** รักษาแท็ก HTML (`<p>`, `<b>`, `<span>`) และ HTML Entities (`&amp;`, `&quot;`) ให้คงอยู่สมบูรณ์ ไม่แทรกสัญลักษณ์ตัดคำเข้าไปภายในแท็ก
@@ -33,7 +33,7 @@
 
 ## รองรับหลายภาษาโปรแกรม (Multi-Language Architecture)
 
-ThaiBreak ได้รับการออกแบบสถาปัตยกรรมแบบ Monorepo เพื่อรองรับการใช้งานในทุก Stack โดยใช้คลังคำศัพท์มาตรฐาน (`data/words.txt`: 36,040 คำ (รวม 10,133 ชื่อคนไทย)) เป็น Single Source of Truth:
+ThaiBreak ได้รับการออกแบบสถาปัตยกรรมแบบ Monorepo เพื่อรองรับการใช้งานในทุก Stack โดยใช้คลังคำศัพท์มาตรฐาน (`data/words.txt`: 25,907 คำ) เป็น Single Source of Truth:
 
 ```
 thai-break/
@@ -322,7 +322,7 @@ ThaiBreak ได้รับการออกแบบให้มีควา�
 
 ### 1. ความแม่นยำในการตัดคำ (Accuracy Benchmark)
 
-วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ โดยใช้พจนานุกรมเริ่มต้น `data/words.txt` (36,040 คำ (รวม 10,133 ชื่อคนไทย)) เพียงอย่างเดียว เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard):
+วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ โดยใช้พจนานุกรมเริ่มต้น `data/words.txt` (25,907 คำ) เพียงอย่างเดียว เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard):
 
 | ชุดทดสอบ | Word F1 | Boundary F1 |
 | :--- | :---: | :---: |
@@ -346,12 +346,7 @@ python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
 
 > [!NOTE]
 > **Clean & Safe for Commercial Use:**
-> ThaiBreak ใช้พจนานุกรม **Apache-2.0 ล้วน**: ฐาน 25,907 คำจากราชบัณฑิตยสถาน (Public Domain)
-> ผสาน 10,133 ชื่อคนไทย (Apache-2.0, จาก [PyThaiNLP](https://github.com/PyThaiNLP/pythainlp))
-> เพื่อลดปัญหาชื่อ-นามสกุลถูกตัดผิด (เช่น `สมศักดิ์` → `สม|ศักดิ์`) — คัดกรองด้วยหลักฐานความถี่จาก
-> [LST20](https://huggingface.co/datasets/lst20) ก่อนรวมเข้าพจนานุกรม (`tools/select_names.py`)
-> เพื่อไม่ให้ชื่อเล่นที่ซ้ำกับวลีธรรมดา (เช่น `โชคดี`) ไปรวมคำผิดที่ ไม่มีข้อความจาก LST20 เอง
-> รวมอยู่ในโปรเจกต์ — คลังข้อมูลนั้นใช้เพื่อวัดผลเท่านั้น
+> ThaiBreak ใช้เพียงพจนานุกรม **Public Domain (ราชบัณฑิตยสถาน 25,907 คำ)** ทำให้ซอร์สโค้ดและข้อมูลทั้งหมดอยู่ภายใต้สัญญาอนุญาต **Apache-2.0** อย่างแท้จริง ไม่มีข้อมูลจากคลังข้อมูลที่มีข้อจำกัด (เช่น LST20) รวมอยู่ในโปรเจกต์ คลังข้อมูลเหล่านั้นใช้เพื่อวัดผลเท่านั้น
 
 ### 2. ประสิทธิภาพและการใช้ทรัพยากร (Performance & Resource Benchmarks)
 

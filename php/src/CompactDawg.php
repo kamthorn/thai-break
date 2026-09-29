@@ -7,7 +7,7 @@ namespace ThaiBreak;
 /**
  * Ultra-compact Directed Acyclic Word Graph (DAWG / Minimal DFA) in PHP.
  *
- * Reads an immutable binary DAWG file (TBD1 format, ~226 KB for 36,040 Thai words (incl. 10,133 given names))
+ * Reads an immutable binary DAWG file (TBD1 format, ~167 KB for 25,907 Thai words)
  * with zero pre-parsing overhead and minimal memory footprint (< 0.5 MB).
  *
  * License: Apache-2.0
