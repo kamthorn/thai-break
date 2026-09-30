@@ -25,3 +25,11 @@ python/dist/
 dist/
 build/
 
+
+# Python wheel staging (see python/stage_native.py)
+python/thaibreak/_lib/
+python/thaibreak/data/
+python/LICENSE
+python/build/
+python/dist/
+*.egg-info/

@@ -256,14 +256,16 @@ gcc -I rust/include main.c -L rust/target/release -lthaibreak -o app
 ## 6. Python (ผ่าน C-FFI / PyO3)
 
 ```bash
-pip install ./python
+pip install thaibreak
 ```
+
+แพ็กเกจเป็น wheel แยกตามแพลตฟอร์ม (`py3-none-<platform>`) ที่มีไลบรารี Rust และพจนานุกรมพื้นฐาน (`words.fst`) ติดมาด้วย ใช้ได้กับ Python 3.9 ขึ้นไป (ทดสอบ 3.9–3.13) โดยไม่ต้องติดตั้ง Rust: Linux x86_64/aarch64 (glibc 2.28+), macOS x86_64/arm64 และ Windows x64 แพลตฟอร์มอื่น (เช่น Alpine/musl) ต้อง build เองตามด้านล่าง
 
 ```python
 import thaibreak
 
-# เริ่มต้นด้วยพจนานุกรม FST (หรือเรียก thaibreak.init() เปล่าๆ เพื่อโหลด data/words.fst อัตโนมัติ)
-thaibreak.init("data/words.fst")
+# ไม่ต้องเรียก init ก็ใช้งานได้ (โหลดพจนานุกรมพื้นฐานที่ติดมากับแพ็กเกจ)
+# หรือระบุพจนานุกรมเอง เช่น thaibreak.init("data/words.fst")
 
 # ตัดคำ
 tokens = thaibreak.words("ฉันรักภาษาไทย")
@@ -276,6 +278,14 @@ html = thaibreak.lines("<b>สวัสดี</b> &amp; ประเทศไท
 wrapped = thaibreak.wrap("ฉันรักภาษาไทยมากที่สุดในโลก", width=12)
 print(wrapped)
 ```
+
+**Build wheel เอง** (ต้องมี Rust และ Python):
+
+```bash
+tools/build_python_wheel.sh      # ได้ไฟล์ใน python/dist/
+```
+
+GitHub Actions workflow `python-wheels.yml` build wheel ครบทุกแพลตฟอร์มและอัปโหลดเป็น artifact `python-wheels` (ไม่ publish ขึ้น PyPI ให้อัตโนมัติ)
 
 ---
 

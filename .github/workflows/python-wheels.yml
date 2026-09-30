@@ -1,0 +1,109 @@
+name: Python wheels
+
+# Builds one py3-none-<platform> wheel per platform (Rust library + base dictionary
+# bundled) and uploads them as artifacts. Publishing to PyPI is done by hand.
+on:
+  push:
+    tags: [ 'v*' ]
+  pull_request:
+    paths:
+      - 'python/**'
+      - 'rust/**'
+      - 'data/words.fst'
+      - 'tools/build_python_wheel.sh'
+      - '.github/workflows/python-wheels.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.arch }} (manylinux_2_28)
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86_64,  runner: ubuntu-24.04 }
+          - { arch: aarch64, runner: ubuntu-24.04-arm }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheel in the manylinux container
+        run: |
+          mkdir -p wheelhouse
+          docker run --rm -v "$PWD":/src:ro -v "$PWD/wheelhouse":/out \
+            quay.io/pypa/manylinux_2_28_${{ matrix.arch }} bash -euc '
+              cp -r /src /work && cd /work && rm -rf rust/target python/build python/dist
+              curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+              . "$HOME/.cargo/env"
+              PYTHON=/opt/python/cp39-cp39/bin/python OUT=/work/python/dist tools/build_python_wheel.sh
+              auditwheel repair --plat manylinux_2_28_${{ matrix.arch }} -w /out python/dist/*.whl
+            '
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Smoke test the installed wheel
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install wheelhouse/*.whl
+          cd "$RUNNER_TEMP" && "$RUNNER_TEMP/venv/bin/python" "$GITHUB_WORKSPACE/python/tests/smoke_installed.py"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-${{ matrix.arch }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  native:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macOS x86_64,  runner: macos-15-intel, target: '10.13', venv-python: bin/python }
+          - { name: macOS arm64,   runner: macos-15,       target: '11.0',  venv-python: bin/python }
+          - { name: Windows x64,   runner: windows-latest, target: '',      venv-python: Scripts/python }
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build wheel
+        shell: bash
+        run: OUT="$PWD/wheelhouse" tools/build_python_wheel.sh
+
+      - name: Smoke test the installed wheel
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          VPY="$RUNNER_TEMP/venv/${{ matrix.venv-python }}"
+          "$VPY" -m pip install wheelhouse/*.whl
+          cd "$RUNNER_TEMP" && "$VPY" "$GITHUB_WORKSPACE/python/tests/smoke_installed.py"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.runner }}
+          path: wheelhouse/*.whl
+          if-no-files-found: error
+
+  collect:
+    name: Collect wheels
+    needs: [linux, native]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/upload-artifact/merge@v4
+        with:
+          name: python-wheels
+          pattern: wheel-*
