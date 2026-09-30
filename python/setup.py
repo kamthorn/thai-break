@@ -1,3 +1,7 @@
+import os
+import platform
+import sys
+
 from setuptools import Distribution, setup
 
 try:
@@ -22,6 +26,10 @@ class PlatformWheel(bdist_wheel):
 
     def get_tag(self):
         _, _, plat = super().get_tag()
+        if sys.platform == "darwin":
+            # The bundled library is single-arch, so never tag the wheel universal2
+            target = os.environ.get("MACOSX_DEPLOYMENT_TARGET", "11.0").replace(".", "_")
+            plat = f"macosx_{target}_{platform.machine()}"
         return "py3", "none", plat
 
 

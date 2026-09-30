@@ -66,9 +66,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { name: macOS x86_64,  runner: macos-15-intel, target: '10.13', venv-python: bin/python }
-          - { name: macOS arm64,   runner: macos-15,       target: '11.0',  venv-python: bin/python }
-          - { name: Windows x64,   runner: windows-latest, target: '',      venv-python: Scripts/python }
+          - { name: macOS x86_64,  runner: macos-15-intel, target: '10.13', venv-python: bin/python, tag: macosx_10_13_x86_64 }
+          - { name: macOS arm64,   runner: macos-15,       target: '11.0',  venv-python: bin/python, tag: macosx_11_0_arm64 }
+          - { name: Windows x64,   runner: windows-latest, target: '',      venv-python: Scripts/python, tag: win_amd64 }
     env:
       MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
     steps:
@@ -83,6 +83,10 @@ jobs:
       - name: Build wheel
         shell: bash
         run: OUT="$PWD/wheelhouse" tools/build_python_wheel.sh
+
+      - name: Check the wheel platform tag
+        shell: bash
+        run: ls wheelhouse/thaibreak-*-py3-none-${{ matrix.tag }}.whl
 
       - name: Smoke test the installed wheel
         shell: bash
