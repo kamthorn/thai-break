@@ -91,3 +91,13 @@ fn test_standard_data_words_fst_matches_txt() {
         assert_eq!(words_txt, words_fst, "Tokenization mismatch on text: {}", s);
     }
 }
+
+#[cfg(feature = "embedded-dict")]
+#[test]
+fn embedded_dictionary_matches_data_dir() {
+    let embedded = thaibreak::trie::ThaiTrie::embedded().expect("embedded dict loads");
+    let on_disk = thaibreak::trie::ThaiTrie::load_fst_file(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/words.fst"))
+        .expect("data/words.fst loads");
+    assert_eq!(embedded.max_weight(), on_disk.max_weight());
+    assert!(!embedded.is_empty());
+}
