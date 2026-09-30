@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-30
+
+### Added
+- **Rust crate embeds the base dictionary** (feature `embedded-dict`, on by
+  default): `thaibreak::words()` and the C API (`thaibreak_init(NULL, NULL)`)
+  work with no files on disk, including when installed from crates.io. Use
+  `default-features = false` to leave the dictionary out. `ThaiTrie::embedded()`
+  exposes it, and the WASM build gains `WasmThaiBreak.withDefault()`.
+- `tools/sync_dict.sh` (`stage` / `check`) and a CI job that fails when the
+  committed copy in `go/data` drifts from `data/`.
+
+### Changed
+- `data/` is the only place the dictionary is maintained. Rust stages
+  `words.fst` into the crate at package time (`rust/data/`, gitignored; the
+  build fails if it is missing), Python stages it into the wheel, and
+  TypeScript copies `data/words.dawg` during `npm run build`. The duplicate
+  `typescript/src/data/words.dawg` is removed.
+- The `typst-plugin` feature uses the same embedded dictionary instead of an
+  `include_bytes!` path outside the crate, so it builds from the published crate.
+- `/typst` is excluded from the Composer archive.
+
 ## [1.1.1] - 2026-09-30
 
 ### Removed

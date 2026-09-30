@@ -322,6 +322,13 @@ impl ThaiTrie {
         Ok(Self::Fst(FstTrie::from_bytes(bytes)?))
     }
 
+    /// The base dictionary compiled into this build (feature `embedded-dict`).
+    #[cfg(feature = "embedded-dict")]
+    pub fn embedded() -> io::Result<Self> {
+        static WORDS_FST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/words.fst"));
+        Self::from_fst_bytes(WORDS_FST.into())
+    }
+
     pub fn load_fst_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let bytes: Arc<[u8]> = std::fs::read(path)?.into();
         Self::from_fst_bytes(bytes)

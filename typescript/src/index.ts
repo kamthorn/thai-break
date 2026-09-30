@@ -26,7 +26,6 @@ function tryLoadDefault(): void {
     const currentDir = path.dirname(fileURLToPath(import.meta.url));
     const candidates = [
       path.resolve(currentDir, 'data/words.dawg'),
-      path.resolve(currentDir, '../src/data/words.dawg'),
       path.resolve(currentDir, '../data/words.dawg'),
       path.resolve(currentDir, '../../data/words.dawg'),
       path.resolve(process.cwd(), 'data/words.dawg'),

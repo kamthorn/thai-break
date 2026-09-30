@@ -1,12 +1,21 @@
 [package]
 name = "thaibreak"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2021"
 authors = ["kamthorn"]
 description = "Fast, high-accuracy Thai word segmentation and typographic line breaker core engine"
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/kamthorn/thai-break"
+include = [
+    "src/**",
+    "tests/**",
+    "include/**",
+    "build.rs",
+    "data/words.fst",
+    "README.md",
+    "LICENSE",
+]
 
 [lib]
 name = "thaibreak"
@@ -22,11 +31,12 @@ pyo3 = { version = "0.23", optional = true, features = ["extension-module"] }
 wasm-minimal-protocol = { version = "0.1", optional = true }
 
 [features]
-default = ["c-ffi"]
+default = ["c-ffi", "embedded-dict"]
+embedded-dict = []
 c-ffi = ["dep:libc"]
 wasm = ["dep:wasm-bindgen"]
 python = ["dep:pyo3"]
-typst-plugin = ["dep:wasm-minimal-protocol"]
+typst-plugin = ["dep:wasm-minimal-protocol", "embedded-dict"]
 
 [profile.release]
 opt-level = 3

@@ -50,6 +50,13 @@ fn ensure_initialized() {
         }
     }
 
+    #[cfg(feature = "embedded-dict")]
+    if trie.is_empty() {
+        if let Ok(t) = ThaiTrie::embedded() {
+            trie = t;
+        }
+    }
+
     let tokenizer = Tokenizer::new(trie, bigrams);
     let breaker = LineBreaker::new(tokenizer.clone());
 

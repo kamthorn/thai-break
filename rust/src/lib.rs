@@ -75,16 +75,10 @@ fn ensure_default_loaded() {
         }
     }
 
-    #[cfg(feature = "typst-plugin")]
+    #[cfg(feature = "embedded-dict")]
     if trie.is_empty() {
-        static EMBEDDED_FST: &[u8] = include_bytes!("../../data/words.fst");
-        if let Ok(t) = ThaiTrie::from_fst_bytes(EMBEDDED_FST.into()) {
+        if let Ok(t) = ThaiTrie::embedded() {
             trie = t;
-        } else {
-            static EMBEDDED_WORDS: &str = include_str!("../../data/words.txt");
-            if let Ok(t) = ThaiTrie::load_tsv(EMBEDDED_WORDS.as_bytes()) {
-                trie = t;
-            }
         }
     }
 

@@ -13,6 +13,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dictionary:
+    name: Dictionary copies in sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check committed copies match data/
+        run: tools/sync_dict.sh check
+
   php:
     name: PHP (${{ matrix.php }})
     runs-on: ubuntu-latest
@@ -123,6 +133,12 @@ jobs:
         run: |
           cd rust
           cargo build --release --verbose
+
+      - name: Package the crate and build it on its own
+        run: |
+          tools/sync_dict.sh stage
+          cd rust
+          cargo package --allow-dirty
 
   python:
     name: Python (${{ matrix.python }})

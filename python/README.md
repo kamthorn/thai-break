@@ -195,8 +195,10 @@ console.log(displayWidth('ภาษาไทย')); // 7
 
 ```toml
 [dependencies]
-thaibreak = { path = "./rust" }
+thaibreak = "1"
 ```
+
+พจนานุกรมพื้นฐาน (`words.fst`, 289 KB) ฝังอยู่ในไลบรารีแล้ว (feature `embedded-dict` เปิดเป็นค่าเริ่มต้น) จึงเรียก `words()` ได้ทันทีโดยไม่ต้องมีไฟล์ หากต้องการใช้พจนานุกรมของตัวเองเท่านั้น ให้ใช้ `default-features = false`
 
 ```rust
 use thaibreak::{words, lines, wrap, display_width, DEFAULT_BREAK_MARKER};
@@ -299,7 +301,8 @@ cd rust && wasm-pack build --target web --features wasm
 import init, { WasmThaiBreak } from './pkg/thaibreak.js';
 
 await init();
-const tb = new WasmThaiBreak(dictTextString);
+const tb = WasmThaiBreak.withDefault();          // ใช้พจนานุกรมพื้นฐานที่ฝังในโมดูล
+// const tb = new WasmThaiBreak(dictTextString); // หรือส่งพจนานุกรมของคุณเอง (TSV)
 console.log(tb.words("ฉันรักภาษาไทย"));
 ```
 
