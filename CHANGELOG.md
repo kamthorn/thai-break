@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Platform wheels for Python**: `py3-none-<platform>` wheels bundle the Rust
+  library and the base dictionary (`words.fst`), so `pip install thaibreak`
+  works without Rust and `thaibreak.words()` needs no `init()`. Built for
+  Linux x86_64/aarch64 (manylinux_2_28), macOS x86_64/arm64 and Windows x64 by
+  `.github/workflows/python-wheels.yml` (`tools/build_python_wheel.sh`).
+  The loader now looks for `.dylib`/`.dll` as well as `.so`.
 - **Thai Text Normalizer (`rust/src/normalizer.rs`)**:
   - Canonicalizes mis-typed vowels (`เเ` → `แ`, `ํา` → `ำ`), reorders
     misplaced tones/vowels, collapses elongations (`มากกก` → `มาก`,
