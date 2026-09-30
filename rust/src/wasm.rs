@@ -36,6 +36,17 @@ impl WasmThaiBreak {
         Ok(WasmThaiBreak { tokenizer, breaker })
     }
 
+    /// Uses the base dictionary compiled into the module; no files needed.
+    #[cfg(feature = "embedded-dict")]
+    #[wasm_bindgen(js_name = withDefault)]
+    pub fn with_default(bigrams_tsv: Option<String>) -> Result<WasmThaiBreak, JsValue> {
+        let trie = ThaiTrie::embedded().map_err(|e| JsValue::from_str(&e.to_string()))?;
+        let bigrams = bigrams_tsv.and_then(|b| BigramModel::load_tsv(b.as_bytes(), 0.15).ok());
+        let tokenizer = Tokenizer::new(trie, bigrams);
+        let breaker = LineBreaker::new(tokenizer.clone());
+        Ok(WasmThaiBreak { tokenizer, breaker })
+    }
+
     #[wasm_bindgen]
     pub fn words(&self, text: &str) -> Vec<String> {
         self.tokenizer.tokenize(text, false)

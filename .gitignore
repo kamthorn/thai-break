@@ -33,3 +33,6 @@ python/LICENSE
 python/build/
 python/dist/
 *.egg-info/
+
+# Dictionary staged for `cargo package` (see tools/sync_dict.sh)
+rust/data/
