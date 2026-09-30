@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,10 +10,13 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = "Apache-2.0"
 authors = [{ name = "kamthorn" }]
+license-files = ["LICENSE"]
 keywords = ["thai", "word-segmentation", "line-break", "nlp"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
 ]
 
 [project.urls]
@@ -24,3 +27,6 @@ Repository = "https://github.com/kamthorn/thai-break"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["thaibreak*"]
+
+[tool.setuptools.package-data]
+thaibreak = ["_lib/*", "data/*"]
