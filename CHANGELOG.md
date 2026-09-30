@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-30
+
+### Removed
+- `data/bigrams.tsv` (bigram counts derived from a news corpus) is no longer
+  shipped: the libraries use only the base dictionary (`words.dawg` / `words.fst`).
+  A bigram file next to the dictionary is still loaded if the user provides one.
+
 ### Added
 - **Platform wheels for Python**: `py3-none-<platform>` wheels bundle the Rust
   library and the base dictionary (`words.fst`), so `pip install thaibreak`
