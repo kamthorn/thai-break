@@ -2,7 +2,7 @@
 name = "thaibreak"
 version = "0.1.0"
 entrypoint = "lib.typ"
-authors = ["Kamthorn Krairuks <@kamthorn>"]
+authors = ["Kamthorn Krairaksa <@kamthorn>"]
 license = "Apache-2.0"
 description = "Natural Thai word segmentation and line breaking using dictionary trie."
 repository = "https://github.com/kamthorn/thai-break"
