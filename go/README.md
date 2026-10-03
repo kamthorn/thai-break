@@ -1,6 +1,7 @@
 # ThaiBreak for Go
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/kamthorn/thai-break/go.svg)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
+[![Go version](https://img.shields.io/github/v/tag/kamthorn/thai-break?filter=go%2Fv*&sort=semver&label=go)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **ThaiBreak** is a high-performance, dictionary-based Thai word segmentation and typographic line breaking engine for Go. It strictly implements the **Unicode Line Breaking Algorithm (UAX #14)** and **W3C Thai Layout Requirements**, making it ideal for PDF generation, terminal rendering, HTML typesetting, and NLP text processing.

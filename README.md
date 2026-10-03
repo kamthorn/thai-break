@@ -4,6 +4,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Packagist Version](https://img.shields.io/packagist/v/kamthorn/thai-break.svg)](https://packagist.org/packages/kamthorn/thai-break)
 [![Go Reference](https://pkg.go.dev/badge/github.com/kamthorn/thai-break/go.svg)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
+[![Go version](https://img.shields.io/github/v/tag/kamthorn/thai-break?filter=go%2Fv*&sort=semver&label=go)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
 [![npm version](https://img.shields.io/npm/v/thai-break.svg)](https://www.npmjs.com/package/thai-break)
 [![crates.io](https://img.shields.io/crates/v/thaibreak.svg)](https://crates.io/crates/thaibreak)
 [![PyPI version](https://img.shields.io/pypi/v/thaibreak.svg)](https://pypi.org/project/thaibreak/)
