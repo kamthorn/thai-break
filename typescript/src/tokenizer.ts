@@ -30,7 +30,8 @@ interface DagEdge {
 
 /**
  * Normalize common Thai spelling variants for dictionary matching:
- * เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ").
+ * เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ"), and a
+ * tone mark typed after Sara Am is moved before it (ำ + tone → tone + ำ, "นำ้" → "น้ำ").
  * Returns the normalized characters and, for each of them, the index of the
  * original character it starts at (plus a final entry for the end). Token
  * boundaries never fall inside a replaced pair, so tokens map back to exact
@@ -45,10 +46,18 @@ function normalizeForMatching(chars: string[]): [string[], number[]] {
     if (chars[i] === 'เ' && next === 'เ') {
       norm.push('แ');
       orig.push(i++);
+    } else if (chars[i] === 'ำ' && isToneMark(next)) {
+      norm.push(next, 'ำ');
+      orig.push(i, i);
+      i += 1;
+    } else if (chars[i] === '\u0e4d' && next === 'า' && isToneMark(chars[i + 2] ?? '')) {
+      norm.push(chars[i + 2], 'ำ');
+      orig.push(i, i);
+      i += 2;
     } else if (chars[i] === '\u0e4d' && next === 'า') {
       norm.push('ำ');
       orig.push(i++);
-    } else if (chars[i] === '\u0e4d' && next >= '่' && next <= '๋' && chars[i + 2] === 'า') {
+    } else if (chars[i] === '\u0e4d' && isToneMark(next) && chars[i + 2] === 'า') {
       norm.push(next, 'ำ');
       orig.push(i, i);
       i += 2;
@@ -59,6 +68,10 @@ function normalizeForMatching(chars: string[]): [string[], number[]] {
   }
   orig.push(n);
   return [norm, orig];
+}
+
+function isToneMark(ch: string): boolean {
+  return ch >= '่' && ch <= '๋';
 }
 
 function isThaiRune(code: number): boolean {
