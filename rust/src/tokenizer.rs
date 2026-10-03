@@ -38,7 +38,8 @@ struct DagEdge {
 }
 
 /// Normalize common Thai spelling variants for dictionary matching:
-/// เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ").
+/// เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ"), and a
+/// tone mark typed after Sara Am is moved before it (ำ + tone → tone + ำ, "นำ้" → "น้ำ").
 /// Returns the normalized characters and, for each of them, the index of the
 /// original character it starts at (plus a final entry for the end). Token
 /// boundaries never fall inside a replaced pair, so tokens map back to exact
@@ -55,11 +56,19 @@ fn normalize_for_matching(chars: &[char]) -> (Vec<char>, Vec<usize>) {
             norm.push('แ');
             orig.push(i);
             i += 2;
+        } else if chars[i] == 'ำ' && is_tone_mark(next) {
+            norm.extend([next, 'ำ']);
+            orig.extend([i, i]);
+            i += 2;
+        } else if chars[i] == '\u{0E4D}' && next == 'า' && is_tone_mark(at(i + 2)) {
+            norm.extend([at(i + 2), 'ำ']);
+            orig.extend([i, i]);
+            i += 3;
         } else if chars[i] == '\u{0E4D}' && next == 'า' {
             norm.push('ำ');
             orig.push(i);
             i += 2;
-        } else if chars[i] == '\u{0E4D}' && ('่'..='๋').contains(&next) && at(i + 2) == 'า' {
+        } else if chars[i] == '\u{0E4D}' && is_tone_mark(next) && at(i + 2) == 'า' {
             norm.extend([next, 'ำ']);
             orig.extend([i, i]);
             i += 3;
@@ -71,6 +80,11 @@ fn normalize_for_matching(chars: &[char]) -> (Vec<char>, Vec<usize>) {
     }
     orig.push(n);
     (norm, orig)
+}
+
+#[inline]
+fn is_tone_mark(ch: char) -> bool {
+    ('่'..='๋').contains(&ch)
 }
 
 #[inline]
