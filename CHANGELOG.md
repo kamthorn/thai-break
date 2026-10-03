@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- 505 dictionary entries spelled with a decomposed Sara Am (`ํ` + `า`, optionally with a tone
+  mark between, e.g. `กระทํา`, `กระป่ํา`). Each one already had a `ำ` twin (`กระทำ`, `กระป่ำ`),
+  and the tokenizers match text with Sara Am recomposed, so these entries could never match.
+  `data/words.txt` now has 25,402 words; `words.fst`, `words.dawg` and `words.php` are rebuilt.
+  Segmentation output is unchanged (LST20 test: word F1 0.8521, boundary F1 0.9263 before and
+  after).
+
 ## [1.1.2] - 2026-09-30
 
 ### Added
