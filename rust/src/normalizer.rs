@@ -153,6 +153,17 @@ pub fn normalize_text_with_options_dict(
         // Case B: ํ + tone + า -> tone + ำ ("นํ้า" -> "น้ำ")
         // Case C: tone + ํ + า -> tone + ำ
         if options.normalize_sara_am {
+            // ํ + า + tone -> tone + ำ
+            if ch == '\u{0E4D}'
+                && j + 2 < m
+                && step1[j + 1] == 'า'
+                && is_thai_tone(step1[j + 2])
+            {
+                step2.push(step1[j + 2]);
+                step2.push('ำ');
+                j += 3;
+                continue;
+            }
             if ch == '\u{0E4D}' && j + 1 < m && step1[j + 1] == 'า' {
                 step2.push('ำ');
                 j += 2;
@@ -193,8 +204,8 @@ pub fn normalize_text_with_options_dict(
                 continue;
             }
 
-            // Follow vowel (ะ, า, ๅ) BEFORE tone mark -> tone mark + follow vowel
-            if matches!(ch, 'ะ' | 'า' | 'ๅ') && j + 1 < m && is_thai_tone(step1[j + 1]) {
+            // Follow vowel (ะ, า, ำ, ๅ) BEFORE tone mark -> tone mark + follow vowel ("นำ้" -> "น้ำ")
+            if matches!(ch, 'ะ' | 'า' | 'ำ' | 'ๅ') && j + 1 < m && is_thai_tone(step1[j + 1]) {
                 step2.push(step1[j + 1]);
                 let norm_v = if ch == 'ๅ' { 'า' } else { ch };
                 step2.push(norm_v);
@@ -403,6 +414,9 @@ mod tests {
         assert_eq!(normalize_text("นํ้า"), "น้ำ");
         assert_eq!(normalize_text("กํ้า"), "ก้ำ");
         assert_eq!(normalize_text("ลําดับ"), "ลำดับ");
+        // tone mark typed after Sara Am, or after decomposed Sara Am
+        assert_eq!(normalize_text("น\u{0E33}\u{0E49}ตาล"), "น้ำตาล");
+        assert_eq!(normalize_text("น\u{0E4D}\u{0E32}\u{0E49}ตาล"), "น้ำตาล");
     }
 
     #[test]

@@ -26,6 +26,8 @@ class SegmentationTest extends TestCase
             'no-break spaces are whitespace, not words' => ['ราคา 100 บาท', 'ราคา|100|บาท'],
             'two sara e are matched as sara ae, the text is kept' => ['เเข็งเเรงมาก', 'เเข็งเเรง|มาก'],
             'nikhahit + sara aa is matched as sara am, the text is kept' => ['นํ้าตาลทราย', 'นํ้าตาล|ทราย'],
+            'a tone mark after sara am is matched before it, the text is kept' => ['นำ้ตาลทราย', 'นำ้ตาล|ทราย'],
+            'nikhahit + sara aa + tone mark is matched as tone + sara am' => ['นํา้ตาลทราย', 'นํา้ตาล|ทราย'],
         ];
     }
 

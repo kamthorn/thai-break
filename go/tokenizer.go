@@ -93,7 +93,8 @@ func (tok *Tokenizer) Tokenize(text string, keepWhitespace bool) []string {
 
 // normalizeForMatching normalizes common Thai spelling variants for
 // dictionary matching: เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ
-// (e.g. "นํ้า" → "น้ำ"). It returns the normalized runes and, for each of
+// (e.g. "นํ้า" → "น้ำ"), and a tone mark typed after Sara Am is moved before
+// it (ำ + tone → tone + ำ, "นำ้" → "น้ำ"). It returns the normalized runes and, for each of
 // them, the index of the original rune it starts at (plus a final entry for
 // the end). Token boundaries never fall inside a replaced pair, so tokens map
 // back to exact slices of the original text.
@@ -112,10 +113,16 @@ func normalizeForMatching(runes []rune) ([]rune, []int) {
 		case runes[i] == 'เ' && next == 'เ':
 			norm, orig = append(norm, 'แ'), append(orig, i)
 			i++
+		case runes[i] == 'ำ' && isToneMark(next):
+			norm, orig = append(norm, next, 'ำ'), append(orig, i, i)
+			i++
+		case runes[i] == '\u0E4D' && next == 'า' && isToneMark(at(i+2)):
+			norm, orig = append(norm, at(i+2), 'ำ'), append(orig, i, i)
+			i += 2
 		case runes[i] == '\u0E4D' && next == 'า':
 			norm, orig = append(norm, 'ำ'), append(orig, i)
 			i++
-		case runes[i] == '\u0E4D' && next >= '่' && next <= '๋' && at(i+2) == 'า':
+		case runes[i] == '\u0E4D' && isToneMark(next) && at(i+2) == 'า':
 			norm, orig = append(norm, next, 'ำ'), append(orig, i, i)
 			i += 2
 		default:
@@ -123,6 +130,10 @@ func normalizeForMatching(runes []rune) ([]rune, []int) {
 		}
 	}
 	return norm, append(orig, n)
+}
+
+func isToneMark(r rune) bool {
+	return r >= '่' && r <= '๋'
 }
 
 // segment runs the Viterbi segmentation over runes and returns all tokens,

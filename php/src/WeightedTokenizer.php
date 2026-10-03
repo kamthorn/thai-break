@@ -297,7 +297,8 @@ class WeightedTokenizer
 
     /**
      * Normalize common Thai spelling variants for dictionary matching:
-     *   เ + เ → แ,  ํ + า → ำ,  ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ")
+     *   เ + เ → แ,  ํ + า → ำ,  ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ"),
+     *   ำ + tone → tone + ำ (a tone mark typed after Sara Am, "นำ้" → "น้ำ")
      *
      * Returns the normalized characters and, for each of them, the index of
      * the original character it starts at (plus a final entry for the end).
@@ -317,10 +318,18 @@ class WeightedTokenizer
             if ($chars[$i] === 'เ' && $next === 'เ') {
                 array_push($norm, 'แ');
                 array_push($orig, $i++);
+            } elseif ($chars[$i] === 'ำ' && self::isToneMark($next)) {
+                array_push($norm, $next, 'ำ');
+                array_push($orig, $i, $i);
+                $i += 1;
+            } elseif ($chars[$i] === "\u{0E4D}" && $next === 'า' && self::isToneMark($chars[$i + 2] ?? '')) {
+                array_push($norm, $chars[$i + 2], 'ำ');
+                array_push($orig, $i, $i);
+                $i += 2;
             } elseif ($chars[$i] === "\u{0E4D}" && $next === 'า') {
                 array_push($norm, 'ำ');
                 array_push($orig, $i++);
-            } elseif ($chars[$i] === "\u{0E4D}" && preg_match('/^[่-๋]$/u', $next) && ($chars[$i + 2] ?? '') === 'า') {
+            } elseif ($chars[$i] === "\u{0E4D}" && self::isToneMark($next) && ($chars[$i + 2] ?? '') === 'า') {
                 array_push($norm, $next, 'ำ');
                 array_push($orig, $i, $i);
                 $i += 2;
@@ -332,6 +341,11 @@ class WeightedTokenizer
         $orig[] = $n;
 
         return [$norm, $orig];
+    }
+
+    private static function isToneMark(string $char): bool
+    {
+        return $char !== '' && $char >= '่' && $char <= '๋';
     }
 
     /** Return true if the character is in the Thai Unicode block U+0E00-U+0E7F */
