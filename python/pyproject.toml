@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "thaibreak"
-version = "1.1.2"
+version = "1.2.0"
 description = "Fast, high-accuracy Thai word segmentation and typographic line breaker"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "Apache-2.0"
 authors = [{ name = "kamthorn" }]
 license-files = ["LICENSE"]

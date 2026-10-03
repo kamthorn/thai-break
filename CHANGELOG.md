@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-03
+
+### Fixed
+
+- A tone mark typed after Sara Am (`นำ้` instead of `น้ำ`), or after a decomposed Sara Am
+  (`นํา้`), did not match the dictionary, so `นำ้ตาลทราย` was segmented as `นำ้|ตาล|ทราย`. The
+  tokenizers in all languages now match these as tone mark + `ำ` (tokens keep the original
+  text), and `normalize_text` in Rust rewrites them to `น้ำ`.
+
+### Changed
+
+- Python: `requires-python` is now `>=3.9`, matching the versions the wheels are built and
+  tested for (3.9-3.13).
+
 ### Removed
 
 - 505 dictionary entries spelled with a decomposed Sara Am (`ํ` + `า`, optionally with a tone
