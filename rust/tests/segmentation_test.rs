@@ -86,3 +86,78 @@ fn test_segmentation() {
         assert_eq!(words(input).join("|"), *expected, "{name}");
     }
 }
+
+#[test]
+fn break_iterator_follows_the_viterbi_boundaries() {
+    use thaibreak::BreakIterator;
+    let trie = ThaiTrie::load_tsv_file("../data/words.txt").expect("Failed to load wordlist");
+    let tokenizer = Tokenizer::new(trie, None);
+    // "นํ้า" is matched as น้ำ but keeps its characters, so offsets are into the original text
+    let text = "นํ้าตาลทราย ราคา 100 บาท";
+    let mut it = BreakIterator::new(&tokenizer, text);
+
+    let boundaries: Vec<usize> = std::iter::once(it.current()).chain(it.clone()).collect();
+    let segments: Vec<&str> = boundaries.windows(2).map(|w| &text[w[0]..w[1]]).collect();
+    assert_eq!(segments.concat(), text);
+    let words: Vec<&str> = segments.iter().copied().filter(|s| !s.trim().is_empty()).collect();
+    assert_eq!(words, tokenizer.tokenize(text, false).iter().map(String::as_str).collect::<Vec<_>>());
+
+    let mid = boundaries[1];
+    assert!(it.is_boundary(mid));
+    assert_eq!(it.current(), mid);
+    // one byte into the next word is inside a character, so not a boundary
+    assert!(!it.is_boundary(mid + 1));
+    assert_eq!(it.current(), boundaries[2]);
+    assert_eq!(it.following(mid), Some(boundaries[2]));
+    assert_eq!(it.preceding(mid), Some(boundaries[0]));
+    assert_eq!(it.preceding(0), None);
+    assert_eq!(it.following(text.len()), None);
+    assert_eq!(it.last_boundary(), text.len());
+    assert_eq!(it.next_boundary(), None);
+    assert_eq!(it.first_boundary(), 0);
+    assert_eq!(it.previous(), None);
+
+    let mut empty = BreakIterator::new(&tokenizer, "");
+    assert_eq!((empty.current(), empty.next_boundary()), (0, None));
+}
+
+#[test]
+fn break_iterator_offsets_in_code_points_and_utf16() {
+    use thaibreak::BreakIterator;
+    let trie = ThaiTrie::load_tsv_file("../data/words.txt").expect("Failed to load wordlist");
+    let tokenizer = Tokenizer::new(trie, None);
+    // 😀 is 4 bytes, 2 UTF-16 units and 1 code point
+    let text = "กินข้าว😀ดี";
+    let it = BreakIterator::new(&tokenizer, text);
+    let bytes = it.boundaries().to_vec();
+    assert_eq!(bytes.first(), Some(&0));
+    assert_eq!(bytes.last(), Some(&text.len()));
+    let chars = it.boundaries_in(text, false);
+    let utf16 = it.boundaries_in(text, true);
+    assert_eq!(chars.len(), bytes.len());
+    assert_eq!(chars.last(), Some(&text.chars().count()));
+    assert_eq!(utf16.last(), Some(&text.encode_utf16().count()));
+    let units: Vec<u16> = text.encode_utf16().collect();
+    for (i, w) in utf16.windows(2).enumerate() {
+        let segment = String::from_utf16(&units[w[0]..w[1]]).unwrap();
+        assert_eq!(segment, text[bytes[i]..bytes[i + 1]]);
+    }
+}
+
+#[cfg(feature = "c-ffi")]
+#[test]
+fn c_boundaries_round_trip() {
+    use std::ffi::CString;
+    let text = CString::new("กินข้าว ครับ").unwrap();
+    let mut count = 0usize;
+    unsafe {
+        let ptr = thaibreak::c_ffi::thaibreak_boundaries(text.as_ptr(), &mut count);
+        assert!(!ptr.is_null());
+        let offsets = std::slice::from_raw_parts(ptr, count).to_vec();
+        thaibreak::c_ffi::thaibreak_free_boundaries(ptr, count);
+        assert_eq!(offsets.first(), Some(&0));
+        assert_eq!(offsets.last(), Some(&text.as_bytes().len()));
+        assert!(offsets.windows(2).all(|w| w[0] < w[1]));
+        assert!(thaibreak::c_ffi::thaibreak_boundaries(std::ptr::null(), &mut count).is_null());
+    }
+}

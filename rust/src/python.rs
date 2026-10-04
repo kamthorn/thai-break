@@ -4,6 +4,8 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 use crate::bigram::BigramModel;
 #[cfg(feature = "python")]
+use crate::break_iterator::BreakIterator;
+#[cfg(feature = "python")]
 use crate::linebreaker::{thai_display_width, LineBreaker};
 #[cfg(feature = "python")]
 use crate::tokenizer::Tokenizer;
@@ -43,6 +45,11 @@ impl PyThaiBreak {
     #[pyo3(signature = (text, keep_whitespace=false))]
     pub fn words(&self, text: &str, keep_whitespace: bool) -> Vec<String> {
         self.tokenizer.tokenize(text, keep_whitespace)
+    }
+
+    /// Word boundaries as offsets into `text` (Python str indices), from 0 to len(text).
+    pub fn boundaries(&self, text: &str) -> Vec<usize> {
+        BreakIterator::new(&self.tokenizer, text).boundaries_in(text, false)
     }
 
     #[pyo3(signature = (text, marker="\u{200B}", is_html=false))]

@@ -274,6 +274,11 @@ import thaibreak
 tokens = thaibreak.words("ฉันรักภาษาไทย")
 print(tokens) # ['ฉัน', 'รัก', 'ภาษา', 'ไทย']
 
+# ตำแหน่งขอบเขตคำแบบ BreakIterator (index ของ str; ช่องว่างและเครื่องหมายเป็น segment ด้วย)
+text = "ฉันรักภาษาไทย"
+b = thaibreak.boundaries(text)   # [0, 3, 6, 10, 13]
+segments = [text[i:j] for i, j in zip(b, b[1:])]
+
 # แทรกจุดตัดบรรทัดสำหรับ HTML
 html = thaibreak.lines("<b>สวัสดี</b> &amp; ประเทศไทย", is_html=True)
 
@@ -307,6 +312,7 @@ await init();
 const tb = WasmThaiBreak.withDefault();          // ใช้พจนานุกรมพื้นฐานที่ฝังในโมดูล
 // const tb = new WasmThaiBreak(dictTextString); // หรือส่งพจนานุกรมของคุณเอง (TSV)
 console.log(tb.words("ฉันรักภาษาไทย"));
+console.log(tb.boundaries("ฉันรักภาษาไทย")); // ตำแหน่ง UTF-16 ตาม string index ของ JS
 ```
 
 ---

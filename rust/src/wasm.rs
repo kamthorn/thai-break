@@ -4,6 +4,8 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wasm")]
 use crate::bigram::BigramModel;
 #[cfg(feature = "wasm")]
+use crate::break_iterator::BreakIterator;
+#[cfg(feature = "wasm")]
 use crate::linebreaker::{thai_display_width, LineBreaker};
 #[cfg(feature = "wasm")]
 use crate::tokenizer::Tokenizer;
@@ -50,6 +52,13 @@ impl WasmThaiBreak {
     #[wasm_bindgen]
     pub fn words(&self, text: &str) -> Vec<String> {
         self.tokenizer.tokenize(text, false)
+    }
+
+    /// Word boundaries as UTF-16 offsets (JavaScript string indices), from 0 to `text.length`.
+    #[wasm_bindgen]
+    pub fn boundaries(&self, text: &str) -> Vec<u32> {
+        let it = BreakIterator::new(&self.tokenizer, text);
+        it.boundaries_in(text, true).into_iter().map(|b| b as u32).collect()
     }
 
     #[wasm_bindgen]
