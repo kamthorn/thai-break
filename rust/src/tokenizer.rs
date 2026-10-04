@@ -20,6 +20,15 @@ const OOV_COST_FACTOR: f64 = 3.0;
 /// Extra cost per further cluster of an out-of-vocabulary edge, relative to the cost of the rarest
 /// word. Below about 0.5 an unknown word beats real words and F1 drops sharply.
 const OOV_CLUSTER_COST_FACTOR: f64 = 0.8;
+/// Frequent function words. An out-of-vocabulary edge may not start or end with one of them, so an
+/// unknown word does not swallow its neighbours ("ฮิวจ์ส|ไม่|ได้", not "ฮิวจ์สไม่ได้"): the same
+/// name would otherwise be tokenized differently on its own and next to a function word, and a
+/// search for it would miss the document.
+const OOV_BOUNDARY_WORDS: &[&str] = &[
+    "ที่", "และ", "ของ", "ใน", "ได้", "ให้", "ไม่", "ว่า", "เป็น", "มี", "จะ", "ไป", "มา", "ก็", "กับ", "แต่", "หรือ", "จาก",
+    "โดย", "เพื่อ", "แล้ว", "อยู่", "นี้", "นั้น", "ซึ่ง", "การ", "ความ", "ต่อ", "ถึง", "ยัง", "เมื่อ", "ทั้ง", "ตาม", "ด้วย",
+    "อีก", "คือ",
+];
 /// Costs closer than this are a tie. Edges into a position are visited from
 /// the longest word to the shortest, so on a tie the later, shorter last word
 /// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
@@ -102,6 +111,13 @@ fn is_tone_mark(ch: char) -> bool {
 #[inline]
 fn is_oov_char(ch: char) -> bool {
     matches!(ch as u32, 0x0E01..=0x0E2E | 0x0E30..=0x0E3A | 0x0E40..=0x0E45 | 0x0E47..=0x0E4E)
+}
+
+/// Whether `word` is longer than, and starts or ends with, a word of `OOV_BOUNDARY_WORDS`.
+fn borders_function_word(word: &str) -> bool {
+    OOV_BOUNDARY_WORDS
+        .iter()
+        .any(|f| word.len() > f.len() && (word.starts_with(f) || word.ends_with(f)))
 }
 
 #[inline]
@@ -253,21 +269,27 @@ impl Tokenizer {
 
                 // 3. Out-of-vocabulary words of 1..=OOV_MAX_CLUSTERS TCC clusters
                 let mut clusters = 0;
-                let mut j = i + 1;
-                while j <= n && is_oov_char(chars[j - 1]) {
-                    if valid_pos[j] {
-                        clusters += 1;
-                        if clusters > OOV_MAX_CLUSTERS {
-                            break;
-                        }
-                        edges.push(DagEdge {
-                            to: j,
-                            word: chars[i..j].iter().collect(),
-                            cost: (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1) as f64) * rare_cost,
-                            unknown: true,
-                        });
+                for j in i + 1..=n {
+                    if !is_oov_char(chars[j - 1]) {
+                        break;
                     }
-                    j += 1;
+                    if !valid_pos[j] {
+                        continue;
+                    }
+                    clusters += 1;
+                    if clusters > OOV_MAX_CLUSTERS {
+                        break;
+                    }
+                    let word: String = chars[i..j].iter().collect();
+                    if borders_function_word(&word) {
+                        continue;
+                    }
+                    edges.push(DagEdge {
+                        to: j,
+                        word,
+                        cost: (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1) as f64) * rare_cost,
+                        unknown: true,
+                    });
                 }
             } else if let Some(m) = PAT_NONTHAI.find(sub_text) {
                 // 3. Non-Thai tokens

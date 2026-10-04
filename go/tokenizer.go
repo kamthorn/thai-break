@@ -33,6 +33,17 @@ const (
 	tieEpsilon = 1e-9
 )
 
+// oovBoundaryWords are frequent function words. An out-of-vocabulary edge may not start or end
+// with one of them, so an unknown word does not swallow its neighbours (ฮิวจ์ส|ไม่|ได้, not
+// ฮิวจ์สไม่ได้): the same name would otherwise be tokenized differently on its own and next to a
+// function word, and a search for it would miss the document.
+var oovBoundaryWords = []string{
+	"ที่", "และ", "ของ", "ใน", "ได้", "ให้", "ไม่", "ว่า", "เป็น",
+	"มี", "จะ", "ไป", "มา", "ก็", "กับ", "แต่", "หรือ", "จาก",
+	"โดย", "เพื่อ", "แล้ว", "อยู่", "นี้", "นั้น", "ซึ่ง", "การ", "ความ",
+	"ต่อ", "ถึง", "ยัง", "เมื่อ", "ทั้ง", "ตาม", "ด้วย", "อีก", "คือ",
+}
+
 var (
 	patNonThai = regexp.MustCompile(`^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\x{0e00}-\x{0e7f}a-zA-Z0-9 \t\r\n])`)
 	patAbbr    = regexp.MustCompile(`^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+`)
@@ -54,6 +65,16 @@ func NewTokenizer(trie *ThaiTrie, bigrams *BigramModel) *Tokenizer {
 
 func isThaiRune(r rune) bool {
 	return r >= 0x0E00 && r <= 0x0E7F
+}
+
+// bordersFunctionWord reports whether w is longer than, and starts or ends with, an oovBoundaryWords word.
+func bordersFunctionWord(w string) bool {
+	for _, f := range oovBoundaryWords {
+		if len(w) > len(f) && (strings.HasPrefix(w, f) || strings.HasSuffix(w, f)) {
+			return true
+		}
+	}
+	return false
 }
 
 // isOOVRune reports whether an out-of-vocabulary edge may cover r: Thai letters, vowels and marks,
@@ -257,7 +278,11 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				if clusters > oovMaxClusters {
 					break
 				}
-				edges = append(edges, outEdge{j, string(runes[i:j]), (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
+				w := string(runes[i:j])
+				if bordersFunctionWord(w) {
+					continue
+				}
+				edges = append(edges, outEdge{j, w, (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
 			}
 		} else {
 			// 4. Non-Thai tokens

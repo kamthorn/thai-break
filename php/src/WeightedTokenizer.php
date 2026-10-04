@@ -82,6 +82,19 @@ class WeightedTokenizer
     private const OOV_CLUSTER_COST_FACTOR = 0.8;
 
     /**
+     * Frequent function words. An out-of-vocabulary edge may not start or end with one of them, so an
+     * unknown word does not swallow its neighbours (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้): the same name
+     * would otherwise be tokenized differently on its own and next to a function word, and a search
+     * for it would miss the document.
+     */
+    private const OOV_BOUNDARY_WORDS = [
+        'ที่', 'และ', 'ของ', 'ใน', 'ได้', 'ให้', 'ไม่', 'ว่า', 'เป็น',
+        'มี', 'จะ', 'ไป', 'มา', 'ก็', 'กับ', 'แต่', 'หรือ', 'จาก',
+        'โดย', 'เพื่อ', 'แล้ว', 'อยู่', 'นี้', 'นั้น', 'ซึ่ง', 'การ', 'ความ',
+        'ต่อ', 'ถึง', 'ยัง', 'เมื่อ', 'ทั้ง', 'ตาม', 'ด้วย', 'อีก', 'คือ',
+    ];
+
+    /**
      * Characters an out-of-vocabulary edge may cover: Thai letters, vowels and marks, but not ๆ, ฯ,
      * digits or other symbols, which are tokens of their own.
      */
@@ -248,9 +261,13 @@ class WeightedTokenizer
                     if ($clusters > self::OOV_MAX_CLUSTERS) {
                         break;
                     }
+                    $oovWord = implode('', array_slice($chars, $i, $j - $i));
+                    if (self::bordersFunctionWord($oovWord)) {
+                        continue;
+                    }
                     $edges[] = [
                         $j,
-                        implode('', array_slice($chars, $i, $j - $i)),
+                        $oovWord,
                         (self::OOV_COST_FACTOR + self::OOV_CLUSTER_COST_FACTOR * ($clusters - 1)) * $rareCost,
                         true,
                     ];
@@ -385,6 +402,18 @@ class WeightedTokenizer
     private static function isToneMark(string $char): bool
     {
         return $char !== '' && $char >= '่' && $char <= '๋';
+    }
+
+    /** Whether $word is longer than, and starts or ends with, a word of OOV_BOUNDARY_WORDS. */
+    private static function bordersFunctionWord(string $word): bool
+    {
+        foreach (self::OOV_BOUNDARY_WORDS as $f) {
+            if (strlen($word) > strlen($f) && (str_starts_with($word, $f) || str_ends_with($word, $f))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Return true if the character is in the Thai Unicode block U+0E00-U+0E7F */

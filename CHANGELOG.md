@@ -18,9 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.8522 to 0.8599, and from 7.9% to 25.3% of out-of-vocabulary person names come out as one
   token (boundary F1 0.9263 to 0.9317; gold words missing from the dictionary that are cut wrongly drop from 12,734 to 12,037, while gold dictionary words that are cut wrongly rise from 5,433 to 5,955); on Blackboard F1 goes from 0.6724 to 0.6751 (word level) and from 0.8516 to 0.8572
   (sub-word level). Segmentation is about 9% slower. The trade-off is that an unknown word next to
-  a short dictionary word can now merge with it (`รึยัง` is one token), which is why the unknown
-  cost is not lower. Output changes for text with unknown words, so existing indices built from it
+  a short dictionary word can merge with it, which is why the unknown cost is not lower and why
+  the function-word rule below exists. Output changes for text with unknown words, so existing indices built from it
   should be reindexed. Rust, Go, TypeScript and PHP give identical tokens.
+- **An out-of-vocabulary word may not start or end with a frequent function word** (36 words such
+  as `ที่ และ ไม่ ได้ มา ว่า`). Without this rule an unknown word swallowed the function words
+  next to it when the text has no spaces (`ฮิวจ์สไม่ได้`, `จินตะและ`), so the same name was
+  tokenized differently on its own and in a document, and a search for it missed that document.
+  In a retrieval test on the 483 LST20 test articles with 450 name queries, recall for names
+  went from 0.986 to 0.990 (0.993 before out-of-vocabulary words competed with the dictionary),
+  and LST20 test word F1 goes from 0.8599 to 0.8613. `รึยัง` is `รึ|ยัง` again.
 
 ### Fixed
 
