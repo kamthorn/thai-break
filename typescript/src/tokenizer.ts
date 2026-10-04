@@ -17,6 +17,18 @@ const UNKNOWN_COST_FACTOR = 2.0;
  * wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
  */
 const TIE_EPSILON = 1e-9;
+/**
+ * An out-of-vocabulary word may span up to this many TCC clusters. Such an edge competes with the
+ * dictionary words, so a long unknown word is kept whole instead of being cut into short words.
+ */
+const OOV_MAX_CLUSTERS = 6;
+/** Cost of an out-of-vocabulary edge of one cluster, relative to the cost of the rarest word. */
+const OOV_COST_FACTOR = 3.0;
+/**
+ * Extra cost per further cluster of an out-of-vocabulary edge, relative to the cost of the rarest
+ * word. Below about 0.5 an unknown word beats real words and F1 drops sharply.
+ */
+const OOV_CLUSTER_COST_FACTOR = 0.8;
 
 const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
 const PAT_ABBR = /^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u;
@@ -26,6 +38,8 @@ interface DagEdge {
   to: number;
   word: string;
   cost: number;
+  /** true for an out-of-vocabulary edge, which is merged with neighbouring unknown words */
+  unknown: boolean;
 }
 
 /**
@@ -72,6 +86,20 @@ function normalizeForMatching(chars: string[]): [string[], number[]] {
 
 function isToneMark(ch: string): boolean {
   return ch >= '่' && ch <= '๋';
+}
+
+/**
+ * Characters an out-of-vocabulary edge may cover: Thai letters, vowels and marks, but not ๆ, ฯ,
+ * digits or other symbols, which are tokens of their own.
+ */
+function isOovChar(ch: string): boolean {
+  const code = ch.codePointAt(0) ?? 0;
+  return (
+    (code >= 0x0e01 && code <= 0x0e2e) ||
+    (code >= 0x0e30 && code <= 0x0e3a) ||
+    (code >= 0x0e40 && code <= 0x0e45) ||
+    (code >= 0x0e47 && code <= 0x0e4e)
+  );
 }
 
 function isThaiRune(code: number): boolean {
@@ -194,7 +222,7 @@ export class Tokenizer {
         // 1. Thai dictionary words starting at i
         for (const m of this.trie.prefixesFromChars(chars, i, 25)) {
           if (m.end <= n && validPos[m.end]) {
-            edges.push({ to: m.end, word: m.word, cost: Math.log(normalizer / m.weight) });
+            edges.push({ to: m.end, word: m.word, cost: Math.log(normalizer / m.weight), unknown: false });
           }
         }
 
@@ -206,16 +234,34 @@ export class Tokenizer {
           const j = i + abbrLen;
           if (j <= n && validPos[j]) {
             const letters = abbrLen - mStr.split('.').length + 1;
-            edges.push({ to: j, word: mStr, cost: (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost });
+            edges.push({ to: j, word: mStr, cost: (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost, unknown: false });
           }
         }
+
+        // 3. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
+        let clusters = 0;
+        for (let j = i + 1; j <= n && isOovChar(chars[j - 1]); j++) {
+          if (!validPos[j]) {
+            continue;
+          }
+          clusters++;
+          if (clusters > OOV_MAX_CLUSTERS) {
+            break;
+          }
+          edges.push({
+            to: j,
+            word: chars.slice(i, j).join(''),
+            cost: (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1)) * rareCost,
+            unknown: true,
+          });
+        }
       } else {
-        // 3. Non-Thai tokens
+        // 4. Non-Thai tokens
         const mNonThai = PAT_NONTHAI.exec(subText);
         if (mNonThai && mNonThai[0].length > 0) {
           const j = i + Array.from(mNonThai[0]).length;
           if (j <= n && validPos[j]) {
-            edges.push({ to: j, word: mNonThai[0], cost: rareCost });
+            edges.push({ to: j, word: mNonThai[0], cost: rareCost, unknown: false });
           }
         }
       }
@@ -235,7 +281,7 @@ export class Tokenizer {
           dp[j] = newCost;
           from[j] = i;
           word[j] = edge.word;
-          isUnk[j] = false;
+          isUnk[j] = edge.unknown;
         }
       }
     }
