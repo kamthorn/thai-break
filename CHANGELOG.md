@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-04
+
+> **Reindex recommended.** Segmentation output changes for text with out-of-vocabulary words and
+> for some syllables with Mai Han-akat or a consonant cluster after Sara E, so terms indexed with
+> an earlier version may not match queries tokenized with this one.
+
 ### Changed
 
 - **A long out-of-vocabulary word is no longer cut into short dictionary words.** The Viterbi
@@ -15,12 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   word), so a name or loanword such as `ชวรัตน์` or `ศุภชัย` stays whole instead of becoming
   `ชว|รัตน์` and `ศุภ|ชัย`. The unknown word covers Thai letters, vowels and tone marks only, so
   `ๆ`, `ฯ` and digits stay separate tokens (`อื่น|ๆ`). On the LST20 test split word F1 goes from
-  0.8522 to 0.8599, and from 7.9% to 25.3% of out-of-vocabulary person names come out as one
-  token (boundary F1 0.9263 to 0.9317; gold words missing from the dictionary that are cut wrongly drop from 12,734 to 12,037, while gold dictionary words that are cut wrongly rise from 5,433 to 5,955); on Blackboard F1 goes from 0.6724 to 0.6751 (word level) and from 0.8516 to 0.8572
-  (sub-word level). Segmentation is about 9% slower. The trade-off is that an unknown word next to
-  a short dictionary word can merge with it, which is why the unknown cost is not lower and why
-  the function-word rule below exists. Output changes for text with unknown words, so existing indices built from it
-  should be reindexed. Rust, Go, TypeScript and PHP give identical tokens.
+  0.8522 to 0.8599 and from 7.9% to 25.3% of out-of-vocabulary person names come out as one
+  token. Gold words missing from the dictionary that are cut wrongly drop from 12,734 to 12,037,
+  while gold dictionary words that are cut wrongly rise from 5,433 to 5,955. On Blackboard F1
+  goes from 0.6724 to 0.6751 (word level) and from 0.8516 to 0.8572 (sub-word level).
+  Segmentation is about 9% slower. The trade-off is that an unknown word next to a short
+  dictionary word can merge with it, which is why the unknown cost is not lower and why the
+  function-word rule below exists. Rust, Go, TypeScript and PHP give identical tokens.
 - **An out-of-vocabulary word may not start or end with a frequent function word** (36 words such
   as `ที่ และ ไม่ ได้ มา ว่า`). Without this rule an unknown word swallowed the function words
   next to it when the text has no spaces (`ฮิวจ์สไม่ได้`, `จินตะและ`), so the same name was
@@ -28,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   In a retrieval test on the 483 LST20 test articles with 450 name queries, recall for names
   went from 0.986 to 0.990 (0.993 before out-of-vocabulary words competed with the dictionary),
   and LST20 test word F1 goes from 0.8599 to 0.8613. `รึยัง` is `รึ|ยัง` again.
+
+Accuracy of the default dictionary on the four test sets (word F1 / boundary F1, 1.2.0 to 1.3.0):
+LST20 test 85.2 / 92.6 to 86.1 / 93.3, LST20 eval 81.6 / 90.0 to 82.6 / 90.7, Blackboard sub-word
+85.1 / 93.1 to 85.8 / 93.5, Wisesight-1000 83.0 / 90.3 to 83.3 / 90.2 (boundary F1 essentially
+unchanged on social media text).
 
 ### Fixed
 
