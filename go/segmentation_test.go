@@ -62,6 +62,28 @@ func TestTCCKeepsAMaiHanAkatSyllableWhole(t *testing.T) {
 	}
 }
 
+func TestTCCKeepsAClusterOnsetAfterSaraEWhole(t *testing.T) {
+	// เ + a true cluster or ห-led onset + -ิ / -ือ / -า is one syllable
+	for _, word := range []string{"เปล่า", "เหล้า", "เหงา", "เพลิง", "เหลือ", "เกลือ", "เครือ"} {
+		runes := []rune(word)
+		valid := TCCPosArray(runes)
+		for i := 1; i < len(runes); i++ {
+			if valid[i] {
+				t.Errorf("%q was split before %q", word, runes[i])
+			}
+		}
+	}
+	// a consonant pair that is not a cluster can still start the next word
+	for _, c := range []struct {
+		text     string
+		boundary int
+	}{{"เทลง", 2}, {"ทะเลว่า", 4}} {
+		if !TCCPosArray([]rune(c.text))[c.boundary] {
+			t.Errorf("no boundary at %d in %q", c.boundary, c.text)
+		}
+	}
+}
+
 func TestSegmentation(t *testing.T) {
 	for _, c := range segmentationCases {
 		if got := strings.Join(Words(c.input), "|"); got != c.want {

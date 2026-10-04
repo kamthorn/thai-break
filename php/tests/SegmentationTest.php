@@ -65,6 +65,22 @@ class SegmentationTest extends TestCase
         }
     }
 
+    public function testTccKeepsAClusterOnsetAfterSaraEWhole(): void
+    {
+        // เ + a true cluster or ห-led onset + -ิ / -ือ / -า is one syllable
+        foreach (['เปล่า', 'เหล้า', 'เหงา', 'เพลิง', 'เหลือ', 'เกลือ', 'เครือ'] as $word) {
+            $chars = mb_str_split($word);
+            $valid = ThaiTCC::tccPosArray($chars);
+            for ($i = 1; $i < count($chars); $i++) {
+                $this->assertFalse($valid[$i], "$word was split before {$chars[$i]}");
+            }
+        }
+        // a consonant pair that is not a cluster can still start the next word
+        foreach ([['เทลง', 2], ['ทะเลว่า', 4]] as [$text, $boundary]) {
+            $this->assertTrue(ThaiTCC::tccPosArray(mb_str_split($text))[$boundary], "no boundary at $boundary in $text");
+        }
+    }
+
     #[DataProvider('segmentationCases')]
     public function testTokenize(string $input, string $expected): void
     {

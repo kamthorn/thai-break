@@ -55,6 +55,21 @@ test('TCC keeps a Mai Han-akat syllable whole', () => {
   }
 });
 
+test('TCC keeps a cluster onset after Sara E whole', () => {
+  // เ + a true cluster or ห-led onset + -ิ / -ือ / -า is one syllable
+  for (const word of ['เปล่า', 'เหล้า', 'เหงา', 'เพลิง', 'เหลือ', 'เกลือ', 'เครือ']) {
+    const chars = Array.from(word);
+    const valid = tccPosArray(chars);
+    for (let i = 1; i < chars.length; i++) {
+      assert.ok(!valid[i], `${word} was split before ${chars[i]}`);
+    }
+  }
+  // a consonant pair that is not a cluster can still start the next word
+  for (const [text, boundary] of [['เทลง', 2], ['ทะเลว่า', 4]] as [string, number][]) {
+    assert.ok(tccPosArray(Array.from(text))[boundary], `no boundary at ${boundary} in ${text}`);
+  }
+});
+
 test('segmentation', () => {
   for (const [name, input, expected] of SEGMENTATION_CASES) {
     assert.strictEqual(words(input).join('|'), expected, name);

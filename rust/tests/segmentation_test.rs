@@ -60,6 +60,21 @@ fn test_tcc_keeps_a_mai_han_akat_syllable_whole() {
 }
 
 #[test]
+fn test_tcc_keeps_a_cluster_onset_after_sara_e_whole() {
+    // เ + a true cluster or ห-led onset + -ิ / -ือ / -า is one syllable
+    for word in ["เปล่า", "เหล้า", "เหงา", "เพลิง", "เหลือ", "เกลือ", "เครือ"] {
+        let chars: Vec<char> = word.chars().collect();
+        let valid = tcc_pos_array(&chars);
+        assert!((1..chars.len()).all(|i| !valid[i]), "{} was split", word);
+    }
+    // a consonant pair that is not a cluster can still start the next word
+    for (text, boundary) in [("เทลง", 2), ("ทะเลว่า", 4)] {
+        let chars: Vec<char> = text.chars().collect();
+        assert!(tcc_pos_array(&chars)[boundary], "no boundary at {} in {}", boundary, text);
+    }
+}
+
+#[test]
 fn test_segmentation() {
     init_test_dict();
     for (name, input, expected) in SEGMENTATION_CASES {

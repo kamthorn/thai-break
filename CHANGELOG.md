@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   syllable is one cluster. On the LST20 test split, clusters average 1.82 characters instead of
   1.74, every gold word boundary is still a cluster boundary, and segmentation is unchanged
   (word F1 0.8521 to 0.8522).
+- After Sara E, a true consonant cluster (กร กล กว ขร ขล ขว คร คล คว ตร ปร ปล พร พล ผล บร บล ดร ทร)
+  or a ห-led onset (หง หญ หน หม หย หร หล หว) followed by `ิ`, `ือ` or `า` was cut between the
+  two consonants (`เป|ล่า`, `เค|รือ`, `เพ|ลิง`). These syllables are now one cluster. Other
+  consonant pairs are left alone because they can start the next word (`เท|ลง`, `ทะเล|ว่า`).
+  On LST20 (train, eval and test) clusters drop by 0.22% and no gold word boundary is lost.
 
 ## [1.2.0] - 2026-10-03
 
