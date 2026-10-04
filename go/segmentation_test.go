@@ -49,6 +49,19 @@ func TestTCCNeverSplitsBeforeAVowelOrToneMark(t *testing.T) {
 	}
 }
 
+func TestTCCKeepsAMaiHanAkatSyllableWhole(t *testing.T) {
+	// Mai Han-akat is always followed by a final (or -ัวะ), so the syllable is one cluster
+	for _, word := range []string{"ผัวะ", "จั๊วะ", "ยัง", "ยั่ง", "หัว", "สัญ", "กัณฐ์"} {
+		runes := []rune(word)
+		valid := TCCPosArray(runes)
+		for i := 1; i < len(runes); i++ {
+			if valid[i] {
+				t.Errorf("%q was split before %q", word, runes[i])
+			}
+		}
+	}
+}
+
 func TestSegmentation(t *testing.T) {
 	for _, c := range segmentationCases {
 		if got := strings.Join(Words(c.input), "|"); got != c.want {

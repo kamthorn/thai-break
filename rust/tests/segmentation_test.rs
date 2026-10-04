@@ -50,6 +50,16 @@ fn test_tcc_never_splits_before_a_vowel_or_tone_mark() {
 }
 
 #[test]
+fn test_tcc_keeps_a_mai_han_akat_syllable_whole() {
+    // Mai Han-akat is always followed by a final (or -ัวะ), so the syllable is one cluster
+    for word in ["ผัวะ", "จั๊วะ", "ยัง", "ยั่ง", "หัว", "สัญ", "กัณฐ์"] {
+        let chars: Vec<char> = word.chars().collect();
+        let valid = tcc_pos_array(&chars);
+        assert!((1..chars.len()).all(|i| !valid[i]), "{} was split", word);
+    }
+}
+
+#[test]
 fn test_segmentation() {
     init_test_dict();
     for (name, input, expected) in SEGMENTATION_CASES {

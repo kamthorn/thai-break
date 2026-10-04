@@ -44,6 +44,17 @@ test('TCC never splits before a vowel or tone mark', () => {
   }
 });
 
+test('TCC keeps a Mai Han-akat syllable whole', () => {
+  // Mai Han-akat is always followed by a final (or -ัวะ), so the syllable is one cluster
+  for (const word of ['ผัวะ', 'จั๊วะ', 'ยัง', 'ยั่ง', 'หัว', 'สัญ', 'กัณฐ์']) {
+    const chars = Array.from(word);
+    const valid = tccPosArray(chars);
+    for (let i = 1; i < chars.length; i++) {
+      assert.ok(!valid[i], `${word} was split before ${chars[i]}`);
+    }
+  }
+});
+
 test('segmentation', () => {
   for (const [name, input, expected] of SEGMENTATION_CASES) {
     assert.strictEqual(words(input).join('|'), expected, name);
