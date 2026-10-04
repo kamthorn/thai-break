@@ -56,6 +56,12 @@ def _find_lib():
         _lib.thaibreak_free_tokens.argtypes = [ctypes.POINTER(ctypes.c_char_p), ctypes.c_size_t]
         _lib.thaibreak_free_tokens.restype = None
 
+        _lib.thaibreak_boundaries.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_size_t)]
+        _lib.thaibreak_boundaries.restype = ctypes.POINTER(ctypes.c_size_t)
+
+        _lib.thaibreak_free_boundaries.argtypes = [ctypes.POINTER(ctypes.c_size_t), ctypes.c_size_t]
+        _lib.thaibreak_free_boundaries.restype = None
+
         _lib.thaibreak_lines.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
         _lib.thaibreak_lines.restype = ctypes.c_void_p
 
@@ -105,6 +111,33 @@ def words(text: str) -> List[str]:
     finally:
         lib.thaibreak_free_tokens(ptr, count)
     return tokens
+
+def boundaries(text: str) -> List[int]:
+    """Word boundaries of ``text`` as indices into the str, from 0 to ``len(text)``.
+
+    Like an ICU BreakIterator, whitespace and punctuation are segments of their own, so
+    ``text[b[i]:b[i + 1]]`` are consecutive segments that cover the text.
+    """
+    lib = _engine()
+    if not lib:
+        return []
+    if not text:
+        return [0]
+    b_text = text.encode("utf-8")
+    count = ctypes.c_size_t()
+    ptr = lib.thaibreak_boundaries(b_text, ctypes.byref(count))
+    if not ptr:
+        return []
+    try:
+        offsets = [ptr[i] for i in range(count.value)]
+    finally:
+        lib.thaibreak_free_boundaries(ptr, count)
+    # byte offsets to str indices
+    result, index = [0], 0
+    for start, end in zip(offsets, offsets[1:]):
+        index += len(b_text[start:end].decode("utf-8"))
+        result.append(index)
+    return result
 
 def lines(text: str, marker: str = "\u200b", is_html: bool = False) -> str:
     lib = _engine()

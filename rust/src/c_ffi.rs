@@ -5,6 +5,7 @@ use std::sync::RwLock;
 use once_cell::sync::Lazy;
 
 use crate::bigram::BigramModel;
+use crate::break_iterator::BreakIterator;
 use crate::linebreaker::{thai_display_width, LineBreaker};
 use crate::tokenizer::Tokenizer;
 use crate::trie::ThaiTrie;
@@ -310,3 +311,55 @@ pub unsafe extern "C" fn thaibreak_free_string(s: *mut c_char) {
     });
 }
 
+
+/// Word boundaries of UTF-8 text, as byte offsets from 0 to the text length (inclusive), so a text
+/// with n segments gives n + 1 offsets. Whitespace and punctuation are segments.
+/// The returned array must be freed with `thaibreak_free_boundaries`.
+///
+/// # Safety
+/// - `text` must be non-NULL and point to a valid NUL-terminated C string
+///   containing UTF-8, valid for reads for the duration of the call.
+/// - `count` must be non-NULL and point to writable `usize` storage.
+/// - NULL inputs or invalid UTF-8 return a NULL pointer instead of aborting.
+#[no_mangle]
+pub unsafe extern "C" fn thaibreak_boundaries(text: *const c_char, count: *mut usize) -> *mut usize {
+    std::panic::catch_unwind(|| {
+        if text.is_null() || count.is_null() {
+            return std::ptr::null_mut();
+        }
+
+        ensure_initialized();
+
+        let text_str = match CStr::from_ptr(text).to_str() {
+            Ok(s) => s,
+            Err(_) => return std::ptr::null_mut(),
+        };
+
+        let read_guard = GLOBAL_TOKENIZER.read().unwrap_or_else(|e| e.into_inner());
+        let tokenizer = match read_guard.as_ref() {
+            Some(t) => t,
+            None => return std::ptr::null_mut(),
+        };
+
+        let boundaries = BreakIterator::new(tokenizer, text_str).boundaries().to_vec().into_boxed_slice();
+        *count = boundaries.len();
+        Box::into_raw(boundaries) as *mut usize
+    })
+    .unwrap_or(std::ptr::null_mut())
+}
+
+/// Free an array allocated by `thaibreak_boundaries`.
+///
+/// # Safety
+/// - `boundaries` must be either NULL (no-op) or an array previously returned by
+///   `thaibreak_boundaries`, with `count` exactly matching the count written into `*count` by that
+///   call. A mismatched count is undefined behavior.
+/// - The array must not be used after freeing (no double free).
+#[no_mangle]
+pub unsafe extern "C" fn thaibreak_free_boundaries(boundaries: *mut usize, count: usize) {
+    let _ = std::panic::catch_unwind(|| {
+        if !boundaries.is_null() {
+            drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(boundaries, count)));
+        }
+    });
+}

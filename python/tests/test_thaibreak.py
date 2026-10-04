@@ -20,6 +20,17 @@ class TestThaiBreak(unittest.TestCase):
         tokens = thaibreak.words("ฉันรักภาษาไทย")
         self.assertEqual(tokens, ["ฉัน", "รัก", "ภาษา", "ไทย"])
 
+    def test_boundaries(self):
+        # str indices, even after characters outside the BMP and multi-byte Thai
+        text = "ฉันรักภาษาไทย 😀 ครับ"
+        b = thaibreak.boundaries(text)
+        self.assertEqual(b[0], 0)
+        self.assertEqual(b[-1], len(text))
+        segments = [text[i:j] for i, j in zip(b, b[1:])]
+        self.assertEqual("".join(segments), text)
+        self.assertEqual([s for s in segments if s.strip()], thaibreak.words(text))
+        self.assertEqual(thaibreak.boundaries(""), [0])
+
     def test_lines_html(self):
         html = '<div class="title"><b>สวัสดี</b> &amp; ประเทศไทย</div><script>var x = "สวัสดีประเทศไทย";</script><!-- หมายเหตุ -->'
         broken = thaibreak.lines(html, marker="|", is_html=True)

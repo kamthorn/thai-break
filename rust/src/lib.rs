@@ -1,4 +1,5 @@
 pub mod bigram;
+pub mod break_iterator;
 mod linebreak_data;
 pub mod linebreaker;
 pub mod normalizer;
@@ -29,6 +30,7 @@ pub use normalizer::{
     normalize_text_with_options_dict, NormalizeOptions,
 };
 pub use tcc::tcc_pos_array;
+pub use break_iterator::BreakIterator;
 pub use tokenizer::Tokenizer;
 pub use trie::{FlatTrie, FstTrie, PrefixMatch, ThaiTrie};
 pub use linebreak_data::UNICODE_VERSION;

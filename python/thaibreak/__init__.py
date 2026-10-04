@@ -2,9 +2,9 @@
 ThaiBreak — Fast, high-accuracy Thai word segmentation and typographic line breaker.
 """
 
-from .core import init, words, lines, wrap, display_width
+from .core import init, words, boundaries, lines, wrap, display_width
 
-__all__ = ["init", "words", "lines", "wrap", "display_width"]
+__all__ = ["init", "words", "boundaries", "lines", "wrap", "display_width"]
 try:
     from importlib.metadata import version as _version
 

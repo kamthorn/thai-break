@@ -38,6 +38,22 @@ char **thaibreak_tokenize(const char *text, size_t *count);
 void thaibreak_free_tokens(char **tokens, size_t count);
 
 /**
+ * Word boundaries of text, as byte offsets from 0 to the text length (inclusive): n segments give
+ * n + 1 offsets. Whitespace and punctuation are segments, as in an ICU BreakIterator.
+ * @param text UTF-8 encoded text
+ * @param count Pointer to receive the number of offsets
+ * @return Array of offsets, or NULL on error. Free with thaibreak_free_boundaries.
+ */
+size_t *thaibreak_boundaries(const char *text, size_t *count);
+
+/**
+ * Free the array returned by thaibreak_boundaries.
+ * @param boundaries Pointer returned by thaibreak_boundaries
+ * @param count Number of offsets in the array
+ */
+void thaibreak_free_boundaries(size_t *boundaries, size_t count);
+
+/**
  * Insert break opportunities into text.
  * @param text UTF-8 encoded text
  * @param marker Break marker to insert (e.g. "\u200B" for ZWSP). Pass NULL for default ZWSP.

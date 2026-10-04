@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Rust: `BreakIterator`, a boundary iterator in the style of ICU `BreakIterator` and
+  `Intl.Segmenter` (`first_boundary`, `last_boundary`, `next_boundary`, `previous`, `current`,
+  `following`, `preceding`, `is_boundary`; byte offsets, `None` for ICU's `DONE`). It uses the
+  Viterbi boundaries, so the segmentation is unchanged. Whitespace and punctuation are segments.
+- `boundaries(text)` in the bindings: C `thaibreak_boundaries` / `thaibreak_free_boundaries` (byte
+  offsets), Python (str indices, ctypes wheel and PyO3) and WebAssembly (UTF-16 offsets). Go,
+  TypeScript and PHP do not have it yet.
+
 ## [1.3.0] - 2026-10-04
 
 > **Reindex recommended.** Segmentation output changes for text with out-of-vocabulary words and
