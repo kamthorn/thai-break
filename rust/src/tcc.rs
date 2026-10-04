@@ -9,8 +9,10 @@ static TCC_GENERAL_REGEX: Lazy<Regex> = Lazy::new(|| {
     let k = "([ก-ฮ][ก-ฮ]?[ุูิ]?์)?";
 
     let raw_general_rules = [
-        "c[ั]([่-๋]c)?",
-        "c[ั]([่-๋]c)?k",
+        // Mai Han-akat always has a final: -ัวะ, or a consonant (with or without a tone mark).
+        "cั[่-๋]?วะ",
+        "cั[่-๋]?ck",
+        "cั[่-๋]?",
         "เc็ck",
         "เcctาะk",
         "เccีtยะk",

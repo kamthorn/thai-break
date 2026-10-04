@@ -53,6 +53,18 @@ class SegmentationTest extends TestCase
         }
     }
 
+    public function testTccKeepsAMaiHanAkatSyllableWhole(): void
+    {
+        // Mai Han-akat is always followed by a final (or -ัวะ), so the syllable is one cluster
+        foreach (['ผัวะ', 'จั๊วะ', 'ยัง', 'ยั่ง', 'หัว', 'สัญ', 'กัณฐ์'] as $word) {
+            $chars = mb_str_split($word);
+            $valid = ThaiTCC::tccPosArray($chars);
+            for ($i = 1; $i < count($chars); $i++) {
+                $this->assertFalse($valid[$i], "$word was split before {$chars[$i]}");
+            }
+        }
+    }
+
     #[DataProvider('segmentationCases')]
     public function testTokenize(string $input, string $expected): void
     {

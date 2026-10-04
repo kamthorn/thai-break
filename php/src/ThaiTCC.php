@@ -47,8 +47,10 @@ class ThaiTCC
         $k = '([ก-ฮ][ก-ฮ]?[ุูิ]?์)?';
 
         $rawRules = [
-            'c[ั]([่-๋]c)?',
-            'c[ั]([่-๋]c)?k',
+            // Mai Han-akat always has a final: -ัวะ, or a consonant (with or without a tone mark).
+            'cั[่-๋]?วะ',
+            'cั[่-๋]?ck',
+            'cั[่-๋]?',
             'เc็ck',
             'เcctาะk',
             'เccีtยะk',

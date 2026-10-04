@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A syllable with Mai Han-akat (`ั`) was cut after the vowel when it had no tone mark, so `ยัง`
+  became the clusters `ยั|ง`, `หัว` became `หั|ว`, and `ผัวะ` became `ผั|วะ`. The TCC rule for
+  `ั` now requires its final (a consonant, or `วะ` for -ัวะ), with an optional tone mark, so the
+  syllable is one cluster. On the LST20 test split, clusters average 1.82 characters instead of
+  1.74, every gold word boundary is still a cluster boundary, and segmentation is unchanged
+  (word F1 0.8521 to 0.8522).
+
 ## [1.2.0] - 2026-10-03
 
 ### Fixed
