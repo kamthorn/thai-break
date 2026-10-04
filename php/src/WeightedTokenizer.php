@@ -66,6 +66,27 @@ class WeightedTokenizer
     /** Cost of an unknown-word fallback edge, relative to the cost of the rarest word */
     private const UNKNOWN_COST_FACTOR = 2.0;
 
+    /**
+     * An out-of-vocabulary word may span up to this many TCC clusters. Such an edge competes with
+     * the dictionary words, so a long unknown word is kept whole instead of being cut into short words.
+     */
+    private const OOV_MAX_CLUSTERS = 6;
+
+    /** Cost of an out-of-vocabulary edge of one cluster, relative to the cost of the rarest word. */
+    private const OOV_COST_FACTOR = 3.0;
+
+    /**
+     * Extra cost per further cluster of an out-of-vocabulary edge, relative to the cost of the
+     * rarest word. Below about 0.5 an unknown word beats real words and F1 drops sharply.
+     */
+    private const OOV_CLUSTER_COST_FACTOR = 0.8;
+
+    /**
+     * Characters an out-of-vocabulary edge may cover: Thai letters, vowels and marks, but not ๆ, ฯ,
+     * digits or other symbols, which are tokens of their own.
+     */
+    private const PAT_OOV_CHAR = '/^[\x{0E01}-\x{0E2E}\x{0E30}-\x{0E3A}\x{0E40}-\x{0E45}\x{0E47}-\x{0E4E}]$/u';
+
     private ThaiTrie     $trie;
     private ?BigramModel $bigramModel;
 
@@ -194,7 +215,7 @@ class WeightedTokenizer
                 break;
             }
 
-            // ── Edges starting at i: [end position, word, cost]
+            // ── Edges starting at i: [end position, word, cost, out-of-vocabulary]
             $edges   = [];
             $bytePos = $charByteOffsets[$i];
 
@@ -203,7 +224,7 @@ class WeightedTokenizer
                 foreach ($this->trie->prefixesFromChars($chars, $i) as $entry) {
                     $j = $i + mb_strlen($entry['word'], 'UTF-8');
                     if ($j <= $n && $validPos[$j]) {
-                        $edges[] = [$j, $entry['word'], log($normalizer / $entry['weight'])];
+                        $edges[] = [$j, $entry['word'], log($normalizer / $entry['weight']), false];
                     }
                 }
 
@@ -213,21 +234,39 @@ class WeightedTokenizer
                     $j       = $i + $abbrLen;
                     if ($j <= $n && $validPos[$j]) {
                         $letters  = $abbrLen - substr_count($mAbbr[0], '.');
-                        $edges[]  = [$j, $mAbbr[0], (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost];
+                        $edges[]  = [$j, $mAbbr[0], (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost, false];
                     }
                 }
+
+                // ── 3. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
+                $clusters = 0;
+                for ($j = $i + 1; $j <= $n && preg_match(self::PAT_OOV_CHAR, $chars[$j - 1]); $j++) {
+                    if (!$validPos[$j]) {
+                        continue;
+                    }
+                    $clusters++;
+                    if ($clusters > self::OOV_MAX_CLUSTERS) {
+                        break;
+                    }
+                    $edges[] = [
+                        $j,
+                        implode('', array_slice($chars, $i, $j - $i)),
+                        (self::OOV_COST_FACTOR + self::OOV_CLUSTER_COST_FACTOR * ($clusters - 1)) * $rareCost,
+                        true,
+                    ];
+                }
             } else {
-                // ── 3. Non-Thai tokens (English words, numbers, single symbols, spaces)
+                // ── 4. Non-Thai tokens (English words, numbers, single symbols, spaces)
                 if (preg_match(self::PAT_NONTHAI, $text, $mNonThai, 0, $bytePos) && $mNonThai[0] !== '') {
                     $j = $i + mb_strlen($mNonThai[0], 'UTF-8');
                     if ($j <= $n && $validPos[$j]) {
-                        $edges[] = [$j, $mNonThai[0], $rareCost];
+                        $edges[] = [$j, $mNonThai[0], $rareCost, false];
                     }
                 }
             }
 
             // ── Relax the edges
-            foreach ($edges as [$j, $w, $baseCost]) {
+            foreach ($edges as [$j, $w, $baseCost, $unknown]) {
                 // Apply bigram collocation bonus if bigram model is present
                 if ($this->bigramModel !== null && $word[$i] !== '') {
                     $bonus    = $this->bigramModel->getBonus($word[$i], $w, $j - $i);
@@ -243,7 +282,7 @@ class WeightedTokenizer
                     $dp[$j]    = $newCost;
                     $from[$j]  = $i;
                     $word[$j]  = $w;
-                    $isUnk[$j] = false;
+                    $isUnk[$j] = $unknown;
                 }
             }
         }

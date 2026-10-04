@@ -16,6 +16,17 @@ const (
 	abbrLetterCostFactor = 0.01
 	// unknownCostFactor is the cost of an unknown-word fallback edge, relative to the cost of the rarest word.
 	unknownCostFactor = 2.0
+	// oovMaxClusters is the most TCC clusters an out-of-vocabulary word may span. Such an edge
+	// competes with the dictionary words, so a long unknown word is kept whole instead of being
+	// cut into short words.
+	oovMaxClusters = 6
+	// oovCostFactor is the cost of an out-of-vocabulary edge of one cluster, relative to the cost
+	// of the rarest word.
+	oovCostFactor = 3.0
+	// oovClusterCostFactor is the extra cost per further cluster of an out-of-vocabulary edge,
+	// relative to the cost of the rarest word. Below about 0.5 an unknown word beats real words
+	// and F1 drops sharply.
+	oovClusterCostFactor = 0.8
 	// tieEpsilon: costs closer than this are a tie. Edges into a position are visited from
 	// the longest word to the shortest, so on a tie the later, shorter last word
 	// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
@@ -43,6 +54,12 @@ func NewTokenizer(trie *ThaiTrie, bigrams *BigramModel) *Tokenizer {
 
 func isThaiRune(r rune) bool {
 	return r >= 0x0E00 && r <= 0x0E7F
+}
+
+// isOOVRune reports whether an out-of-vocabulary edge may cover r: Thai letters, vowels and marks,
+// but not ๆ, ฯ, digits or other symbols, which are tokens of their own.
+func isOOVRune(r rune) bool {
+	return (r >= 0x0E01 && r <= 0x0E2E) || (r >= 0x0E30 && r <= 0x0E3A) || (r >= 0x0E40 && r <= 0x0E45) || (r >= 0x0E47 && r <= 0x0E4E)
 }
 
 func isThaiString(s string) bool {
@@ -179,9 +196,10 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 	dp[0] = 0.0
 
 	type outEdge struct {
-		to   int
-		word string
-		cost float64
+		to      int
+		word    string
+		cost    float64
+		unknown bool // an out-of-vocabulary edge, merged with neighbouring unknown words
 	}
 	var edges []outEdge
 
@@ -215,7 +233,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 			// 1. Thai dictionary words starting at i
 			for _, m := range tok.trie.Prefixes(runes, i, 25) {
 				if j := m.End; j <= n && validPos[j] {
-					edges = append(edges, outEdge{j, string(runes[i:j]), math.Log(normalizer / m.Weight)})
+					edges = append(edges, outEdge{j, string(runes[i:j]), math.Log(normalizer / m.Weight), false})
 				}
 			}
 
@@ -225,15 +243,28 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				abbrLen := utf8.RuneCountInString(mStr)
 				if j := i + abbrLen; j <= n && validPos[j] {
 					letters := abbrLen - strings.Count(mStr, ".")
-					edges = append(edges, outEdge{j, mStr, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost})
+					edges = append(edges, outEdge{j, mStr, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost, false})
 				}
 			}
+
+			// 3. Out-of-vocabulary words of 1..oovMaxClusters TCC clusters
+			clusters := 0
+			for j := i + 1; j <= n && isOOVRune(runes[j-1]); j++ {
+				if !validPos[j] {
+					continue
+				}
+				clusters++
+				if clusters > oovMaxClusters {
+					break
+				}
+				edges = append(edges, outEdge{j, string(runes[i:j]), (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
+			}
 		} else {
-			// 3. Non-Thai tokens
+			// 4. Non-Thai tokens
 			if loc := patNonThai.FindStringIndex(subText); loc != nil && loc[0] == 0 {
 				mStr := subText[:loc[1]]
 				if j := i + utf8.RuneCountInString(mStr); j <= n && validPos[j] {
-					edges = append(edges, outEdge{j, mStr, rareCost})
+					edges = append(edges, outEdge{j, mStr, rareCost, false})
 				}
 			}
 		}
@@ -251,7 +282,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				dp[e.to] = newCost
 				from[e.to] = i
 				word[e.to] = e.word
-				isUnk[e.to] = false
+				isUnk[e.to] = e.unknown
 			}
 		}
 	}

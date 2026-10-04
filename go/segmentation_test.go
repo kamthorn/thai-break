@@ -15,10 +15,13 @@ var segmentationCases = []struct{ name, input, want string }{
 	{"ties keep the earlier word whole", "บอกว่าอึดอัด", "บอก|ว่า|อึดอัด"},
 	{"ties keep the earlier word whole (2)", "ลาออกจากรองประธาน", "ลาออก|จาก|รอง|ประธาน"},
 	{"ก็ is not swallowed by the cluster before it", "ทะเลก็สวย", "ทะเล|ก็|สวย"},
-	{"a final consonant before a vowel starts the next cluster", "รึยัง", "รึ|ยัง"},
+	{"an unknown word and a short dictionary word can merge into one unknown word (รึ + ยัง)", "รึยัง", "รึยัง"},
 	{"no-break spaces are whitespace, not words", "ราคา 100 บาท", "ราคา|100|บาท"},
 	{"two sara e are matched as sara ae, the text is kept", "เเข็งเเรงมาก", "เเข็งเเรง|มาก"},
 	{"nikhahit + sara aa is matched as sara am, the text is kept", "นํ้าตาลทราย", "นํ้าตาล|ทราย"},
+	{"an out-of-vocabulary name made of dictionary words is kept whole", "ชวรัตน์", "ชวรัตน์"},
+	{"an out-of-vocabulary name is kept whole in a sentence", "นายศุภชัยกล่าวว่ามีการประชุม", "นาย|ศุภชัย|กล่าว|ว่า|มี|การ|ประชุม"},
+	{"the repetition mark is not part of an unknown word", "อื่นๆ", "อื่น|ๆ"},
 	{"a tone mark after sara am is matched before it, the text is kept", "นำ้ตาลทราย", "นำ้ตาล|ทราย"},
 	{"nikhahit + sara aa + tone mark is matched as tone + sara am", "นํา้ตาลทราย", "นํา้ตาล|ทราย"},
 }
@@ -38,7 +41,7 @@ func TestLongTextIsSegmentedToTheEnd(t *testing.T) {
 }
 
 func TestTCCNeverSplitsBeforeAVowelOrToneMark(t *testing.T) {
-	for _, word := range []string{"เมื่อ", "เนื้อ", "เบื่อ", "ต้น", "เกล็ด", "เหม็น", "ลั๊วะ"} {
+	for _, word := range []string{"เมื่อ", "เนื้อ", "เบื่อ", "ต้น", "เกล็ด", "เหม็น", "ลั๊วะ", "รึยัง"} {
 		runes := []rune(word)
 		valid := TCCPosArray(runes)
 		for i := 1; i < len(runes); i++ {

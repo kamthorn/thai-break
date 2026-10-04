@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A long out-of-vocabulary word is no longer cut into short dictionary words.** The Viterbi
+  search now also considers an unknown word of 1 to 6 TCC clusters at every position, with a cost
+  that grows with its length (3.0 + 0.8 per further cluster, relative to the cost of the rarest
+  word), so a name or loanword such as `ชวรัตน์` or `ศุภชัย` stays whole instead of becoming
+  `ชว|รัตน์` and `ศุภ|ชัย`. The unknown word covers Thai letters, vowels and tone marks only, so
+  `ๆ`, `ฯ` and digits stay separate tokens (`อื่น|ๆ`). On the LST20 test split word F1 goes from
+  0.8522 to 0.8599, and from 7.9% to 25.3% of out-of-vocabulary person names come out as one
+  token (boundary F1 0.9263 to 0.9317; gold words missing from the dictionary that are cut wrongly drop from 12,734 to 12,037, while gold dictionary words that are cut wrongly rise from 5,433 to 5,955); on Blackboard F1 goes from 0.6724 to 0.6751 (word level) and from 0.8516 to 0.8572
+  (sub-word level). Segmentation is about 9% slower. The trade-off is that an unknown word next to
+  a short dictionary word can now merge with it (`รึยัง` is one token), which is why the unknown
+  cost is not lower. Output changes for text with unknown words, so existing indices built from it
+  should be reindexed. Rust, Go, TypeScript and PHP give identical tokens.
+
 ### Fixed
 
 - A syllable with Mai Han-akat (`ั`) was cut after the vowel when it had no tone mark, so `ยัง`
