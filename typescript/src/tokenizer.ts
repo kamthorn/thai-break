@@ -29,6 +29,18 @@ const OOV_COST_FACTOR = 3.0;
  * word. Below about 0.5 an unknown word beats real words and F1 drops sharply.
  */
 const OOV_CLUSTER_COST_FACTOR = 0.8;
+/**
+ * Frequent function words. An out-of-vocabulary edge may not start or end with one of them, so an
+ * unknown word does not swallow its neighbours (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้): the same name would
+ * otherwise be tokenized differently on its own and next to a function word, and a search for it
+ * would miss the document.
+ */
+const OOV_BOUNDARY_WORDS = [
+  'ที่', 'และ', 'ของ', 'ใน', 'ได้', 'ให้', 'ไม่', 'ว่า', 'เป็น',
+  'มี', 'จะ', 'ไป', 'มา', 'ก็', 'กับ', 'แต่', 'หรือ', 'จาก',
+  'โดย', 'เพื่อ', 'แล้ว', 'อยู่', 'นี้', 'นั้น', 'ซึ่ง', 'การ', 'ความ',
+  'ต่อ', 'ถึง', 'ยัง', 'เมื่อ', 'ทั้ง', 'ตาม', 'ด้วย', 'อีก', 'คือ',
+];
 
 const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
 const PAT_ABBR = /^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u;
@@ -86,6 +98,11 @@ function normalizeForMatching(chars: string[]): [string[], number[]] {
 
 function isToneMark(ch: string): boolean {
   return ch >= '่' && ch <= '๋';
+}
+
+/** Whether `word` is longer than, and starts or ends with, a word of OOV_BOUNDARY_WORDS. */
+function bordersFunctionWord(word: string): boolean {
+  return OOV_BOUNDARY_WORDS.some((f) => word.length > f.length && (word.startsWith(f) || word.endsWith(f)));
 }
 
 /**
@@ -248,9 +265,13 @@ export class Tokenizer {
           if (clusters > OOV_MAX_CLUSTERS) {
             break;
           }
+          const oovWord = chars.slice(i, j).join('');
+          if (bordersFunctionWord(oovWord)) {
+            continue;
+          }
           edges.push({
             to: j,
-            word: chars.slice(i, j).join(''),
+            word: oovWord,
             cost: (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1)) * rareCost,
             unknown: true,
           });
