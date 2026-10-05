@@ -17,3 +17,4 @@ phpunit.xml export-ignore
 /go/linebreak_data.go linguist-generated
 /rust/src/linebreak_data.rs linguist-generated
 /typescript/src/linebreak-data.ts linguist-generated
+/examples export-ignore

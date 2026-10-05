@@ -1,0 +1,30 @@
+services:
+  thai-break-service:
+    build:
+      context: ../..
+      dockerfile: examples/service/Dockerfile
+    image: thai-break-service:latest
+    container_name: thai-break-service
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - RUST_LOG=info
+      - MAX_BODY_MB=10
+    # Extremely lightweight resource footprint
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "2.0"
+        reservations:
+          memory: 32M
+          cpus: "0.2"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s

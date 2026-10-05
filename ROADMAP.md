@@ -19,8 +19,8 @@ thai-break เริ่มจากการตัดคำและตัดบ
 | ตัดคำ Viterbi + TCC + คำที่ไม่รู้จัก | Rust, Go, TS, PHP, Python (ผ่าน C/PyO3) ผลตรงกัน |
 | ตัดบรรทัด UAX #14 + ไทย | ครบ |
 | Normalize ข้อความ (สระซ้ำ, นิคหิต+สระอา, ลำดับสระ/วรรณยุกต์, เสียงลาก) | Rust (`normalizer.rs`), เปิดใน service |
-| `BreakIterator` / `boundaries()` | Rust, C, Python, Wasm (ยังไม่มี Go, TS, PHP) |
-| Service HTTP | แยก repo `thai-break-service` ไม่มี remote สร้างเป็นตัวอย่าง ยังไม่เปิดใช้งานจริง |
+| `BreakIterator` / `boundaries()` | Rust, C, Python, Wasm, Go, TS, PHP (Rust, Go, TS, PHP ได้ผลตรงกันบน 51,475 ข้อความ LST20) |
+| Service HTTP | `examples/service/` เป็นตัวอย่าง ยังไม่เปิดใช้งานจริง |
 | bahttext, ตรวจเลขบัตรประชาชน | เฉพาะใน service |
 | plugin OpenSearch | collation, ตัดวรรณยุกต์, keyboard, soundex อยู่ใน Java |
 
@@ -30,10 +30,10 @@ thai-break เริ่มจากการตัดคำและตัดบ
 
 | งาน | ขนาด | หมายเหตุ |
 |---|---|---|
-| `boundaries()` ใน Go, TS, PHP | เล็ก–กลาง | ครบทุกภาษาก่อนประกาศว่าเป็นฟีเจอร์หลัก |
-| ย้าย `thai-break-service` เข้า monorepo เป็น `examples/service/` | เล็ก | เก็บ history ด้วย `git subtree` หรือ `git filter-repo` ตอนนี้ไม่มี remote จึงเสี่ยงหาย |
-| พจนานุกรมของ service สร้างจากสคริปต์ที่มีอยู่ (`compile_dicts.py`) ไม่ต้องทำ CI และ image สาธารณะ | เล็ก | ไม่มีผู้ใช้จริง ไม่คุ้มกับการดูแล image |
-| README ของ service ตามของใหม่ใน 1.3.0 และวัดความแม่นยำบนพจนานุกรมใหม่ | เล็ก | ยังไม่เคยวัด |
+| ~~`boundaries()` ใน Go, TS, PHP~~ | เสร็จ 2026-10-05 | ผล parity ตรงกับ Rust บน 51,475 ข้อความ |
+| ~~ย้าย `thai-break-service` เข้า monorepo เป็น `examples/service/`~~ | เสร็จ 2026-10-05 | คัดลอกไฟล์ปัจจุบันเป็น commit เดียว ไม่นำ history 17 commit มา (มีไฟล์ FST ไบนารีหลายรุ่นรวม 15 MB และสำเนา crate เก่า) repo เดิมยังเก็บไว้ในเครื่องที่ `~/code/thai-break-service` ไม่ได้ลบ |
+| พจนานุกรมของ service สร้างจากสคริปต์ที่มีอยู่ (`compile_dicts.py`) ไม่ต้องทำ CI และ image สาธารณะ | เล็ก | ไม่มีผู้ใช้จริง ไม่คุ้มกับการดูแล image (สคริปต์ปรับ path ให้ใช้ใน monorepo แล้ว) |
+| ~~README ของ service ตามของใหม่ใน 1.3.0 และวัดความแม่นยำบนพจนานุกรมใหม่~~ | เสร็จ 2026-10-05 | word F1 83.7 / boundary F1 92.0 (ไม่มี bigram) เทียบ 83.3 / 91.7 เมื่อใช้ bigram Prachathai จึงเอา bigram ออกจากค่าเริ่มต้นและจาก repo |
 | รายงานความแม่นยำสองแบบให้ตรงกับการใช้งาน (ดู "dict-extra กับตัวชี้วัด") | เล็ก | README รายงานแต่ฐานอย่างเดียว ขณะที่ plugin, service และ demo ใช้พจนานุกรมรวม |
 | **วัดการค้นหาบน OpenSearch เทียบพจนานุกรมฐานอย่างเดียวกับฐาน + dict-extra** และเทียบ decompound mode แต่ละแบบ (`none`, `mixed` ฯลฯ) | กลาง | ใช้ชุดวัดเดิม (LST20 test 483 บทความ, query ชื่อเฉพาะ 450 และคำ 300, ช่วงความเชื่อมั่น bootstrap) เก็บตัวเลขไว้อ้างอิงใน README ของ plugin ต้องสร้าง plugin อีกรุ่นที่ใช้พจนานุกรมฐานอย่างเดียว |
 | เพิ่ม plugin Java เข้าชุดตรวจ parity ร่วมกับ Rust/Go/TS/PHP | กลาง | plugin เป็นอีกหนึ่งพอร์ตของเอนจิน แต่ยังไม่อยู่ในชุดตรวจ |
