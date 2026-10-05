@@ -21,6 +21,8 @@
 
 🌐 **ลองใช้งานในเบราว์เซอร์:** [thai-break-demo](https://kamthorn.github.io/thai-break-demo/) ตัดคำ ตัดบรรทัด ใช้พจนานุกรมเสริม และอัปโหลดพจนานุกรมของคุณเองเพื่อทดสอบได้ ([ซอร์สโค้ด](https://github.com/kamthorn/thai-break-demo))
 
+🧪 **ตัวอย่าง HTTP service:** [`examples/service`](examples/service) ตัดคำ ตัดบรรทัด และ normalize ผ่าน REST API (Rust/Axum, Docker) เป็นตัวอย่างการนำไปใช้ ไม่ใช่ผลิตภัณฑ์ที่รองรับการใช้งานจริง
+
 ---
 
 ## คุณสมบัติเด่น

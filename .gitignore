@@ -9,6 +9,7 @@ composer.lock
 rust/target/
 **/target/
 Cargo.lock
+!examples/service/Cargo.lock
 
 # Node / TypeScript
 node_modules/
@@ -36,3 +37,6 @@ python/dist/
 
 # Dictionary staged for `cargo package` (see tools/sync_dict.sh)
 rust/data/
+
+# Optional bigram model for the example service (copy of thai-break-dict-extra/data/bigrams-prachathai.tsv)
+examples/service/data/bigrams.tsv

@@ -1,0 +1,11 @@
+# Used by `docker build -f examples/service/Dockerfile .` (repository root as context)
+**/target
+**/node_modules
+.git
+vendor
+go
+php
+python
+typescript
+typst
+testdata
