@@ -12,9 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Intl.Segmenter` (`first_boundary`, `last_boundary`, `next_boundary`, `previous`, `current`,
   `following`, `preceding`, `is_boundary`; byte offsets, `None` for ICU's `DONE`). It uses the
   Viterbi boundaries, so the segmentation is unchanged. Whitespace and punctuation are segments.
-- `boundaries(text)` in the bindings: C `thaibreak_boundaries` / `thaibreak_free_boundaries` (byte
-  offsets), Python (str indices, ctypes wheel and PyO3) and WebAssembly (UTF-16 offsets). Go,
-  TypeScript and PHP do not have it yet.
+- `boundaries(text)` in every language: C `thaibreak_boundaries` / `thaibreak_free_boundaries`
+  (byte offsets), Python (str indices, ctypes wheel and PyO3), WebAssembly and TypeScript (UTF-16
+  offsets), Go (`Boundaries`, byte offsets) and PHP (`ThaiBreak::boundaries`, bytes, or code points
+  with `$inCharacters`). Rust, Go, TypeScript and PHP give identical boundaries on 51,475 LST20
+  texts.
 
 ## [1.3.0] - 2026-10-04
 

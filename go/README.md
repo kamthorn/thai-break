@@ -50,6 +50,11 @@ func main() {
 	fmt.Printf("%v\n", words)
 	// Output: [ภาษา ไทย เข้าใจ ง่าย]
 
+	// Word boundaries as byte offsets, in the style of an ICU BreakIterator:
+	// text[b[i]:b[i+1]] are consecutive segments that cover the text
+	fmt.Println(thaibreak.Boundaries("ภาษาไทย"))
+	// Output: [0 12 21]
+
 	// 2. Join words with delimiter
 	joined := thaibreak.Join("ภาษาไทยเข้าใจง่าย", "|")
 	fmt.Println(joined)

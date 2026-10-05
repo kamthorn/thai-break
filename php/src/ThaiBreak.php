@@ -51,6 +51,28 @@ class ThaiBreak
     }
 
     /**
+     * Word boundaries of the text, in the style of an ICU BreakIterator: n segments give n + 1
+     * offsets from 0 to the text length, and whitespace and punctuation are segments of their own.
+     *
+     * Offsets are bytes by default, for substr(); pass $inCharacters for code point offsets, for
+     * mb_substr().
+     *
+     * @param  string $text         UTF-8 text
+     * @param  bool   $inCharacters Count code points instead of bytes
+     * @return int[]
+     */
+    public static function boundaries(string $text, bool $inCharacters = false): array
+    {
+        $offsets = [0];
+        $pos = 0;
+        foreach (ThaiTokenizer::getDefault()->tokenize($text, true) as $token) {
+            $pos += $inCharacters ? mb_strlen($token, 'UTF-8') : strlen($token);
+            $offsets[] = $pos;
+        }
+        return $offsets;
+    }
+
+    /**
      * Tokenize Thai text and join tokens with a delimiter.
      *
      * @param  string $text      UTF-8 text

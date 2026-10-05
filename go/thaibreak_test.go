@@ -130,3 +130,36 @@ func TestEmbeddedDictionary(t *testing.T) {
 	}
 }
 
+
+func TestBoundaries(t *testing.T) {
+	// byte offsets: each Thai character is 3 bytes, the emoji 4
+	text := "ฉันรักภาษาไทย 😀 ครับ"
+	b := Boundaries(text)
+	if b[0] != 0 || b[len(b)-1] != len(text) {
+		t.Fatalf("boundaries must run from 0 to len(text), got %v", b)
+	}
+	var segments, words []string
+	for i := 0; i+1 < len(b); i++ {
+		segments = append(segments, text[b[i]:b[i+1]])
+	}
+	if strings.Join(segments, "") != text {
+		t.Errorf("segments %q do not cover the text", segments)
+	}
+	for _, seg := range segments {
+		if strings.TrimSpace(seg) != "" {
+			words = append(words, seg)
+		}
+	}
+	if !reflect.DeepEqual(words, Words(text)) {
+		t.Errorf("segments %v differ from words %v", words, Words(text))
+	}
+	if got := Boundaries(""); !reflect.DeepEqual(got, []int{0}) {
+		t.Errorf("empty text: got %v, want [0]", got)
+	}
+	// the text keeps its original characters when it is matched in normalized form
+	legacy := "นํ้าตาล"
+	lb := Boundaries(legacy)
+	if lb[len(lb)-1] != len(legacy) {
+		t.Errorf("legacy spelling: got %v for %d bytes", lb, len(legacy))
+	}
+}
