@@ -176,6 +176,18 @@ func isToneMark(r rune) bool {
 
 // segment runs the Viterbi segmentation over runes and returns all tokens,
 // including whitespace.
+// Boundaries returns the word boundaries of text as byte offsets from 0 to len(text). Whitespace
+// and punctuation are segments of their own, as in an ICU BreakIterator.
+func (tok *Tokenizer) Boundaries(text string) []int {
+	offsets := []int{0}
+	pos := 0
+	for _, token := range tok.Tokenize(text, true) {
+		pos += len(token)
+		offsets = append(offsets, pos)
+	}
+	return offsets
+}
+
 func (tok *Tokenizer) segment(runes []rune) []string {
 	text := string(runes)
 	n := len(runes)

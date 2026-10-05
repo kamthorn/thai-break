@@ -135,6 +135,14 @@ export function words(text: string, keepWhitespace: boolean = false): string[] {
 }
 
 /**
+ * Word boundaries as UTF-16 offsets (string indices) from 0 to `text.length`; whitespace and
+ * punctuation are segments of their own, as in an ICU BreakIterator.
+ */
+export function boundaries(text: string): number[] {
+  return getTokenizer().boundaries(text);
+}
+
+/**
  * Insert break opportunities (default: ZWSP U+200B) into text.
  */
 export function lines(

@@ -147,6 +147,21 @@ export class Tokenizer {
     this.bigramModel = model;
   }
 
+  /**
+   * Word boundaries as UTF-16 offsets (JavaScript string indices) from 0 to `text.length`, in the
+   * style of an ICU BreakIterator: `text.slice(b[i], b[i + 1])` are consecutive segments that
+   * cover the text. Whitespace and punctuation are segments of their own.
+   */
+  boundaries(text: string): number[] {
+    const offsets = [0];
+    let pos = 0;
+    for (const token of this.tokenize(text, true)) {
+      pos += token.length;
+      offsets.push(pos);
+    }
+    return offsets;
+  }
+
   tokenize(text: string, keepWhitespace: boolean = false): string[] {
     if (!text) {
       return [];

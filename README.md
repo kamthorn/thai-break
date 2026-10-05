@@ -71,6 +71,10 @@ use ThaiBreak\ThaiBreak;
 $words = ThaiBreak::words('ฉันรักภาษาไทย');
 // → ['ฉัน', 'รัก', 'ภาษา', 'ไทย']
 
+// ตำแหน่งขอบเขตคำแบบ BreakIterator (นับไบต์ สำหรับ substr(); ส่ง true เป็นอาร์กิวเมนต์ที่สองเพื่อนับตัวอักษร สำหรับ mb_substr())
+$bounds = ThaiBreak::boundaries('ฉันรักภาษาไทย');
+// → [0, 9, 18, 30, 39]
+
 // 2. ตัดคำคั่นด้วยเครื่องหมาย
 $joined = ThaiBreak::join('สวัสดีครับคุณลูกค้า', '|');
 // → "สวัสดี|ครับ|คุณ|ลูกค้า"
@@ -150,6 +154,9 @@ func main() {
     words := tb.Words("ฉันรักภาษาไทย")
     fmt.Println(words) // [ฉัน รัก ภาษา ไทย]
 
+    // ตำแหน่งขอบเขตคำแบบ BreakIterator (นับไบต์ ใช้กับ text[b[i]:b[i+1]])
+    bounds := tb.Boundaries("ฉันรักภาษาไทย") // [0 9 18 30 39]
+
     // แทรกจุดตัดบรรทัด (Zero-Width Space U+200B)
     lines := tb.Lines("สวัสดีครับคุณลูกค้า", false)
 
@@ -173,11 +180,14 @@ npm install thai-break
 ```
 
 ```typescript
-import { words, lines, wrap, displayWidth } from 'thai-break';
+import { words, boundaries, lines, wrap, displayWidth } from 'thai-break';
 
 // ตัดคำ
 const tokens = words('ฉันรักภาษาไทย');
 console.log(tokens); // ['ฉัน', 'รัก', 'ภาษา', 'ไทย']
+
+// ตำแหน่งขอบเขตคำแบบ BreakIterator (UTF-16 ตรงกับ string.slice)
+console.log(boundaries('ฉันรักภาษาไทย')); // [0, 3, 6, 10, 13]
 
 // ตัดบรรทัดสำหรับ HTML (รักษาแท็กและ entities ไม่เสียหาย)
 const htmlWithZwsp = lines('<div class="header"><b>สวัสดี</b> &amp; ประเทศไทย</div>', true);

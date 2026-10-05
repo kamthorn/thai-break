@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   init,
   words,
+  boundaries,
   lines,
   wrap,
   displayWidth,
@@ -101,4 +102,22 @@ test('Line wrapping breaks at spaces', () => {
     'the lazy',
     'dog',
   ]);
+});
+
+test('boundaries are UTF-16 offsets that cover the text', () => {
+  // 😀 is two UTF-16 units
+  const text = 'ฉันรักภาษาไทย 😀 ครับ';
+  const b = boundaries(text);
+  assert.strictEqual(b[0], 0);
+  assert.strictEqual(b[b.length - 1], text.length);
+  const segments = b.slice(1).map((end, i) => text.slice(b[i], end));
+  assert.strictEqual(segments.join(''), text);
+  assert.deepStrictEqual(
+    segments.filter((s) => s.trim() !== ''),
+    words(text)
+  );
+  assert.deepStrictEqual(boundaries(''), [0]);
+  // the text keeps its original characters when it is matched in normalized form
+  const legacy = 'นํ้าตาล';
+  assert.strictEqual(boundaries(legacy).at(-1), legacy.length);
 });

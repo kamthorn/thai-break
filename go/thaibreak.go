@@ -106,6 +106,13 @@ func Tokenize(text string) []string {
 	return Words(text)
 }
 
+// Boundaries returns the word boundaries of text as byte offsets from 0 to len(text), in the style
+// of an ICU BreakIterator: n segments give n+1 offsets, and whitespace and punctuation are segments
+// of their own, so text[b[i]:b[i+1]] are consecutive segments that cover the text.
+func Boundaries(text string) []int {
+	return GetDefaultTokenizer().Boundaries(text)
+}
+
 // Join tokenizes and joins tokens with a delimiter.
 func Join(text string, sep string) string {
 	return strings.Join(Words(text), sep)

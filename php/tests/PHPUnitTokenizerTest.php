@@ -119,4 +119,32 @@ class PHPUnitTokenizerTest extends TestCase
         $this->assertStringContainsString("\n", $wrapped);
         $this->assertSame('ประเทศไทยมีวัฒนธรรมที่สวยงามและหลากหลาย', str_replace("\n", '', $wrapped));
     }
+
+    public function testBoundariesCoverTheText(): void
+    {
+        // bytes for substr(), code points for mb_substr(); the emoji is 4 bytes
+        $text = 'ฉันรักภาษาไทย 😀 ครับ';
+        $bytes = ThaiBreak::boundaries($text);
+        $chars = ThaiBreak::boundaries($text, true);
+        $this->assertSame(0, $bytes[0]);
+        $this->assertSame(strlen($text), end($bytes));
+        $this->assertSame(mb_strlen($text, 'UTF-8'), end($chars));
+        $segments = [];
+        for ($i = 0; $i + 1 < count($bytes); $i++) {
+            $segments[] = substr($text, $bytes[$i], $bytes[$i + 1] - $bytes[$i]);
+            $this->assertSame(
+                end($segments),
+                mb_substr($text, $chars[$i], $chars[$i + 1] - $chars[$i], 'UTF-8')
+            );
+        }
+        $this->assertSame($text, implode('', $segments));
+        $this->assertSame(
+            ThaiBreak::words($text),
+            array_values(array_filter($segments, fn ($s) => trim($s) !== ''))
+        );
+        $this->assertSame([0], ThaiBreak::boundaries(''));
+        $legacy = 'นํ้าตาล';
+        $legacyBounds = ThaiBreak::boundaries($legacy);
+        $this->assertSame(strlen($legacy), end($legacyBounds));
+    }
 }
