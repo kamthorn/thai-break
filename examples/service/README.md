@@ -282,7 +282,7 @@ Service นี้ใช้พจนานุกรม 2 ชั้นรวมก
 | **Lines Dictionary** | `dist/words-extra-lines.tsv` (ตัดชื่อเฉพาะ/โรงเรียน/คำประสมข่าวออกเพื่อให้พับบรรทัดได้ยืดหยุ่น) | CC0-1.0 | 9,218 คำ |
 | **Bigram Model** (ไม่บังคับ ไม่อยู่ใน repo) | `thai-break-dict-extra/data/bigrams-prachathai.tsv` สกัดจาก Prachathai-67k (54,380 บทความ) | Apache-2.0 | 955,967 คู่คำ |
 
-**ผลลัพธ์หลังรวม:** `data/words.fst` = **41,272 คำ** (918 KB), `data/lines.fst` = **33,145 คำ** (700 KB)
+**ผลลัพธ์หลังรวม:** `data/words.fst` = **40,911 คำ** (908 KB), `data/lines.fst` = **33,017 คำ** (696 KB)
 
 ### การรีบิลด์พจนานุกรม
 ```bash
