@@ -35,6 +35,20 @@ const OOV_BOUNDARY_WORDS: &[&str] = &[
 /// Function words that may still occur inside an out-of-vocabulary word: they are frequent
 /// syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
 const OOV_INNER_ALLOWED: &[&str] = &["มา", "มี"];
+/// Names of the letters of the Latin alphabet in Thai. A name that starts another one comes first
+/// (เอ็ม before เอ), so the longest name wins.
+const LETTER_NAMES: &[&str] = &[
+    "ดับเบิลยู", "เอ็กซ์", "แอล", "เอ็ม", "เอ็น", "เอฟ", "เอช", "เอส", "อาร์", "คิว", "แซด", "ซี", "ดี", "จี", "ไอ", "เจ", "เค",
+    "โอ", "พี", "ยู", "วี", "วาย", "บี", "ที", "อี", "เอ",
+];
+/// Whether a letter name can start with `ch`; a cheap test before comparing every name.
+fn starts_a_letter_name(ch: char) -> bool {
+    matches!(ch, 'ด' | 'เ' | 'แ' | 'อ' | 'ค' | 'ซ' | 'จ' | 'ไ' | 'โ' | 'พ' | 'ย' | 'ว' | 'บ' | 'ท')
+}
+static LETTER_NAME_CHARS: Lazy<Vec<Vec<char>>> = Lazy::new(|| LETTER_NAMES.iter().map(|n| n.chars().collect()).collect());
+/// Cost of a run of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น), relative to the cost of the
+/// rarest word.
+const LETTER_RUN_COST_FACTOR: f64 = 1.0;
 /// Costs closer than this are a tie. Edges into a position are visited from
 /// the longest word to the shortest, so on a tie the later, shorter last word
 /// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
@@ -314,7 +328,28 @@ impl Tokenizer {
                     }
                 }
 
-                // 3. Out-of-vocabulary words of 1..=OOV_MAX_CLUSTERS TCC clusters
+                // 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
+                let mut end = i;
+                let mut letters = 0;
+                while let Some(len) = LETTER_NAME_CHARS
+                    .iter()
+                    .filter(|_| end < n && starts_a_letter_name(chars[end]))
+                    .find(|name| end + name.len() <= n && chars[end..end + name.len()] == name[..] && valid_pos[end + name.len()])
+                    .map(|name| name.len())
+                {
+                    end += len;
+                    letters += 1;
+                    if letters >= 2 {
+                        edges.push(DagEdge {
+                            to: end,
+                            word: chars[i..end].iter().collect(),
+                            cost: LETTER_RUN_COST_FACTOR * rare_cost,
+                            unknown: false,
+                        });
+                    }
+                }
+
+                // 4. Out-of-vocabulary words of 1..=OOV_MAX_CLUSTERS TCC clusters
                 let mut clusters = 0;
                 for j in i + 1..=n {
                     if !is_oov_char(chars[j - 1]) {
@@ -342,7 +377,7 @@ impl Tokenizer {
                     });
                 }
             } else if let Some(m) = PAT_NONTHAI.find(sub_text) {
-                // 3. Non-Thai tokens
+                // 5. Non-Thai tokens
                 let j = i + m.as_str().chars().count();
                 if j <= n && valid_pos[j] {
                     edges.push(DagEdge {

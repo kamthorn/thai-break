@@ -65,6 +65,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes for some text, so indices built from it should be reindexed. Rust, Go, TypeScript and PHP
   give identical tokens on LST20 eval and test.
 
+- **A run of two or more spelled-out letters is one token** (`เอทีเอ็ม`, `ยูเอ็น`, `ดีเอสไอ`,
+  `เอสเอ็มอี`): the names of the letters of the Latin alphabet in Thai (`เอ บี ซี ดี อี เอฟ จี เอช
+  ไอ เจ เค แอล เอ็ม เอ็น โอ พี คิว อาร์ เอส ที ยู วี ดับเบิลยู เอ็กซ์ วาย แซด`) were cut into single
+  letters, so a search for `ดีเอสไอ` with AND matched any text with `ดี`, `เอส` and `ไอ` in it.
+  A single letter name stays a word, and a tone mark keeps `ที่` from being the letter T. Word F1
+  goes from 86.58 to 86.93 on LST20 test (train 86.32 to 86.61, eval 83.20 to 83.47, Blackboard
+  86.29 to 86.59, Wisesight-1000 84.26 to 84.50); 374 (eval) and 406 (test) LST20 lines change.
+  It costs about 2% of the speed. Output changes for text with spelled-out letters, so indices
+  built from it should be reindexed. Rust, Go, TypeScript, PHP and Java give identical tokens on
+  LST20 eval and test.
+
 ### Fixed
 - **A word followed by a full stop is no longer read as an abbreviation.** The abbreviation pattern
   takes one to four consonant letters before a full stop, and อ ว ย count as consonants, so

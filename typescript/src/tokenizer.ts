@@ -2,6 +2,16 @@ import { tccPosArray } from './tcc.js';
 import { ThaiTrie } from './trie.js';
 import { BigramModel } from './bigram.js';
 
+/**
+ * Names of the letters of the Latin alphabet in Thai. A name that starts another one comes first
+ * (เอ็ม before เอ), so the longest name wins.
+ */
+const LETTER_NAMES = [
+  'ดับเบิลยู', 'เอ็กซ์', 'แอล', 'เอ็ม', 'เอ็น', 'เอฟ', 'เอช', 'เอส', 'อาร์', 'คิว', 'แซด', 'ซี', 'ดี', 'จี', 'ไอ', 'เจ', 'เค',
+  'โอ', 'พี', 'ยู', 'วี', 'วาย', 'บี', 'ที', 'อี', 'เอ',
+].map((n) => Array.from(n));
+/** Cost of a run of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น), relative to the cost of the rarest word. */
+const LETTER_RUN_COST_FACTOR = 1.0;
 /** Cost of an abbreviation pattern, relative to the cost of the rarest word. */
 const ABBR_COST_FACTOR = 1.5;
 /**
@@ -317,7 +327,19 @@ export class Tokenizer {
           }
         }
 
-        // 3. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
+        // 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
+        for (let end = i, letters = 0; ; ) {
+          const e = end;
+          const name = LETTER_NAMES.find((nm) => e + nm.length <= n && validPos[e + nm.length] && nm.every((c, k) => chars[e + k] === c));
+          if (!name) break;
+          end += name.length;
+          letters++;
+          if (letters >= 2) {
+            edges.push({ to: end, word: chars.slice(i, end).join(''), cost: LETTER_RUN_COST_FACTOR * rareCost, unknown: false });
+          }
+        }
+
+        // 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
         let clusters = 0;
         for (let j = i + 1; j <= n && isOovChar(chars[j - 1]); j++) {
           if (!validPos[j]) {
@@ -342,7 +364,7 @@ export class Tokenizer {
           });
         }
       } else {
-        // 4. Non-Thai tokens
+        // 5. Non-Thai tokens
         const mNonThai = PAT_NONTHAI.exec(subText);
         if (mNonThai && mNonThai[0].length > 0) {
           const j = i + Array.from(mNonThai[0]).length;

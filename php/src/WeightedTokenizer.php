@@ -46,6 +46,18 @@ class WeightedTokenizer
     /** Pattern matching Thai abbreviations with periods (e.g. รพ., พญ., ด.ญ., มิ.ย., น., จ.) */
     private const PAT_ABBR = '/\G(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u';
 
+    /**
+     * Names of the letters of the Latin alphabet in Thai. A name that starts another one comes first
+     * (เอ็ม before เอ), so the longest name wins.
+     */
+    private const LETTER_NAMES = [
+        'ดับเบิลยู', 'เอ็กซ์', 'แอล', 'เอ็ม', 'เอ็น', 'เอฟ', 'เอช', 'เอส', 'อาร์', 'คิว', 'แซด', 'ซี', 'ดี', 'จี', 'ไอ', 'เจ', 'เค',
+        'โอ', 'พี', 'ยู', 'วี', 'วาย', 'บี', 'ที', 'อี', 'เอ',
+    ];
+
+    /** Cost of a run of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น), relative to the cost of the rarest word */
+    private const LETTER_RUN_COST_FACTOR = 1.0;
+
     /** Cost of an abbreviation pattern, relative to the cost of the rarest word */
     private const ABBR_COST_FACTOR = 1.5;
 
@@ -261,7 +273,26 @@ class WeightedTokenizer
                     }
                 }
 
-                // ── 3. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
+                // ── 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
+                for ($end = $i, $letters = 0; ;) {
+                    $next = 0;
+                    foreach (self::LETTER_NAMES as $name) {
+                        $len = mb_strlen($name, 'UTF-8');
+                        if ($end + $len <= $n && $validPos[$end + $len] && implode('', array_slice($chars, $end, $len)) === $name) {
+                            $next = $end + $len;
+                            break;
+                        }
+                    }
+                    if ($next === 0) {
+                        break;
+                    }
+                    $end = $next;
+                    if (++$letters >= 2) {
+                        $edges[] = [$end, implode('', array_slice($chars, $i, $end - $i)), self::LETTER_RUN_COST_FACTOR * $rareCost, false];
+                    }
+                }
+
+                // ── 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
                 $clusters = 0;
                 for ($j = $i + 1; $j <= $n && preg_match(self::PAT_OOV_CHAR, $chars[$j - 1]); $j++) {
                     if (!$validPos[$j]) {
@@ -286,7 +317,7 @@ class WeightedTokenizer
                     ];
                 }
             } else {
-                // ── 4. Non-Thai tokens (English words, numbers, single symbols, spaces)
+                // ── 5. Non-Thai tokens (English words, numbers, single symbols, spaces)
                 if (preg_match(self::PAT_NONTHAI, $text, $mNonThai, 0, $bytePos) && $mNonThai[0] !== '') {
                     $j = $i + mb_strlen($mNonThai[0], 'UTF-8');
                     if ($j <= $n && $validPos[$j]) {

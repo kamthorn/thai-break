@@ -3,11 +3,29 @@ package thaibreak
 import (
 	"math"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 )
 
+// letterNames are the names of the letters of the Latin alphabet in Thai. A name that starts another
+// one comes first (เอ็ม before เอ), so the longest name wins.
+var letterNames = func() [][]rune {
+	names := []string{
+		"ดับเบิลยู", "เอ็กซ์", "แอล", "เอ็ม", "เอ็น", "เอฟ", "เอช", "เอส", "อาร์", "คิว", "แซด", "ซี", "ดี", "จี", "ไอ", "เจ", "เค",
+		"โอ", "พี", "ยู", "วี", "วาย", "บี", "ที", "อี", "เอ",
+	}
+	out := make([][]rune, len(names))
+	for i, n := range names {
+		out[i] = []rune(n)
+	}
+	return out
+}()
+
 const (
+	// letterRunCostFactor is the cost of a run of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น),
+	// relative to the cost of the rarest word.
+	letterRunCostFactor = 1.0
 	// abbrCostFactor is the cost of an abbreviation pattern, relative to the cost of the rarest word.
 	abbrCostFactor = 1.5
 	// abbrLetterCostFactor is the extra cost per letter of an abbreviation
@@ -325,7 +343,26 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				}
 			}
 
-			// 3. Out-of-vocabulary words of 1..oovMaxClusters TCC clusters
+			// 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
+			for end, letters := i, 0; ; {
+				next := 0
+				for _, name := range letterNames {
+					if e := end + len(name); e <= n && validPos[e] && slices.Equal(runes[end:e], name) {
+						next = e
+						break
+					}
+				}
+				if next == 0 {
+					break
+				}
+				end = next
+				letters++
+				if letters >= 2 {
+					edges = append(edges, outEdge{end, string(runes[i:end]), letterRunCostFactor * rareCost, false})
+				}
+			}
+
+			// 4. Out-of-vocabulary words of 1..oovMaxClusters TCC clusters
 			clusters := 0
 			for j := i + 1; j <= n && isOOVRune(runes[j-1]); j++ {
 				if !validPos[j] {
@@ -345,7 +382,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				edges = append(edges, outEdge{j, w, (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
 			}
 		} else {
-			// 4. Non-Thai tokens
+			// 5. Non-Thai tokens
 			if loc := patNonThai.FindStringIndex(subText); loc != nil && loc[0] == 0 {
 				mStr := subText[:loc[1]]
 				if j := i + utf8.RuneCountInString(mStr); j <= n && validPos[j] {
