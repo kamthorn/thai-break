@@ -25,8 +25,8 @@ class DawgAndOpcacheTest extends TestCase
     public function testCompactDawgBasic(): void
     {
         $dawg = CompactDawg::fromFile($this->dawgPath);
-        $this->assertSame(25402, $dawg->getNumWords());
-        $this->assertSame(17444, $dawg->getNumStates());
+        $this->assertSame(25411, $dawg->getNumWords());
+        $this->assertSame(17455, $dawg->getNumStates());
 
         $this->assertTrue($dawg->has('สวัสดี'));
         $this->assertTrue($dawg->has('กฎหมาย'));
