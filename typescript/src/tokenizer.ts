@@ -181,6 +181,34 @@ export class Tokenizer {
     return offsets;
   }
 
+  /**
+   * Whether what the abbreviation pattern matched is really words and a full stop. The pattern
+   * accepts any one to four consonant letters before a full stop, and อ ว ย count as consonants, so
+   * it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when it starts
+   * with a function word followed by more letters ("ของส.ส." is ของ + ส.ส.), or when it is one
+   * dictionary word with a vowel or tone mark and a final full stop that is not followed by a letter
+   * ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants only (มทส. นพ.)
+   * stays an abbreviation even when the dictionary has it without the full stop. `end` is the index of
+   * the character after the match.
+   */
+  private abbreviationIsWords(chars: string[], end: number, abbr: string): boolean {
+    const first = abbr.split('.')[0];
+    if (OOV_BOUNDARY_WORDS.some((f) => first.length > f.length && first.startsWith(f))) {
+      return true;
+    }
+    const next = end < chars.length ? chars[end] : '';
+    const nextIsThai = next >= '\u0e01' && next <= '\u0e5b';
+    return (
+      abbr.split('.').length === 2 &&
+      abbr.endsWith('.') &&
+      Array.from(first).length >= 2 &&
+      /[^ก-ฮ]/u.test(first) &&
+      !nextIsThai &&
+      this.trie.has(first) &&
+      !this.trie.has(abbr)
+    );
+  }
+
   tokenize(text: string, keepWhitespace: boolean = false): string[] {
     if (!text) {
       return [];
@@ -283,7 +311,7 @@ export class Tokenizer {
           const mStr = mAbbr[0];
           const abbrLen = Array.from(mStr).length;
           const j = i + abbrLen;
-          if (j <= n && validPos[j]) {
+          if (j <= n && validPos[j] && !this.abbreviationIsWords(chars, j, mStr)) {
             const letters = abbrLen - mStr.split('.').length + 1;
             edges.push({ to: j, word: mStr, cost: (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost, unknown: false });
           }

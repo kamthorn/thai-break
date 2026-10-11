@@ -65,6 +65,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   changes for some text, so indices built from it should be reindexed. Rust, Go, TypeScript and PHP
   give identical tokens on LST20 eval and test.
 
+### Fixed
+- **A word followed by a full stop is no longer read as an abbreviation.** The abbreviation pattern
+  takes one to four consonant letters before a full stop, and อ ว ย count as consonants, so
+  `ต่อไป.` came out as `ต่อ|ไป.`, `ได้.` as one token with its full stop, and a function word in
+  front of an abbreviation was glued to it (`ของส.ส.`, `ของพ.ต.ท.`). It is not an abbreviation
+  now when it starts with a function word followed by more letters (`ของ|ส.ส.`), or when it is
+  one dictionary word with a vowel or tone mark and a final full stop that is not followed by a
+  letter (`ต่อ|ไป|.`, `หรือ|ไม่|.`), unless the dictionary has the abbreviation itself. A string of
+  consonants only (`มทส.`, `นพ.`) stays an abbreviation, and so does a run (`ก.พ.`, `ผบ.ตร.`) or an
+  abbreviation followed by a name (`จ.|เชียงใหม่`). LST20 has 38 (eval) and 26 (test) lines with such
+  text; word F1 does not fall on any corpus (LST20 test 86.56 to 86.58). Rust, Go, TypeScript, PHP
+  and Java give identical tokens on LST20 eval and test.
+
 ## [1.3.0] - 2026-10-04
 
 > **Reindex recommended.** Segmentation output changes for text with out-of-vocabulary words and

@@ -159,6 +159,12 @@ export class ThaiTrie {
     }
   }
 
+  /** Whether `word` is a dictionary word. */
+  has(word: string): boolean {
+    const chars = Array.from(word);
+    return this.prefixesFromChars(chars, 0, chars.length).some((m) => m.end === chars.length);
+  }
+
   /**
    * Set the weight of a word that is already in the dictionary. Returns false for other words.
    */

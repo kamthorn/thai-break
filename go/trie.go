@@ -186,6 +186,17 @@ func (t *ThaiTrie) Add(word string, weight float64) {
 	}
 }
 
+// Contains reports whether word is a dictionary word.
+func (t *ThaiTrie) Contains(word string) bool {
+	runes := []rune(word)
+	for _, m := range t.Prefixes(runes, 0, len(runes)) {
+		if m.End == len(runes) {
+			return true
+		}
+	}
+	return false
+}
+
 // SetWeight sets the weight of a word that is already in the dictionary.
 // It returns false for other words.
 func (t *ThaiTrie) SetWeight(word string, weight float64) bool {

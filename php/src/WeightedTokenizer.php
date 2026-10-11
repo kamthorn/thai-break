@@ -255,7 +255,7 @@ class WeightedTokenizer
                 if (preg_match(self::PAT_ABBR, $text, $mAbbr, 0, $bytePos) && $mAbbr[0] !== '') {
                     $abbrLen = mb_strlen($mAbbr[0], 'UTF-8');
                     $j       = $i + $abbrLen;
-                    if ($j <= $n && $validPos[$j]) {
+                    if ($j <= $n && $validPos[$j] && !$this->abbreviationIsWords($chars, $j, $mAbbr[0])) {
                         $letters  = $abbrLen - substr_count($mAbbr[0], '.');
                         $edges[]  = [$j, $mAbbr[0], (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost, false];
                     }
@@ -415,6 +415,38 @@ class WeightedTokenizer
     private static function isToneMark(string $char): bool
     {
         return $char !== '' && $char >= '่' && $char <= '๋';
+    }
+
+    /**
+     * Whether what the abbreviation pattern matched is really words and a full stop. The pattern
+     * accepts any one to four consonant letters before a full stop, and อ ว ย count as consonants,
+     * so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when it
+     * starts with a function word followed by more letters ("ของส.ส." is ของ + ส.ส.), or when it is
+     * one dictionary word with a vowel or tone mark and a final full stop that is not followed by a
+     * letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants only
+     * (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
+     *
+     * @param list<string> $chars
+     * @param int          $end   Index of the character after the match
+     */
+    private function abbreviationIsWords(array $chars, int $end, string $abbr): bool
+    {
+        $first = explode('.', $abbr, 2)[0];
+        foreach (self::OOV_BOUNDARY_WORDS as $f) {
+            if (strlen($first) > strlen($f) && str_starts_with($first, $f)) {
+                return true;
+            }
+        }
+        $next       = $chars[$end] ?? '';
+        $nextIsThai = $next !== '' && $next >= "\u{0e01}" && $next <= "\u{0e5b}";
+
+        return substr_count($abbr, '.') === 1
+            && str_ends_with($abbr, '.')
+            && mb_strlen($first, 'UTF-8') >= 2
+            && preg_match('/[^ก-ฮ]/u', $first) === 1
+            && !$nextIsThai
+            && $this->trie->has($first)
+            && !$this->trie->has($abbr);
     }
 
     /** Whether $word is longer than, and starts or ends with, a word of OOV_BOUNDARY_WORDS. */

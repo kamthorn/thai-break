@@ -75,6 +75,27 @@ func isThaiRune(r rune) bool {
 	return r >= 0x0E00 && r <= 0x0E7F
 }
 
+// abbreviationIsWords reports whether what the abbreviation pattern matched is really words and a
+// full stop. The pattern accepts any one to four consonant letters before a full stop, and อ ว ย
+// count as consonants, so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an
+// abbreviation when it starts with a function word followed by more letters ("ของส.ส." is ของ +
+// ส.ส.), or when it is one dictionary word with a vowel or tone mark and a final full stop that is not
+// followed by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of
+// consonants only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
+// end is the index of the rune after the match.
+func (tok *Tokenizer) abbreviationIsWords(runes []rune, end int, abbr string) bool {
+	first, _, _ := strings.Cut(abbr, ".")
+	for _, f := range oovBoundaryWords {
+		if len(first) > len(f) && strings.HasPrefix(first, f) {
+			return true
+		}
+	}
+	nextIsThai := end < len(runes) && runes[end] >= 0x0E01 && runes[end] <= 0x0E5B
+	return strings.Count(abbr, ".") == 1 && strings.HasSuffix(abbr, ".") &&
+		utf8.RuneCountInString(first) >= 2 && strings.ContainsFunc(first, func(r rune) bool { return r < 'ก' || r > 'ฮ' }) && !nextIsThai &&
+		tok.trie.Contains(first) && !tok.trie.Contains(abbr)
+}
+
 // bordersFunctionWord reports whether w is longer than, and starts or ends with, an oovBoundaryWords word.
 func bordersFunctionWord(w string) bool {
 	for _, f := range oovBoundaryWords {
@@ -298,7 +319,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 			if loc := patAbbr.FindStringIndex(subText); loc != nil && loc[0] == 0 {
 				mStr := subText[:loc[1]]
 				abbrLen := utf8.RuneCountInString(mStr)
-				if j := i + abbrLen; j <= n && validPos[j] {
+				if j := i + abbrLen; j <= n && validPos[j] && !tok.abbreviationIsWords(runes, i+abbrLen, mStr) {
 					letters := abbrLen - strings.Count(mStr, ".")
 					edges = append(edges, outEdge{j, mStr, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost, false})
 				}

@@ -34,6 +34,12 @@ class SegmentationTest extends TestCase
             'an unknown word does not swallow a function word inside it' => ['ชวรัตน์ที่ลืมไว้', 'ชวรัตน์|ที่|ลืม|ไว้'],
             'a transliterated name may contain มา' => ['อะห์มาดีเนญาดกล่าวว่า', 'อะห์มาดีเนญาด|กล่าว|ว่า'],
             'an unknown name does not swallow the title before it' => ['พี่เต๋อมาแล้ว', 'พี่|เต๋อ|มา|แล้ว'],
+            'a word and a final full stop are not an abbreviation' => ['ต่อไป.', 'ต่อ|ไป|.'],
+            'a word with a tone mark and a final full stop' => ['หรือไม่.', 'หรือ|ไม่|.'],
+            'a function word does not start an abbreviation' => ['ของส.ส.', 'ของ|ส.ส.'],
+            'a function word before a long abbreviation' => ['ของพ.ต.ท.', 'ของ|พ.ต.ท.'],
+            'an abbreviation followed by a name stays whole' => ['จ.เชียงใหม่', 'จ.|เชียงใหม่'],
+            'a run of abbreviations stays whole' => ['ก.พ.', 'ก.พ.'],
             'a tone mark after sara am is matched before it, the text is kept' => ['นำ้ตาลทราย', 'นำ้ตาล|ทราย'],
             'nikhahit + sara aa + tone mark is matched as tone + sara am' => ['นํา้ตาลทราย', 'นํา้ตาล|ทราย'],
         ];

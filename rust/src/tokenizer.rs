@@ -173,6 +173,30 @@ impl Tokenizer {
         &mut self.trie
     }
 
+    /// Whether what the abbreviation pattern matched is really words and a full stop. The pattern
+    /// accepts any one to four consonant letters before a full stop, and อ ว ย count as consonants,
+    /// so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when
+    /// - it starts with a function word followed by more letters ("ของส.ส." is ของ + ส.ส.), or
+    /// - it is one dictionary word with a vowel or tone mark and a final full stop that is not followed
+    ///   by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants
+    ///   only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
+    ///
+    /// `end` is the index of the character after the match.
+    fn abbreviation_is_words(&self, chars: &[char], end: usize, abbr: &str) -> bool {
+        let first = abbr.split('.').next().unwrap_or("");
+        if OOV_BOUNDARY_WORDS.iter().any(|f| first.len() > f.len() && first.starts_with(f)) {
+            return true;
+        }
+        let next_is_thai = chars.get(end).is_some_and(|c| ('\u{0e01}'..='\u{0e5b}').contains(c));
+        abbr.matches('.').count() == 1
+            && abbr.ends_with('.')
+            && first.chars().count() >= 2
+            && first.chars().any(|c| !('ก'..='ฮ').contains(&c))
+            && !next_is_thai
+            && self.trie.contains(first)
+            && !self.trie.contains(abbr)
+    }
+
     pub fn tokenize(&self, text: &str, keep_whitespace: bool) -> Vec<String> {
         if text.is_empty() {
             return Vec::new();
@@ -279,7 +303,7 @@ impl Tokenizer {
                     let m_str = m.as_str();
                     let abbr_len = m_str.chars().count();
                     let j = i + abbr_len;
-                    if j <= n && valid_pos[j] {
+                    if j <= n && valid_pos[j] && !self.abbreviation_is_words(chars, i + abbr_len, m_str) {
                         let letters = abbr_len - m_str.matches('.').count();
                         edges.push(DagEdge {
                             to: j,
