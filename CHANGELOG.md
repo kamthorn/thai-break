@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The accuracy tables report two dictionaries: the base dictionary alone, and the base plus
   thai-break-dict-extra (the set the OpenSearch plugin and the example service use). dict-extra keeps
   compounds and named entities whole on purpose, so word F1 on the gold corpora, which split them,
-  is lower (LST20 test 86.1 → 83.7, boundary F1 93.3 → 92.0). The numbers do not measure retrieval.
+  is lower (LST20 test 86.3 → 84.1, boundary F1 93.4 → 92.2). The numbers do not measure retrieval.
 
 ### Added
 - Rust: `BreakIterator`, a boundary iterator in the style of ICU `BreakIterator` and
@@ -23,6 +23,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offsets), Go (`Boundaries`, byte offsets) and PHP (`ThaiBreak::boundaries`, bytes, or code points
   with `$inCharacters`). Rust, Go, TypeScript and PHP give identical boundaries on 51,475 LST20
   texts.
+
+### Changed
+- **An out-of-vocabulary word may not contain a frequent function word either**, only start or end
+  with one was forbidden before, and `ไว้` joins the list (37 words). A name followed by a function
+  word and a short word came out as one token (`ชวรัตน์ที่ลืมไว้`), because every word of the
+  base dictionary has the same weight and extending an unknown word by one cluster costs less
+  than a separate word. It is now `ชวรัตน์|ที่|ลืม|ไว้`. `มา` and `มี` may still occur inside an
+  unknown word, since they are frequent syllables of transliterated names (`อาห์มาดิเนจัด`). On
+  LST20 test, unknown words that swallow a function word drop from 60 to 12, names (NE spans)
+  tokenized the same alone and in context rise from 97.2% to 97.5%, and word F1 goes from 86.23
+  to 86.28 (eval 82.95 to 83.00, Blackboard sub-word 85.91 to 85.97, Wisesight-1000 83.42 to
+  83.90). Raising the per-cluster cost instead stopped the merging but split real names
+  (`ศุภชัย`, `กอร์ปศักดิ์`) and lost 0.7 points of word F1. Output changes for text with unknown
+  words, so indices built from it should be reindexed. Rust, Go, TypeScript and PHP give
+  identical tokens on LST20 eval and test.
 
 ## [1.3.0] - 2026-10-04
 

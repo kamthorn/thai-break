@@ -30,8 +30,9 @@ const OOV_COST_FACTOR = 3.0;
  */
 const OOV_CLUSTER_COST_FACTOR = 0.8;
 /**
- * Frequent function words. An out-of-vocabulary edge may not start or end with one of them, so an
- * unknown word does not swallow its neighbours (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้): the same name would
+ * Frequent function words. An out-of-vocabulary edge may not start or end with one of them, nor
+ * contain one at a cluster boundary, so an unknown word does not swallow its neighbours
+ * (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้; ชวรัตน์|ที่|ลืม|ไว้, not ชวรัตน์ที่ลืมไว้): the same name would
  * otherwise be tokenized differently on its own and next to a function word, and a search for it
  * would miss the document.
  */
@@ -40,7 +41,13 @@ const OOV_BOUNDARY_WORDS = [
   'มี', 'จะ', 'ไป', 'มา', 'ก็', 'กับ', 'แต่', 'หรือ', 'จาก',
   'โดย', 'เพื่อ', 'แล้ว', 'อยู่', 'นี้', 'นั้น', 'ซึ่ง', 'การ', 'ความ',
   'ต่อ', 'ถึง', 'ยัง', 'เมื่อ', 'ทั้ง', 'ตาม', 'ด้วย', 'อีก', 'คือ',
+  'ไว้',
 ];
+/**
+ * Function words that may still occur inside an out-of-vocabulary word: they are frequent
+ * syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
+ */
+const OOV_INNER_FUNCTION_WORDS = OOV_BOUNDARY_WORDS.filter((f) => f !== 'มา' && f !== 'มี').map((f) => Array.from(f));
 
 const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
 const PAT_ABBR = /^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u;
@@ -103,6 +110,16 @@ function isToneMark(ch: string): boolean {
 /** Whether `word` is longer than, and starts or ends with, a word of OOV_BOUNDARY_WORDS. */
 function bordersFunctionWord(word: string): boolean {
   return OOV_BOUNDARY_WORDS.some((f) => word.length > f.length && (word.startsWith(f) || word.endsWith(f)));
+}
+
+/**
+ * Whether `chars[start..end)` ends with a function word of OOV_INNER_FUNCTION_WORDS that starts at a
+ * cluster boundary after `start`. Every longer out-of-vocabulary edge from `start` would contain it.
+ */
+function endsWithInnerFunctionWord(chars: string[], start: number, end: number, validPos: boolean[]): boolean {
+  return OOV_INNER_FUNCTION_WORDS.some(
+    (f) => end - start > f.length && validPos[end - f.length] && f.every((c, k) => chars[end - f.length + k] === c),
+  );
 }
 
 /**
@@ -282,6 +299,9 @@ export class Tokenizer {
           }
           const oovWord = chars.slice(i, j).join('');
           if (bordersFunctionWord(oovWord)) {
+            if (endsWithInnerFunctionWord(chars, i, j, validPos)) {
+              break;
+            }
             continue;
           }
           edges.push({

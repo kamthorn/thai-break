@@ -82,8 +82,9 @@ class WeightedTokenizer
     private const OOV_CLUSTER_COST_FACTOR = 0.8;
 
     /**
-     * Frequent function words. An out-of-vocabulary edge may not start or end with one of them, so an
-     * unknown word does not swallow its neighbours (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้): the same name
+     * Frequent function words. An out-of-vocabulary edge may not start or end with one of them, nor
+     * contain one at a cluster boundary, so an unknown word does not swallow its neighbours
+     * (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้; ชวรัตน์|ที่|ลืม|ไว้, not ชวรัตน์ที่ลืมไว้): the same name
      * would otherwise be tokenized differently on its own and next to a function word, and a search
      * for it would miss the document.
      */
@@ -92,7 +93,14 @@ class WeightedTokenizer
         'มี', 'จะ', 'ไป', 'มา', 'ก็', 'กับ', 'แต่', 'หรือ', 'จาก',
         'โดย', 'เพื่อ', 'แล้ว', 'อยู่', 'นี้', 'นั้น', 'ซึ่ง', 'การ', 'ความ',
         'ต่อ', 'ถึง', 'ยัง', 'เมื่อ', 'ทั้ง', 'ตาม', 'ด้วย', 'อีก', 'คือ',
+        'ไว้',
     ];
+
+    /**
+     * Function words that may still occur inside an out-of-vocabulary word: they are frequent
+     * syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
+     */
+    private const OOV_INNER_ALLOWED = ['มา', 'มี'];
 
     /**
      * Characters an out-of-vocabulary edge may cover: Thai letters, vowels and marks, but not ๆ, ฯ,
@@ -263,6 +271,9 @@ class WeightedTokenizer
                     }
                     $oovWord = implode('', array_slice($chars, $i, $j - $i));
                     if (self::bordersFunctionWord($oovWord)) {
+                        if (self::endsWithInnerFunctionWord($chars, $i, $j, $validPos)) {
+                            break;
+                        }
                         continue;
                     }
                     $edges[] = [
@@ -409,6 +420,30 @@ class WeightedTokenizer
     {
         foreach (self::OOV_BOUNDARY_WORDS as $f) {
             if (strlen($word) > strlen($f) && (str_starts_with($word, $f) || str_ends_with($word, $f))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether $chars[$start..$end) ends with a word of OOV_BOUNDARY_WORDS (other than
+     * OOV_INNER_ALLOWED) that starts at a cluster boundary after $start. Every longer
+     * out-of-vocabulary edge from $start would contain that word.
+     *
+     * @param list<string> $chars
+     * @param array<int, bool> $validPos
+     */
+    private static function endsWithInnerFunctionWord(array $chars, int $start, int $end, array $validPos): bool
+    {
+        foreach (self::OOV_BOUNDARY_WORDS as $f) {
+            if (in_array($f, self::OOV_INNER_ALLOWED, true)) {
+                continue;
+            }
+            $len = mb_strlen($f, 'UTF-8');
+            if ($end - $start > $len && !empty($validPos[$end - $len])
+                && implode('', array_slice($chars, $end - $len, $len)) === $f) {
                 return true;
             }
         }

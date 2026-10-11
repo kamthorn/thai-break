@@ -20,15 +20,19 @@ const OOV_COST_FACTOR: f64 = 3.0;
 /// Extra cost per further cluster of an out-of-vocabulary edge, relative to the cost of the rarest
 /// word. Below about 0.5 an unknown word beats real words and F1 drops sharply.
 const OOV_CLUSTER_COST_FACTOR: f64 = 0.8;
-/// Frequent function words. An out-of-vocabulary edge may not start or end with one of them, so an
-/// unknown word does not swallow its neighbours ("ฮิวจ์ส|ไม่|ได้", not "ฮิวจ์สไม่ได้"): the same
-/// name would otherwise be tokenized differently on its own and next to a function word, and a
-/// search for it would miss the document.
+/// Frequent function words. An out-of-vocabulary edge may not start or end with one of them, nor
+/// contain one at a cluster boundary, so an unknown word does not swallow its neighbours
+/// ("ฮิวจ์ส|ไม่|ได้", not "ฮิวจ์สไม่ได้"; "ชวรัตน์|ที่|ลืม|ไว้", not "ชวรัตน์ที่ลืมไว้"): the same name
+/// would otherwise be tokenized differently on its own and next to a function word, and a search
+/// for it would miss the document.
 const OOV_BOUNDARY_WORDS: &[&str] = &[
     "ที่", "และ", "ของ", "ใน", "ได้", "ให้", "ไม่", "ว่า", "เป็น", "มี", "จะ", "ไป", "มา", "ก็", "กับ", "แต่", "หรือ", "จาก",
     "โดย", "เพื่อ", "แล้ว", "อยู่", "นี้", "นั้น", "ซึ่ง", "การ", "ความ", "ต่อ", "ถึง", "ยัง", "เมื่อ", "ทั้ง", "ตาม", "ด้วย",
-    "อีก", "คือ",
+    "อีก", "คือ", "ไว้",
 ];
+/// Function words that may still occur inside an out-of-vocabulary word: they are frequent
+/// syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
+const OOV_INNER_ALLOWED: &[&str] = &["มา", "มี"];
 /// Costs closer than this are a tie. Edges into a position are visited from
 /// the longest word to the shortest, so on a tie the later, shorter last word
 /// wins and the earlier words stay longer ("ผิด|ราย" rather than "ผิ|ดราย").
@@ -118,6 +122,19 @@ fn borders_function_word(word: &str) -> bool {
     OOV_BOUNDARY_WORDS
         .iter()
         .any(|f| word.len() > f.len() && (word.starts_with(f) || word.ends_with(f)))
+}
+
+/// Whether `chars[start..end]` ends with a word of `OOV_BOUNDARY_WORDS` (other than
+/// `OOV_INNER_ALLOWED`) that starts at a cluster boundary after `start`. Every longer
+/// out-of-vocabulary edge from `start` would contain that word.
+fn ends_with_inner_function_word(chars: &[char], start: usize, end: usize, valid_pos: &[bool]) -> bool {
+    OOV_BOUNDARY_WORDS
+        .iter()
+        .filter(|f| !OOV_INNER_ALLOWED.contains(f))
+        .any(|f| {
+            let len = f.chars().count();
+            end - start > len && valid_pos[end - len] && chars[end - len..end].iter().copied().eq(f.chars())
+        })
 }
 
 #[inline]
@@ -282,6 +299,9 @@ impl Tokenizer {
                     }
                     let word: String = chars[i..j].iter().collect();
                     if borders_function_word(&word) {
+                        if ends_with_inner_function_word(chars, i, j, &valid_pos) {
+                            break;
+                        }
                         continue;
                     }
                     edges.push(DagEdge {

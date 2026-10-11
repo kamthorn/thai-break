@@ -34,15 +34,21 @@ const (
 )
 
 // oovBoundaryWords are frequent function words. An out-of-vocabulary edge may not start or end
-// with one of them, so an unknown word does not swallow its neighbours (ฮิวจ์ส|ไม่|ได้, not
-// ฮิวจ์สไม่ได้): the same name would otherwise be tokenized differently on its own and next to a
-// function word, and a search for it would miss the document.
+// with one of them, nor contain one at a cluster boundary, so an unknown word does not swallow its
+// neighbours (ฮิวจ์ส|ไม่|ได้, not ฮิวจ์สไม่ได้; ชวรัตน์|ที่|ลืม|ไว้, not ชวรัตน์ที่ลืมไว้): the same
+// name would otherwise be tokenized differently on its own and next to a function word, and a
+// search for it would miss the document.
 var oovBoundaryWords = []string{
 	"ที่", "และ", "ของ", "ใน", "ได้", "ให้", "ไม่", "ว่า", "เป็น",
 	"มี", "จะ", "ไป", "มา", "ก็", "กับ", "แต่", "หรือ", "จาก",
 	"โดย", "เพื่อ", "แล้ว", "อยู่", "นี้", "นั้น", "ซึ่ง", "การ", "ความ",
 	"ต่อ", "ถึง", "ยัง", "เมื่อ", "ทั้ง", "ตาม", "ด้วย", "อีก", "คือ",
+	"ไว้",
 }
+
+// oovInnerAllowed are function words that may still occur inside an out-of-vocabulary word: they
+// are frequent syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
+var oovInnerAllowed = map[string]bool{"มา": true, "มี": true}
 
 var (
 	patNonThai = regexp.MustCompile(`^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\x{0e00}-\x{0e7f}a-zA-Z0-9 \t\r\n])`)
@@ -71,6 +77,22 @@ func isThaiRune(r rune) bool {
 func bordersFunctionWord(w string) bool {
 	for _, f := range oovBoundaryWords {
 		if len(w) > len(f) && (strings.HasPrefix(w, f) || strings.HasSuffix(w, f)) {
+			return true
+		}
+	}
+	return false
+}
+
+// endsWithInnerFunctionWord reports whether runes[start:end] ends with an oovBoundaryWords word
+// (other than oovInnerAllowed) that starts at a cluster boundary after start. Every longer
+// out-of-vocabulary edge from start would contain that word.
+func endsWithInnerFunctionWord(runes []rune, start, end int, validPos []bool) bool {
+	for _, f := range oovBoundaryWords {
+		if oovInnerAllowed[f] {
+			continue
+		}
+		l := utf8.RuneCountInString(f)
+		if end-start > l && validPos[end-l] && string(runes[end-l:end]) == f {
 			return true
 		}
 	}
@@ -292,6 +314,9 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				}
 				w := string(runes[i:j])
 				if bordersFunctionWord(w) {
+					if endsWithInnerFunctionWord(runes, i, j, validPos) {
+						break
+					}
 					continue
 				}
 				edges = append(edges, outEdge{j, w, (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
