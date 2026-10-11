@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = "Apache-2.0"
 authors = [{ name = "kamthorn" }]
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 keywords = ["thai", "word-segmentation", "line-break", "nlp"]
 classifiers = [
     "Programming Language :: Python :: 3",

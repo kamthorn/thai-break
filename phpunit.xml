@@ -11,6 +11,7 @@
             <file>php/tests/LineBreakerTest.php</file>
             <file>php/tests/SegmentationTest.php</file>
             <file>php/tests/DawgAndOpcacheTest.php</file>
+            <file>php/tests/WordWeightsTest.php</file>
         </testsuite>
     </testsuites>
     <source>

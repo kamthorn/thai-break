@@ -20,7 +20,7 @@ It implements the **Unicode Line Breaking Algorithm (UAX #14)** and **W3C Thai L
   - Attached leading vowels (`เ`, `แ`, `โ`, `ใ`, `ไ`) to initial consonants.
 - 📏 **Thai Visual Display Width:** Accurately computes visual terminal/column width by treating above/below combining vowels and tone marks as zero-width.
 - 🏷️ **HTML Safe:** Safely inserts soft breaks inside HTML strings while preserving tags, comments, and scripts (`<script>`, `<style>`).
-- 🛡️ **Clean & Open:** 100% Public Domain dictionary (40,800+ entries) released under Apache-2.0.
+- 🛡️ **Clean & Open:** Public Domain word list (25,411 entries) with word weights counted on the Prachathai-67k news corpus (Apache-2.0), all released under Apache-2.0.
 
 ---
 

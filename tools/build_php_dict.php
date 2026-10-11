@@ -5,13 +5,17 @@
  * Compile TSV/Text wordlist into an OPcache preloading-ready PHP array file.
  *
  * Usage:
- *   php tools/build_php_dict.php [input.txt] [output.php]
+ *   php tools/build_php_dict.php [input.txt] [output.php] [word-weights.tsv]
  * Default:
- *   data/words.txt -> data/words.php
+ *   data/words.txt + data/word-weights.tsv -> data/words.php
+ *
+ * The word weights are built into the output, so loading words.php needs no
+ * weights file.
  */
 
-$inputFile  = $argv[1] ?? __DIR__ . '/../data/words.txt';
-$outputFile = $argv[2] ?? __DIR__ . '/../data/words.php';
+$inputFile   = $argv[1] ?? __DIR__ . '/../data/words.txt';
+$outputFile  = $argv[2] ?? __DIR__ . '/../data/words.php';
+$weightsFile = $argv[3] ?? (isset($argv[1]) ? null : __DIR__ . '/../data/word-weights.tsv');
 
 if (!file_exists($inputFile)) {
     fwrite(STDERR, "Error: Input file '$inputFile' not found.\n");
@@ -59,15 +63,32 @@ while (($line = fgets($handle)) !== false) {
 }
 fclose($handle);
 
+// Same arithmetic as ThaiTrie::applyWeights(), so the total matches a runtime load
+if ($weightsFile !== null) {
+    foreach (file($weightsFile, FILE_IGNORE_NEW_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+        [$word, $weight] = explode("\t", $line, 2);
+        $old = $prefixes[$word] ?? 0.0;
+        if ($old > 0.0) {
+            $prefixes[$word] = (float) $weight;
+            $totalWeight += (float) $weight - $old;
+        }
+    }
+}
+
 // Write to PHP file with var_export for fastest opcache parsing
-$header = "<?php\n/**\n * Auto-generated OPcache Preload Dictionary.\n * Words: $wordCount, Prefix Entries: " . count($prefixes) . "\n * Generated on " . date('Y-m-d H:i:s') . "\n */\ndeclare(strict_types=1);\n\nreturn [\n    'totalWeight' => $totalWeight,\n    'wordCount' => $wordCount,\n    'prefixes' => [\n";
+$header = "<?php\n/**\n * Auto-generated OPcache Preload Dictionary.\n * Words: $wordCount, Prefix Entries: " . count($prefixes) . "\n * Generated on " . date('Y-m-d H:i:s') . "\n */\ndeclare(strict_types=1);\n\nreturn [\n    'totalWeight' => " . var_export($totalWeight, true) . ",\n    'wordCount' => $wordCount,\n    'prefixes' => [\n";
 
 $fp = fopen($outputFile, 'w');
 fwrite($fp, $header);
 
 foreach ($prefixes as $key => $weight) {
     $escaped = addcslashes($key, "'\\");
-    fwrite($fp, "        '$escaped' => $weight,\n");
+    $value = $weight == floor($weight) ? (string) (int) $weight : var_export($weight, true);
+    fwrite($fp, "        '$escaped' => $value,\n");
 }
 
 fwrite($fp, "    ],\n];\n");

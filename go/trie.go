@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 )
 
 // PrefixMatch represents a prefix match result.
@@ -59,6 +60,7 @@ type ThaiTrie struct {
 	mu          sync.RWMutex
 	dawg        *CompactDawg
 	overlay     map[string]float64
+	weights     map[string]float64 // weights set with SetWeight for words of the DAWG
 	prefixes    map[string]float64
 	maxWeight   float64
 	totalWeight float64
@@ -184,6 +186,63 @@ func (t *ThaiTrie) Add(word string, weight float64) {
 	}
 }
 
+// SetWeight sets the weight of a word that is already in the dictionary.
+// It returns false for other words.
+func (t *ThaiTrie) SetWeight(word string, weight float64) bool {
+	runes := []rune(word)
+	old := 0.0
+	for _, m := range t.Prefixes(runes, 0, len(runes)) {
+		if m.End == len(runes) {
+			old = m.Weight
+		}
+	}
+	if old <= 0 {
+		return false
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	switch {
+	case t.dawg == nil:
+		t.prefixes[word] = weight
+	case t.overlay[word] > 0:
+		t.overlay[word] = weight
+	default:
+		if t.weights == nil {
+			t.weights = make(map[string]float64)
+		}
+		t.weights[word] = weight
+	}
+	t.totalWeight += weight - old
+	if weight > t.maxWeight {
+		t.maxWeight = weight
+	}
+	return true
+}
+
+// ApplyWeights reads a word-weights file (word<TAB>weight lines, # comments)
+// such as data/word-weights.tsv and sets the weight of every listed word that
+// is in the dictionary. It returns the number of words whose weight was set.
+func (t *ThaiTrie) ApplyWeights(r io.Reader) (int, error) {
+	applied := 0
+	sc := bufio.NewScanner(r)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		word, w, ok := strings.Cut(line, "\t")
+		weight, err := strconv.ParseFloat(strings.TrimSpace(w), 64)
+		if !ok || err != nil || weight <= 0 {
+			return applied, fmt.Errorf("bad word-weights line: %q", line)
+		}
+		if t.SetWeight(word, weight) {
+			applied++
+		}
+	}
+	return applied, sc.Err()
+}
+
 // TotalWeight returns the sum of the weights of all words; word probabilities
 // are weight / TotalWeight().
 func (t *ThaiTrie) TotalWeight() float64 {
@@ -221,9 +280,13 @@ func (t *ThaiTrie) Prefixes(runes []rune, start int, maxLen int) []PrefixMatch {
 	if t.dawg != nil {
 		state := 0
 		d := t.dawg
+		var key []byte // the word so far, to look up t.weights without allocating
 
 		for idx := start; idx < limit; idx++ {
 			r := runes[idx]
+			if len(t.weights) > 0 {
+				key = utf8.AppendRune(key, r)
+			}
 			if r > 0xFFFF {
 				break
 			}
@@ -259,9 +322,15 @@ func (t *ThaiTrie) Prefixes(runes []rune, start int, maxLen int) []PrefixMatch {
 			state = nextState
 			nextOff := int(d.offsets[state])
 			if (d.data[nextOff] & 0x80) != 0 {
+				weight := 1.0
+				if len(t.weights) > 0 {
+					if w, ok := t.weights[string(key)]; ok {
+						weight = w
+					}
+				}
 				matches = append(matches, PrefixMatch{
 					End:    idx + 1,
-					Weight: 1.0,
+					Weight: weight,
 				})
 			}
 		}

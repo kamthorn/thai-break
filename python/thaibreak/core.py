@@ -73,6 +73,9 @@ def _find_lib():
 
         _lib.thaibreak_free_string.argtypes = [ctypes.c_void_p]
         _lib.thaibreak_free_string.restype = None
+
+        _lib.thaibreak_load_weights.argtypes = [ctypes.c_char_p]
+        _lib.thaibreak_load_weights.restype = ctypes.c_int
     return _lib
 
 
@@ -85,6 +88,9 @@ def _engine():
         path = _default_dict()
         if path:
             lib.thaibreak_init(path.encode("utf-8"), None)
+            weights = os.path.join(os.path.dirname(path), "word-weights.tsv")
+            if os.path.exists(weights):
+                lib.thaibreak_load_weights(weights.encode("utf-8"))
     return lib
 
 def init(dict_path: Optional[str] = None, bigram_path: Optional[str] = None) -> bool:

@@ -1,10 +1,8 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { init, words, tccPosArray } from '../dist/index.js';
+import { words, tccPosArray } from '../dist/index.js';
 
-init({ dictPath: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/words.txt') });
+// The default dictionary: dist/data/words.dawg and its word weights
 
 /** [name, input, expected words joined by '|'] */
 const SEGMENTATION_CASES: [string, string, string][] = [
@@ -26,7 +24,7 @@ const SEGMENTATION_CASES: [string, string, string][] = [
   ['an unknown word does not swallow the function words after it', 'มาร์คฮิวจ์สไม่ได้สามารถ', 'มาร์ค|ฮิวจ์ส|ไม่|ได้|สามารถ'],
   ['an unknown word does not swallow a conjunction', 'ภานุวัฒน์ จินตะและสุทธินันท์', 'ภานุวัฒน์|จินตะ|และ|สุทธิ|นันท์'],
   ['an unknown word does not swallow a function word inside it', 'ชวรัตน์ที่ลืมไว้', 'ชวรัตน์|ที่|ลืม|ไว้'],
-  ['a transliterated name may contain มา', 'อาห์มาดิเนจัดกล่าวว่า', 'อาห์มาดิเนจัด|กล่าว|ว่า'],
+  ['a transliterated name may contain มา', 'อะห์มาดีเนญาดกล่าวว่า', 'อะห์มาดีเนญาด|กล่าว|ว่า'],
   ['an unknown name does not swallow the title before it', 'พี่เต๋อมาแล้ว', 'พี่|เต๋อ|มา|แล้ว'],
   ['a tone mark after sara am is matched before it, the text is kept', 'นำ้ตาลทราย', 'นำ้ตาล|ทราย'],
   ['nikhahit + sara aa + tone mark is matched as tone + sara am', 'นํา้ตาลทราย', 'นํา้ตาล|ทราย'],

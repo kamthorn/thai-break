@@ -38,7 +38,9 @@ fn ensure_initialized() {
     let mut bigrams = None;
 
     for &c in &candidates {
-        if let Ok(t) = ThaiTrie::load_file(c) {
+        if let Ok(mut t) = ThaiTrie::load_file(c) {
+            // The default dictionary comes with the word weights next to it, if any
+            let _ = t.apply_weights_file(std::path::Path::new(c).with_file_name("word-weights.tsv"));
             trie = t;
             let bigram_path = std::path::Path::new(c)
                 .parent()
@@ -114,6 +116,36 @@ pub unsafe extern "C" fn thaibreak_init(
         *GLOBAL_BREAKER.write().unwrap_or_else(|e| e.into_inner()) = Some(breaker);
 
         0
+    })
+    .unwrap_or(-1)
+}
+
+/// Apply a word-weights file (`word<TAB>weight` lines, such as `data/word-weights.tsv`)
+/// to the current dictionary. Words that are not in the dictionary are skipped.
+/// Returns the number of words whose weight was set, or -1 on error.
+///
+/// # Safety
+/// - `weights_path` must be a non-NULL pointer to a valid NUL-terminated C string
+///   containing UTF-8, valid for reads for the duration of the call.
+#[no_mangle]
+pub unsafe extern "C" fn thaibreak_load_weights(weights_path: *const c_char) -> c_int {
+    std::panic::catch_unwind(|| {
+        if weights_path.is_null() {
+            return -1;
+        }
+        let Ok(path) = CStr::from_ptr(weights_path).to_str() else {
+            return -1;
+        };
+        ensure_initialized();
+        let mut guard = GLOBAL_TOKENIZER.write().unwrap_or_else(|e| e.into_inner());
+        let Some(tokenizer) = guard.as_mut() else {
+            return -1;
+        };
+        let Ok(applied) = tokenizer.trie_mut().apply_weights_file(path) else {
+            return -1;
+        };
+        *GLOBAL_BREAKER.write().unwrap_or_else(|e| e.into_inner()) = Some(LineBreaker::new(tokenizer.clone()));
+        applied as c_int
     })
     .unwrap_or(-1)
 }

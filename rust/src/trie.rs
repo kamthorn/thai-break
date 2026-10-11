@@ -94,6 +94,19 @@ impl FlatTrie {
         }
     }
 
+    /// Set the weight of a word that is already in the dictionary. Returns false for other words.
+    pub fn set_weight(&mut self, word: &str, weight: f64) -> bool {
+        match self.prefixes.get_mut(word) {
+            Some(entry) if *entry > 0.0 => {
+                self.total_weight += weight - *entry;
+                *entry = weight;
+                self.max_weight = self.max_weight.max(weight);
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn prefixes_from_chars(&self, chars: &[char], start: usize, max_len: usize) -> Vec<PrefixMatch> {
         let limit = (start + max_len).min(chars.len());
         let mut matches = Vec::new();
@@ -132,6 +145,8 @@ pub struct FstTrie {
     total_weight: f64,
     max_weight: f64,
     overlay: HashMap<String, f64>,
+    /// Weights set with `set_weight` for words of the FST, by word id
+    weight_overrides: HashMap<u64, f64>,
 }
 
 impl FstTrie {
@@ -167,6 +182,7 @@ impl FstTrie {
                 total_weight,
                 max_weight,
                 overlay: HashMap::new(),
+                weight_overrides: HashMap::new(),
             })
         } else {
             // Raw FST binary
@@ -179,6 +195,7 @@ impl FstTrie {
                 total_weight: count as f64,
                 max_weight: 1.0,
                 overlay: HashMap::new(),
+                weight_overrides: HashMap::new(),
             })
         }
     }
@@ -224,6 +241,21 @@ impl FstTrie {
         }
     }
 
+    /// Set the weight of a word that is already in the dictionary. Returns false for other words.
+    pub fn set_weight(&mut self, word: &str, weight: f64) -> bool {
+        let old = if let Some(entry) = self.overlay.get_mut(word).filter(|w| **w > 0.0) {
+            std::mem::replace(entry, weight)
+        } else if let Some(id) = self.map.get(word) {
+            let fst_weight = self.weights.get(id as usize).copied().unwrap_or(1.0);
+            self.weight_overrides.insert(id, weight).unwrap_or(fst_weight)
+        } else {
+            return false;
+        };
+        self.total_weight += weight - old;
+        self.max_weight = self.max_weight.max(weight);
+        true
+    }
+
     pub fn prefixes_from_chars(&self, chars: &[char], start: usize, max_len: usize) -> Vec<PrefixMatch> {
         let limit = (start + max_len).min(chars.len());
         let mut matches = Vec::new();
@@ -252,10 +284,9 @@ impl FstTrie {
             if node.is_final() {
                 let total_out = out.cat(node.final_output());
                 let word_id = total_out.value() as usize;
-                let weight = if word_id < self.weights.len() {
-                    self.weights[word_id]
-                } else {
-                    1.0
+                let weight = match self.weight_overrides.get(&(word_id as u64)) {
+                    Some(&w) => w,
+                    None => self.weights.get(word_id).copied().unwrap_or(1.0),
                 };
                 matches.push(PrefixMatch {
                     word: chars[start..=idx].iter().collect(),
@@ -322,11 +353,48 @@ impl ThaiTrie {
         Ok(Self::Fst(FstTrie::from_bytes(bytes)?))
     }
 
-    /// The base dictionary compiled into this build (feature `embedded-dict`).
+    /// The base dictionary compiled into this build, with its word weights (feature `embedded-dict`).
     #[cfg(feature = "embedded-dict")]
     pub fn embedded() -> io::Result<Self> {
         static WORDS_FST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/words.fst"));
-        Self::from_fst_bytes(WORDS_FST.into())
+        static WORD_WEIGHTS: &str = include_str!(concat!(env!("OUT_DIR"), "/word-weights.tsv"));
+        let mut trie = Self::from_fst_bytes(WORDS_FST.into())?;
+        trie.apply_weights(WORD_WEIGHTS.as_bytes())?;
+        Ok(trie)
+    }
+
+    /// Set the weight of a word that is already in the dictionary. Returns false for other words.
+    pub fn set_weight(&mut self, word: &str, weight: f64) -> bool {
+        match self {
+            Self::Flat(t) => t.set_weight(word, weight),
+            Self::Fst(t) => t.set_weight(word, weight),
+        }
+    }
+
+    /// Apply a word-weights file (`word<TAB>weight` lines, `#` comments) such as
+    /// `data/word-weights.tsv`. Words that are not in the dictionary are skipped.
+    /// Returns the number of words whose weight was set.
+    pub fn apply_weights<R: Read>(&mut self, reader: R) -> io::Result<usize> {
+        let mut applied = 0;
+        for line in BufReader::new(reader).lines() {
+            let line = line?;
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                continue;
+            }
+            let (word, weight) = trimmed
+                .split_once('\t')
+                .and_then(|(w, x)| x.trim().parse::<f64>().ok().filter(|x| *x > 0.0).map(|x| (w, x)))
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("bad word-weights line: {trimmed}")))?;
+            if self.set_weight(word, weight) {
+                applied += 1;
+            }
+        }
+        Ok(applied)
+    }
+
+    pub fn apply_weights_file<P: AsRef<Path>>(&mut self, path: P) -> io::Result<usize> {
+        self.apply_weights(File::open(path)?)
     }
 
     pub fn load_fst_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {

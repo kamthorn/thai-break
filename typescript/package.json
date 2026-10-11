@@ -6,13 +6,14 @@
   "type": "module",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc && node -e \"const fs = require('fs'); fs.mkdirSync('dist/data', { recursive: true }); fs.copyFileSync('../data/words.dawg', 'dist/data/words.dawg');\"",
+    "build": "tsc && node -e \"const fs = require('fs'); fs.mkdirSync('dist/data', { recursive: true }); fs.copyFileSync('../data/words.dawg', 'dist/data/words.dawg'); fs.copyFileSync('../data/word-weights.tsv', 'dist/data/word-weights.tsv');\"",
     "test": "node --test"
   },
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "keywords": [
     "thai",

@@ -31,6 +31,7 @@ build/
 python/thaibreak/_lib/
 python/thaibreak/data/
 python/LICENSE
+python/NOTICE
 python/build/
 python/dist/
 *.egg-info/

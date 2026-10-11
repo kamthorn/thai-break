@@ -10,6 +10,7 @@ on:
       - 'python/**'
       - 'rust/**'
       - 'data/words.fst'
+      - 'data/word-weights.tsv'
       - 'tools/build_python_wheel.sh'
       - '.github/workflows/python-wheels.yml'
   workflow_dispatch:

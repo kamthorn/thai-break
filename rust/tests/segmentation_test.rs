@@ -4,7 +4,8 @@ use thaibreak::{set_default, tcc_pos_array, words, ThaiTrie, Tokenizer};
 fn init_test_dict() {
     let dict_path = "../data/words.txt";
     if Path::new(dict_path).exists() {
-        let trie = ThaiTrie::load_tsv_file(dict_path).expect("Failed to load wordlist");
+        let mut trie = ThaiTrie::load_tsv_file(dict_path).expect("Failed to load wordlist");
+        trie.apply_weights_file("../data/word-weights.tsv").expect("Failed to load word weights");
         set_default(Tokenizer::new(trie, None));
     }
 }
@@ -29,7 +30,7 @@ const SEGMENTATION_CASES: &[(&str, &str, &str)] = &[
     ("an unknown word does not swallow the function words after it", "มาร์คฮิวจ์สไม่ได้สามารถ", "มาร์ค|ฮิวจ์ส|ไม่|ได้|สามารถ"),
     ("an unknown word does not swallow a conjunction", "ภานุวัฒน์ จินตะและสุทธินันท์", "ภานุวัฒน์|จินตะ|และ|สุทธิ|นันท์"),
     ("an unknown word does not swallow a function word inside it", "ชวรัตน์ที่ลืมไว้", "ชวรัตน์|ที่|ลืม|ไว้"),
-    ("a transliterated name may contain มา", "อาห์มาดิเนจัดกล่าวว่า", "อาห์มาดิเนจัด|กล่าว|ว่า"),
+    ("a transliterated name may contain มา", "อะห์มาดีเนญาดกล่าวว่า", "อะห์มาดีเนญาด|กล่าว|ว่า"),
     ("an unknown name does not swallow the title before it", "พี่เต๋อมาแล้ว", "พี่|เต๋อ|มา|แล้ว"),
     ("a tone mark after sara am is matched before it, the text is kept", "นำ้ตาลทราย", "นำ้ตาล|ทราย"),
     ("nikhahit + sara aa + tone mark is matched as tone + sara am", "นํา้ตาลทราย", "นํา้ตาล|ทราย"),

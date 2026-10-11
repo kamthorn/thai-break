@@ -64,7 +64,9 @@ fn ensure_default_loaded() {
     let mut bigrams = None;
 
     for &c in &candidates {
-        if let Ok(t) = ThaiTrie::load_file(c) {
+        if let Ok(mut t) = ThaiTrie::load_file(c) {
+            // The default dictionary comes with the word weights next to it, if any
+            let _ = t.apply_weights_file(std::path::Path::new(c).with_file_name("word-weights.tsv"));
             trie = t;
             let b_path = std::path::Path::new(c)
                 .parent()

@@ -352,29 +352,34 @@ ThaiBreak ได้รับการออกแบบให้มีควา�
 
 ### 1. ความแม่นยำในการตัดคำ (Accuracy Benchmark)
 
-วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,411 คำ ค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (41,270 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 18,109 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้):
+วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,411 คำ พร้อมน้ำหนักคำจาก `data/word-weights.tsv` ซึ่งเป็นค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (41,270 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 18,109 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้ โดยคำของฐานใช้น้ำหนักชุดเดียวกัน):
 
 | ชุดทดสอบ | ฐานอย่างเดียว Word F1 | Boundary F1 | ฐาน + dict-extra Word F1 | Boundary F1 |
 | :--- | :---: | :---: | :---: | :---: |
-| **LST20 test** (NECTEC, ข่าว) | **86.3%** | **93.4%** | 84.1% | 92.2% |
-| LST20 eval | 83.0% | 91.0% | 82.1% | 90.8% |
-| Blackboard Treebank (ระดับคำย่อย, ไม่รวมประโยคที่ซ้ำกับ LST20 train) | 86.0% | 93.6% | 85.2% | 93.2% |
-| Wisesight-1000 (โซเชียลมีเดีย, CC0) | 84.0% | 90.8% | 81.9%† | 89.9%† |
+| **LST20 test** (NECTEC, ข่าว) | **86.6%** | **93.5%** | 84.5% | 92.5% |
+| LST20 eval | 83.2% | 91.1% | 82.5% | 91.1% |
+| Blackboard Treebank (ระดับคำย่อย, ไม่รวมประโยคที่ซ้ำกับ LST20 train) | 86.2% | 93.8% | 85.7% | 93.5% |
+| Wisesight-1000 (โซเชียลมีเดีย, CC0) | 84.3% | 91.0% | 82.2%† | 90.1%† |
 
 - **Word F1:** นับคำที่ตำแหน่งต้นและท้ายตรงกับคำตอบ **Boundary F1:** เทียบตำแหน่งจุดตัดระหว่างคำ ข้อความแบ่งเป็นท่อนที่ช่องว่างและขอบเขตประโยค และไม่นับช่องว่าง
-- **ทำไมสองคอลัมน์:** gold ของ LST20 และ Blackboard แยกคำประสมและชื่อเป็นหน่วยย่อย ส่วน dict-extra เก็บคำประสมและชื่อเฉพาะไว้เป็นคำเดียวโดยตั้งใจ เพื่อให้การค้นหาด้วยคำประสมตรงตัวได้น้ำหนักมากขึ้น (ค้นด้วยคำย่อยได้ผ่านโหมด decompound ของ plugin) คะแนนระดับคำจึงต่ำลงเมื่อใช้ dict-extra: บน LST20 test จุดตัดที่ทำนายแม่นขึ้น (precision 89.6% → 92.2%) แต่พบจุดตัดของ gold ได้น้อยลง (recall 97.5% → 92.1%) ตัวเลขนี้วัดการตัดคำเทียบ gold เท่านั้น **ไม่ได้วัดคุณภาพการค้นหา** ถ้าจะใช้ตัดคำให้ตรงกับแนวทางของคลังข้อความแบบ LST20 ให้ใช้ฐานอย่างเดียว ส่วนการตัดบรรทัดใช้ชุด `words-extra-lines` ที่ตัดชื่อเฉพาะและคำประสมออกแล้ว
+- **ทำไมสองคอลัมน์:** gold ของ LST20 และ Blackboard แยกคำประสมและชื่อเป็นหน่วยย่อย ส่วน dict-extra เก็บคำประสมและชื่อเฉพาะไว้เป็นคำเดียวโดยตั้งใจ เพื่อให้การค้นหาด้วยคำประสมตรงตัวได้น้ำหนักมากขึ้น (ค้นด้วยคำย่อยได้ผ่านโหมด decompound ของ plugin) คะแนนระดับคำจึงต่ำลงเมื่อใช้ dict-extra: บน LST20 test จุดตัดที่ทำนายแม่นขึ้น (precision 89.8% → 92.6%) แต่พบจุดตัดของ gold ได้น้อยลง (recall 97.7% → 92.4%) ตัวเลขนี้วัดการตัดคำเทียบ gold เท่านั้น **ไม่ได้วัดคุณภาพการค้นหา** ถ้าจะใช้ตัดคำให้ตรงกับแนวทางของคลังข้อความแบบ LST20 ให้ใช้ฐานอย่างเดียว ส่วนการตัดบรรทัดใช้ชุด `words-extra-lines` ที่ตัดชื่อเฉพาะและคำประสมออกแล้ว
 - † dict-extra มีคำสแลงที่สกัดจาก Wisesight Sentiment ซึ่งอาจซ้อนกับข้อความของ Wisesight-1000 คอลัมน์นี้จึงไม่ใช่การทดสอบกับข้อมูลที่ไม่เคยเห็น (แต่คะแนนก็ไม่ได้สูงขึ้น)
 - **คำที่ตัดผิดส่วนใหญ่ไม่มีในพจนานุกรม:** บน LST20 eval ประมาณสองในสามของคำที่ตัดผิด เช่นคำประสมภาษาข่าวตามแนวทางของ LST20 (`มีการ`, `วันที่`, `ดังกล่าว`) การเพิ่มคำด้วย `addCustomWords()` หรือพจนานุกรมเสริมจึงเป็นทางปรับแต่งหลัก แต่ผลขึ้นกับว่าคำที่เพิ่มตรงกับแนวทางตัดคำของงานของคุณหรือไม่ (ดูตารางด้านบน) พจนานุกรมแบบ TSV ที่มีน้ำหนักความถี่ของคำจะถูกใช้เป็นความน่าจะเป็นของคำ (unigram) โดยตรง
 - **คลังข้อมูลไม่ได้รวมอยู่ในโปรเจกต์:** LST20 ต้องขอจาก NECTEC และใช้ได้ตามข้อตกลงการใช้งาน (งานวิจัย ไม่ใช่เชิงพาณิชย์ และโอเพนซอร์ส ห้ามแจกจ่ายต่อ) Blackboard Treebank มาจากแหล่งข่าวเดียวกัน ส่วน Wisesight-1000 มาจาก [PyThaiNLP/wisesight-sentiment](https://github.com/PyThaiNLP/wisesight-sentiment) — วางไว้เป็นโฟลเดอร์ข้าง `thai-break/` (เช่น `../LST20_Corpus`)
 
 ```bash
 # รันจากโฟลเดอร์รากของ thai-break
+# ค่าเริ่มต้นของไลบรารี: รายการคำฐานพร้อมน้ำหนักคำ
 python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
-    --dict data/words.txt --segmenter-cmd "php tools/segment.php {dict}"
+    --dict data/words.txt --weights data/word-weights.tsv
+
+# ภาษาอื่นที่อ่านบรรทัดจาก stdin เช่น PHP
+python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
+    --dict data/words.txt --weights data/word-weights.tsv --segmenter-cmd "php tools/segment.php {dict}"
 
 # ฐาน + dict-extra (ใส่ --dict ซ้ำเพื่อรวมพจนานุกรม)
 python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
-    --dict data/words.txt --dict ../thai-break-dict-extra/dist/words-extra.tsv
+    --dict data/words.txt --dict ../thai-break-dict-extra/dist/words-extra.tsv --weights data/word-weights.tsv
 ```
 
 > [!NOTE]
@@ -382,7 +387,7 @@ python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
 
 > [!NOTE]
 > **Clean & Safe for Commercial Use:**
-> ThaiBreak ใช้เพียงพจนานุกรม **Public Domain (ราชบัณฑิตยสถาน 25,402 คำ)** ทำให้ซอร์สโค้ดและข้อมูลทั้งหมดอยู่ภายใต้สัญญาอนุญาต **Apache-2.0** อย่างแท้จริง ไม่มีข้อมูลจากคลังข้อมูลที่มีข้อจำกัด (เช่น LST20) รวมอยู่ในโปรเจกต์ คลังข้อมูลเหล่านั้นใช้เพื่อวัดผลเท่านั้น
+> ThaiBreak ใช้รายการคำ **Public Domain (ราชบัณฑิตยสถาน 25,411 คำ)** และน้ำหนักความถี่ของคำที่ใช้บ่อย 3,000 คำ (`data/word-weights.tsv`) ซึ่งนับจากคลังข่าว [Prachathai-67k](https://huggingface.co/datasets/wannaphong/prachathai67k) (Apache-2.0, ดูไฟล์ NOTICE) ทำให้ซอร์สโค้ดและข้อมูลทั้งหมดอยู่ภายใต้สัญญาอนุญาต **Apache-2.0** ไม่มีข้อมูลจากคลังข้อมูลที่มีข้อจำกัด (เช่น LST20) รวมอยู่ในโปรเจกต์ คลังข้อมูลเหล่านั้นใช้เพื่อวัดผลเท่านั้น
 
 ### 2. ประสิทธิภาพและการใช้ทรัพยากร (Performance & Resource Benchmarks)
 
@@ -485,6 +490,7 @@ bin/opensearch-plugin install \
 ## เอกสารอ้างอิง
 
 - **Royal Institute Dictionary:** พจนานุกรมฉบับราชบัณฑิตยสถาน (Public Domain Standard Thai Wordlist)
+- **Prachathai-67k:** คลังข่าวประชาไท 67,000 บทความ ([wannaphong/prachathai67k](https://huggingface.co/datasets/wannaphong/prachathai67k), Apache-2.0) ใช้นับน้ำหนักความถี่ของคำ
 - **Thai Character Cluster (TCC):** Theeramunkong et al., *Multi-segmentation for Thai word extraction*, 2000
 - **Unicode Line Breaking Algorithm:** [Unicode Standard Annex #14 (UAX #14)](https://www.unicode.org/reports/tr14/)
 - **W3C Requirements for Thai Text Layout:** [W3C Working Group Note (tlreq)](https://www.w3.org/TR/tlreq/)

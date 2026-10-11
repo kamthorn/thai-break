@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The accuracy tables report two dictionaries: the base dictionary alone, and the base plus
   thai-break-dict-extra (the set the OpenSearch plugin and the example service use). dict-extra keeps
   compounds and named entities whole on purpose, so word F1 on the gold corpora, which split them,
-  is lower (LST20 test 86.3 → 84.1, boundary F1 93.4 → 92.2). The numbers do not measure retrieval.
+  is lower (LST20 test 86.6 → 84.5, boundary F1 93.5 → 92.5). The numbers do not measure retrieval.
 
 ### Added
 - Rust: `BreakIterator`, a boundary iterator in the style of ICU `BreakIterator` and
@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   offsets), Go (`Boundaries`, byte offsets) and PHP (`ThaiBreak::boundaries`, bytes, or code points
   with `$inCharacters`). Rust, Go, TypeScript and PHP give identical boundaries on 51,475 LST20
   texts.
+- Word weights: `set_weight` / `apply_weights` / `apply_weights_file` on Rust `ThaiTrie`, C
+  `thaibreak_load_weights`, Go `SetWeight` / `ApplyWeights`, TypeScript `setWeight` / `applyWeights`,
+  PHP `setWeight` / `applyWeights`. They set the weight of words already in the dictionary and keep
+  the unigram total exact. `tools/build_word_weights.py` builds `data/word-weights.tsv`, and
+  `tools/benchmark.py --weights` measures a dictionary with them.
 
 ### Changed
 - **An out-of-vocabulary word may not contain a frequent function word either**, only start or end
@@ -44,6 +49,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dictionary word drop from 144 to 127, names tokenized the same alone and in context rise from
   97.5% to 97.7%, and word F1 goes from 86.28 to 86.30 (eval 83.00 to 83.02, Blackboard sub-word
   85.97 to 85.98, Wisesight-1000 83.90 to 83.97).
+- **The default dictionary has word weights.** `data/word-weights.tsv` gives the 3,000 most
+  frequent words of the base dictionary a weight of (count / count of the 3,000th word)^0.5 (up to
+  40.6 for `ที่`), counted on the Prachathai-67k news corpus (Apache-2.0, see `NOTICE`); every other
+  word keeps weight 1. Until now every word had the same weight, so the cost model could not tell
+  `ที่` from a rare word, and an unknown name swallowed the frequent words next to it. Word F1 goes
+  from 86.30 to 86.56 on LST20 test (eval 83.02 to 83.19, Blackboard sub-word 85.98 to 86.25,
+  Wisesight-1000 83.97 to 84.25), and with dict-extra from 84.07 to 84.53; unknown words that
+  swallow a dictionary word drop from 127 to 97 on LST20 test. Weighting every word instead loses
+  0.6 points, because frequent short words then split names. The word list itself stays public
+  domain: `words.txt`, `words.fst` and `words.dawg` are unchanged, and each language applies the
+  weights file next to the default dictionary (or the embedded copy); `words.php` has the weights
+  built in. A dictionary loaded from an explicit path gets no weights. Segmentation speed is
+  unchanged in Rust and about 2.5% (Go) to 4% (TypeScript) slower; packages grow by 71 KB. Output
+  changes for some text, so indices built from it should be reindexed. Rust, Go, TypeScript and PHP
+  give identical tokens on LST20 eval and test.
 
 ## [1.3.0] - 2026-10-04
 

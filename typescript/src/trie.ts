@@ -49,7 +49,7 @@ export class CompactDawg {
     }
   }
 
-  prefixesFromChars(chars: string[], start: number, maxLen: number = 25): PrefixMatch[] {
+  prefixesFromChars(chars: string[], start: number, maxLen: number = 25, weights?: Map<string, number>): PrefixMatch[] {
     const limit = Math.min(chars.length, start + maxLen);
     let state = 0;
     const matches: PrefixMatch[] = [];
@@ -84,11 +84,8 @@ export class CompactDawg {
       state = nextState;
       const nextOff = this.offsets[state];
       if ((this.data[nextOff] & 0x80) !== 0) {
-        matches.push({
-          word: chars.slice(start, idx + 1).join(''),
-          end: idx + 1,
-          weight: 1.0,
-        });
+        const word = chars.slice(start, idx + 1).join('');
+        matches.push({ word, end: idx + 1, weight: weights?.get(word) ?? 1.0 });
       }
     }
 
@@ -99,6 +96,8 @@ export class CompactDawg {
 export class ThaiTrie {
   private dawg?: CompactDawg;
   private overlay: Map<string, number> = new Map();
+  /** Weights set with setWeight for words of the DAWG */
+  private weights: Map<string, number> = new Map();
   private prefixes: Map<string, number> = new Map();
   private _maxWeight: number = 1.0;
   private _totalWeight: number = 0.0;
@@ -161,11 +160,53 @@ export class ThaiTrie {
   }
 
   /**
+   * Set the weight of a word that is already in the dictionary. Returns false for other words.
+   */
+  setWeight(word: string, weight: number): boolean {
+    const chars = Array.from(word);
+    const match = this.prefixesFromChars(chars, 0, chars.length).find((m) => m.end === chars.length);
+    if (!match) return false;
+
+    if (!this.dawg) {
+      this.prefixes.set(word, weight);
+    } else if ((this.overlay.get(word) ?? 0) > 0) {
+      this.overlay.set(word, weight);
+    } else {
+      this.weights.set(word, weight);
+    }
+    this._totalWeight += weight - match.weight;
+    if (weight > this._maxWeight) {
+      this._maxWeight = weight;
+    }
+    return true;
+  }
+
+  /**
+   * Apply a word-weights file (`word<TAB>weight` lines, `#` comments) such as
+   * `data/word-weights.tsv`. Words that are not in the dictionary are skipped.
+   * Returns the number of words whose weight was set.
+   */
+  applyWeights(content: string): number {
+    let applied = 0;
+    for (const raw of content.split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const tab = line.indexOf('\t');
+      const weight = tab > 0 ? Number(line.slice(tab + 1).trim()) : NaN;
+      if (!(weight > 0)) {
+        throw new Error(`bad word-weights line: ${line}`);
+      }
+      if (this.setWeight(line.slice(0, tab), weight)) applied++;
+    }
+    return applied;
+  }
+
+  /**
    * Find all matching dictionary words starting at character index `start`.
    */
   prefixesFromChars(chars: string[], start: number, maxLen: number = 25): PrefixMatch[] {
     if (this.dawg) {
-      const matches = this.dawg.prefixesFromChars(chars, start, maxLen);
+      const matches = this.dawg.prefixesFromChars(chars, start, maxLen, this.weights.size > 0 ? this.weights : undefined);
       if (this.overlay.size > 0) {
         const limit = Math.min(chars.length, start + maxLen);
         let cur = '';

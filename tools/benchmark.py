@@ -4,9 +4,10 @@ tools/benchmark.py
 Measure word segmentation accuracy against a gold corpus.
 
 Examples:
-  # ThaiBreak (the Python binding in python/) on the LST20 eval split
+  # ThaiBreak (the Python binding in python/) on the LST20 eval split, with the
+  # default dictionary: the word list and its word weights
   python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/eval \\
-      --dict data/words.txt
+      --dict data/words.txt --weights data/word-weights.tsv
 
   # Any other segmenter that reads lines on stdin and prints tokens joined by
   # "|" ({dict} is replaced by the dictionary path) -- e.g. the PHP port
@@ -148,9 +149,10 @@ def command_segmenter(command: str, dict_path: Path) -> Segmenter:
     return run
 
 
-def merged_dictionary(paths: list[Path]) -> tuple[Path, set[str]]:
-    """Merge word lists (first column of TSV lines) into a temporary file."""
-    if len(paths) == 1:
+def merged_dictionary(paths: list[Path], weights: Path | None = None) -> tuple[Path, set[str]]:
+    """Merge word lists (first column of TSV lines) into a temporary file, then
+    set the weight of every listed word from a word-weights file."""
+    if len(paths) == 1 and weights is None:
         words = {line.split("\t")[0].strip() for line in paths[0].read_text(encoding="utf-8").splitlines()}
         return paths[0], {w for w in words if w and not w.startswith("#")}
     lines: dict[str, str] = {}
@@ -159,7 +161,12 @@ def merged_dictionary(paths: list[Path]) -> tuple[Path, set[str]]:
             word = line.split("\t")[0].strip()
             if word and not word.startswith("#"):
                 lines.setdefault(word, line.strip())
-    tmp = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8")
+    if weights is not None:
+        for line in weights.read_text(encoding="utf-8").splitlines():
+            word = line.split("\t")[0].strip()
+            if word in lines and not word.startswith("#"):
+                lines[word] = line.strip()
+    tmp = tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8")
     tmp.write("\n".join(lines.values()) + "\n")
     tmp.close()
     return Path(tmp.name), set(lines)
@@ -184,13 +191,14 @@ def main() -> None:
     parser.add_argument("--subword", action="store_true", help="Blackboard: evaluate against sub-words (split at '|')")
     parser.add_argument("--exclude-overlap", type=Path, help="Drop chunks whose text occurs in this LST20 split")
     parser.add_argument("--dict", type=Path, action="append", required=True, help="Word list (repeat to merge)")
+    parser.add_argument("--weights", type=Path, help="Word-weights file applied to the dictionary, e.g. data/word-weights.tsv")
     parser.add_argument("--segmenter-cmd", help='Command reading stdin lines; "{dict}" is replaced by the dictionary path')
     parser.add_argument("--binding-dir", type=Path, default=Path(__file__).resolve().parents[1] / "python")
     parser.add_argument("--limit", type=int, help="Evaluate only the first N chunks")
     parser.add_argument("--json", action="store_true", help="Print results as JSON")
     args = parser.parse_args()
 
-    dict_path, dict_words = merged_dictionary(args.dict)
+    dict_path, dict_words = merged_dictionary(args.dict, args.weights)
     chunks = load_chunks(args)
     texts = ["".join(c) for c in chunks]
     segment = (command_segmenter(args.segmenter_cmd, dict_path) if args.segmenter_cmd

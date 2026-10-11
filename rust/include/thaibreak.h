@@ -23,6 +23,14 @@ extern "C" {
 int thaibreak_init(const char *dict_path, const char *bigram_path);
 
 /**
+ * Apply a word-weights file (word<TAB>weight lines, such as data/word-weights.tsv)
+ * to the current dictionary. Words that are not in the dictionary are skipped.
+ * @param weights_path Path to the word-weights file
+ * @return Number of words whose weight was set, or -1 on error
+ */
+int thaibreak_load_weights(const char *weights_path);
+
+/**
  * Tokenize UTF-8 Thai text into word tokens.
  * @param text UTF-8 encoded text
  * @param count Pointer to receive the number of tokens

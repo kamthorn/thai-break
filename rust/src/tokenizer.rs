@@ -169,6 +169,10 @@ impl Tokenizer {
         &self.trie
     }
 
+    pub fn trie_mut(&mut self) -> &mut ThaiTrie {
+        &mut self.trie
+    }
+
     pub fn tokenize(&self, text: &str, keep_whitespace: bool) -> Vec<String> {
         if text.is_empty() {
             return Vec::new();

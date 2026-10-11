@@ -14,6 +14,9 @@ var defaultDawgData []byte
 //go:embed data/words.txt
 var defaultWordsData string
 
+//go:embed data/word-weights.tsv
+var defaultWordWeights string
+
 var (
 	defaultMu          sync.RWMutex
 	defaultTokenizer   *Tokenizer
@@ -58,6 +61,16 @@ func initDefault() {
 			if t, err := LoadTsv(strings.NewReader(defaultWordsData)); err == nil {
 				trie = t
 			}
+		}
+
+		// The default dictionary comes with the word weights next to it, or the embedded ones
+		if dictPath != "" {
+			if f, err := os.Open(filepath.Join(filepath.Dir(dictPath), "word-weights.tsv")); err == nil {
+				trie.ApplyWeights(f)
+				f.Close()
+			}
+		} else {
+			trie.ApplyWeights(strings.NewReader(defaultWordWeights))
 		}
 
 		var bigrams *BigramModel

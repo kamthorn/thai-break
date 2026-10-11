@@ -138,6 +138,64 @@ class ThaiTrie implements \Countable
     }
 
     /**
+     * Set the weight of a word that is already in the dictionary. Returns false for other words.
+     */
+    public function setWeight(string $word, float $weight): bool
+    {
+        if ($this->dawg !== null) {
+            $overlayWeight = $this->overlay[$word] ?? 0.0;
+            $old = $overlayWeight > 0.0 ? $overlayWeight : ($this->dawg->has($word) ? 1.0 : 0.0);
+        } else {
+            $old = $this->prefixes[$word] ?? 0.0;
+        }
+        if ($old <= 0.0) {
+            return false;
+        }
+
+        $targetMap = &$this->prefixes;
+        if ($this->dawg !== null) {
+            $targetMap = &$this->overlay;
+        }
+        $chars = $this->splitChars($word);
+        $sub   = '';
+        foreach (array_slice($chars, 0, -1) as $ch) {
+            $sub .= $ch;
+            if (!isset($targetMap[$sub])) {
+                $targetMap[$sub] = 0.0;
+            }
+        }
+        $targetMap[$word]   = $weight;
+        $this->totalWeight += $weight - $old;
+        return true;
+    }
+
+    /**
+     * Apply a word-weights file (word<TAB>weight lines, # comments) such as
+     * data/word-weights.tsv. Words that are not in the dictionary are skipped.
+     *
+     * @return int Number of words whose weight was set
+     */
+    public function applyWeights(string $content): int
+    {
+        $applied = 0;
+        foreach (explode("\n", $content) as $raw) {
+            $line = trim($raw);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            $parts  = explode("\t", $line, 2);
+            $weight = isset($parts[1]) && is_numeric(trim($parts[1])) ? (float) trim($parts[1]) : 0.0;
+            if ($weight <= 0.0) {
+                throw new \InvalidArgumentException("bad word-weights line: {$line}");
+            }
+            if ($this->setWeight($parts[0], $weight)) {
+                $applied++;
+            }
+        }
+        return $applied;
+    }
+
+    /**
      * Add multiple words from an array.
      *
      * @param array<int|string, string|float> $words

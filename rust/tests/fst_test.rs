@@ -96,8 +96,38 @@ fn test_standard_data_words_fst_matches_txt() {
 #[test]
 fn embedded_dictionary_matches_data_dir() {
     let embedded = thaibreak::trie::ThaiTrie::embedded().expect("embedded dict loads");
-    let on_disk = thaibreak::trie::ThaiTrie::load_fst_file(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/words.fst"))
+    let mut on_disk = thaibreak::trie::ThaiTrie::load_fst_file(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/words.fst"))
         .expect("data/words.fst loads");
+    let applied = on_disk
+        .apply_weights_file(concat!(env!("CARGO_MANIFEST_DIR"), "/../data/word-weights.tsv"))
+        .expect("data/word-weights.tsv loads");
+    assert!(applied > 0);
     assert_eq!(embedded.max_weight(), on_disk.max_weight());
-    assert!(!embedded.is_empty());
+    assert_eq!(embedded.total_weight(), on_disk.total_weight());
+    assert!(embedded.max_weight() > 1.0, "the embedded dictionary carries word weights");
+}
+
+#[test]
+fn set_weight_replaces_the_weight_of_a_dictionary_word() {
+    let tsv = "แมว\nแมวน้ำ\nหมา\n";
+    let mut fst_bytes = Vec::new();
+    ThaiTrie::compile_tsv_to_fst(tsv.as_bytes(), &mut fst_bytes).unwrap();
+    let flat = ThaiTrie::load_tsv(tsv.as_bytes()).unwrap();
+    let fst = ThaiTrie::from_fst_bytes(fst_bytes.into()).unwrap();
+    for mut trie in [flat, fst] {
+        assert!(trie.set_weight("แมว", 5.0));
+        assert_eq!(trie.total_weight(), 7.0);
+        assert!(trie.set_weight("แมว", 2.0));
+        assert_eq!(trie.total_weight(), 4.0);
+        assert!(!trie.set_weight("ปลา", 3.0), "a word outside the dictionary is not added");
+        assert!(!trie.set_weight("แม", 3.0), "a prefix is not a word");
+        assert_eq!(trie.total_weight(), 4.0);
+        let chars: Vec<char> = "แมวน้ำ".chars().collect();
+        let weights: Vec<(String, f64)> =
+            trie.prefixes_from_chars(&chars, 0, 25).into_iter().map(|m| (m.word, m.weight)).collect();
+        assert_eq!(weights, vec![("แมว".to_string(), 2.0), ("แมวน้ำ".to_string(), 1.0)]);
+        assert_eq!(trie.apply_weights("# comment\nหมา\t3.5\nปลา\t2\n".as_bytes()).unwrap(), 1);
+        assert_eq!(trie.total_weight(), 6.5);
+        assert!(trie.apply_weights("หมา\tx\n".as_bytes()).is_err());
+    }
 }

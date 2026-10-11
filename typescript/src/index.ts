@@ -45,6 +45,12 @@ function tryLoadDefault(): void {
             trie = ThaiTrie.fromTsv(content);
           }
 
+          // The default dictionary comes with the word weights next to it, if any
+          const weightsFile = path.join(path.dirname(c), 'word-weights.tsv');
+          if (fs.existsSync(weightsFile)) {
+            trie.applyWeights(fs.readFileSync(weightsFile, 'utf-8'));
+          }
+
           const bigramFile = path.join(path.dirname(c), 'bigrams.tsv');
           if (fs.existsSync(bigramFile)) {
             const bContent = fs.readFileSync(bigramFile, 'utf-8');

@@ -13,8 +13,10 @@ include = [
     "include/**",
     "build.rs",
     "data/words.fst",
+    "data/word-weights.tsv",
     "README.md",
     "LICENSE",
+    "NOTICE",
 ]
 
 [lib]

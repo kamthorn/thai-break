@@ -12,7 +12,7 @@
 
 - ⚡ **Microsecond-Level Latency:** ~30–45 µs per sentence in Go (>25,000 sentences/sec per core).
 - 💾 **Compact DAWG Dictionary (v1.1.0):** Embedded 167 KB minimal acyclic automaton (`words.dawg`) with zero external dependencies, 48 µs instant startup, < 0.2 MB memory footprint, and 24.5M lookups/sec.
-- 🎯 **Accuracy:** Viterbi dynamic programming with a unigram word model (optional bigram bonuses), scoring **93.4%** word-boundary F1 (86.3% word F1) on the LST20 test set with the default dictionary. See the main README for how it is measured.
+- 🎯 **Accuracy:** Viterbi dynamic programming with a unigram word model (optional bigram bonuses), scoring **93.5%** word-boundary F1 (86.6% word F1) on the LST20 test set with the default dictionary. See the main README for how it is measured.
 - 📐 **Unicode UAX #14 & W3C Typographic Rules:**
   - Implements every rule of the Unicode 16.0 Line Breaking Algorithm (LB1–LB31) and passes all 16,672 cases of the official `LineBreakTest.txt`.
   - Uses the dictionary only inside Thai (SA) runs; next to other characters Thai letters are alphabetic, so `ราคา100บาท`, `ภาษาPHPเป็น` and `ไทย(สยาม)` stay together.
@@ -21,7 +21,7 @@
   - Keeps leading vowels (`เ`, `แ`, `โ`, `ใ`, `ไ`) attached to their initial consonants.
 - 📏 **Thai Visual Display Width:** Accurately calculates visual column width by treating upper/lower combining vowels and tone marks as zero-width.
 - 🏷️ **HTML Preservation:** Safely inserts break markers in HTML content while ignoring tags, comments, and scripts (`<script>`, `<style>`).
-- 🛡️ **Clean & Open:** 100% Public Domain clean-room dictionary (25,402 entries) released under Apache-2.0.
+- 🛡️ **Clean & Open:** Public Domain word list (25,411 entries) with word weights counted on the Prachathai-67k news corpus (Apache-2.0), all released under Apache-2.0.
 
 ---
 
@@ -110,11 +110,12 @@ words := tokenizer.Tokenize("ข้อความทดสอบ", false)
 | **Speed (per sentence)** | **~30–45 µs** |
 | **Throughput** | **~25,000 sentences/sec** |
 | **Memory per Tokenizer** | **~14 MB** |
-| **Word Segmentation F1 (LST20 test)** | **86.3% word, 93.4% boundary** |
+| **Word Segmentation F1 (LST20 test)** | **86.6% word, 93.5% boundary** |
 
 ---
 
 ## License
 
 ThaiBreak is open-sourced under the [Apache License 2.0](LICENSE).
-The bundled wordlist is 100% Public Domain.
+The bundled word list is Public Domain; its word weights (`data/word-weights.tsv`) are counted on
+[Prachathai-67k](https://huggingface.co/datasets/wannaphong/prachathai67k) (Apache-2.0), see [NOTICE](NOTICE).

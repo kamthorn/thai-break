@@ -18,6 +18,8 @@ if not lib.exists():
 (HERE / "thaibreak" / "_lib").mkdir(exist_ok=True)
 (HERE / "thaibreak" / "data").mkdir(exist_ok=True)
 shutil.copy2(lib, HERE / "thaibreak" / "_lib" / LIB_NAME)
-shutil.copy2(ROOT / "data" / "words.fst", HERE / "thaibreak" / "data" / "words.fst")
-shutil.copy2(ROOT / "LICENSE", HERE / "LICENSE")
-print(f"staged {LIB_NAME}, words.fst and LICENSE")
+for name in ("words.fst", "word-weights.tsv"):
+    shutil.copy2(ROOT / "data" / name, HERE / "thaibreak" / "data" / name)
+for name in ("LICENSE", "NOTICE"):
+    shutil.copy2(ROOT / name, HERE / name)
+print(f"staged {LIB_NAME}, words.fst, word-weights.tsv, LICENSE and NOTICE")

@@ -11,10 +11,15 @@ cd "$(dirname "$0")/.."
 COMMITTED=(
   "data/words.dawg go/data/words.dawg"
   "data/words.txt go/data/words.txt"
+  "data/word-weights.tsv go/data/word-weights.tsv"
+  "NOTICE go/NOTICE"
+  "NOTICE rust/NOTICE"
+  "NOTICE typescript/NOTICE"
 )
 # staged for packaging only, never committed
 STAGED=(
   "data/words.fst rust/data/words.fst"
+  "data/word-weights.tsv rust/data/word-weights.tsv"
 )
 
 case "${1:-}" in

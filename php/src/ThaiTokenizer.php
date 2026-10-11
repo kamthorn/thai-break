@@ -74,6 +74,12 @@ class ThaiTokenizer
 
         if ($path !== null && file_exists($path)) {
             $trie = DictionaryLoader::fromFile($path);
+            // The default dictionary comes with the word weights next to it, if any;
+            // words.php has them built in (tools/build_php_dict.php)
+            $weightsFile = dirname($path) . '/word-weights.tsv';
+            if ($dictPath === null && !str_ends_with($path, '.php') && file_exists($weightsFile)) {
+                $trie->applyWeights((string) file_get_contents($weightsFile));
+            }
         } else {
             $trie = new ThaiTrie();
         }

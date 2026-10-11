@@ -163,3 +163,44 @@ func TestBoundaries(t *testing.T) {
 		t.Errorf("legacy spelling: got %v for %d bytes", lb, len(legacy))
 	}
 }
+
+func TestSetWeight(t *testing.T) {
+	flat, err := LoadTsv(strings.NewReader("แมว\nแมวน้ำ\nหมา\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dawg, err := LoadDawg(defaultDawgData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, trie := range map[string]*ThaiTrie{"flat": flat, "dawg": dawg} {
+		base := trie.TotalWeight()
+		if !trie.SetWeight("แมว", 5) || trie.TotalWeight() != base+4 {
+			t.Errorf("%s: SetWeight(แมว, 5) total %v, want %v", name, trie.TotalWeight(), base+4)
+		}
+		if !trie.SetWeight("แมว", 2) || trie.TotalWeight() != base+1 {
+			t.Errorf("%s: SetWeight(แมว, 2) total %v, want %v", name, trie.TotalWeight(), base+1)
+		}
+		if trie.SetWeight("ฟลีบโลก", 3) {
+			t.Errorf("%s: a word outside the dictionary was added", name)
+		}
+		runes := []rune("แมวน้ำ")
+		for _, m := range trie.Prefixes(runes, 0, len(runes)) {
+			if m.End == 3 && m.Weight != 2 {
+				t.Errorf("%s: weight of แมว is %v, want 2", name, m.Weight)
+			}
+		}
+		if n, err := trie.ApplyWeights(strings.NewReader("# comment\nหมา\t3.5\nฟลีบโลก\t2\n")); n != 1 || err != nil {
+			t.Errorf("%s: ApplyWeights = %d, %v", name, n, err)
+		}
+		if _, err := trie.ApplyWeights(strings.NewReader("หมา\tx\n")); err == nil {
+			t.Errorf("%s: a bad weight was accepted", name)
+		}
+	}
+}
+
+func TestDefaultDictionaryHasWordWeights(t *testing.T) {
+	if w := GetDefaultTokenizer().trie.MaxWeight(); w <= 1 {
+		t.Errorf("default dictionary max weight %v, want the weights of data/word-weights.tsv", w)
+	}
+}
