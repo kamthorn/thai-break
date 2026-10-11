@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The accuracy tables report two dictionaries: the base dictionary alone, and the base plus
   thai-break-dict-extra (the set the OpenSearch plugin and the example service use). dict-extra keeps
   compounds and named entities whole on purpose, so word F1 on the gold corpora, which split them,
-  is lower (LST20 test 86.9 → 83.8, boundary F1 93.8 → 92.2). The numbers do not measure retrieval.
+  is lower (LST20 test 86.9 → 83.7, boundary F1 93.8 → 92.2). The numbers do not measure retrieval.
 
 ### Added
 - Rust: `BreakIterator`, a boundary iterator in the style of ICU `BreakIterator` and
@@ -30,9 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/benchmark.py --weights` measures a dictionary with them.
 
 ### Changed
+- thai-break-dict-extra drops the loanwords harvested from PyThaiNLP `th_en_transliteration` (CC BY 4.0, not CC0 as
+  labelled before). The extra dictionary has 14,331 words (was 17,819), and the lines dictionary 5,663 (was 9,190).
 - thai-break-dict-extra no longer contains entries selected from LST20, which is used only to measure
   accuracy. The standard abbreviation lists (ranks, titles, addresses, units, months) are restored. The
-  base plus extra dictionary has 41,017 words, and `examples/service/data/*.fst` is rebuilt from it.
+  base plus extra dictionary has 38,483 words, and `examples/service/data/*.fst` is rebuilt from it.
 - **An out-of-vocabulary word may not contain a frequent function word either**, only start or end
   with one was forbidden before, and `ไว้` joins the list (37 words). A name followed by a function
   word and a short word came out as one token (`ชวรัตน์ที่ลืมไว้`), because every word of the

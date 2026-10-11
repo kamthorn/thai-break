@@ -262,9 +262,9 @@ curl -X POST http://localhost:8080/api/v1/validate-id \
     "name": "thai-break-service",
     "version": "0.1.0",
     "engine": "thaibreak-rust",
-    "base_dictionary_words": 41272,
-    "words_dictionary_words": 41272,
-    "lines_dictionary_words": 33145,
+    "base_dictionary_words": 25411,
+    "words_dictionary_words": 38483,
+    "lines_dictionary_words": 30582,
     "status": "ready"
   }
   ```
@@ -277,12 +277,12 @@ Service นี้ใช้พจนานุกรม 2 ชั้นรวมก
 
 | องค์ประกอบ | ที่มา | ลิขสิทธิ์ | จำนวน |
 |---|---|---|---|
-| **Base Dictionary** | `data/words.txt` ของ thai-break (ราชบัณฑิตยสถาน) | Public Domain | 25,402 คำ |
-| **Extra Dictionary** | [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) `dist/words-extra.tsv` | CC0-1.0 | 18,109 คำ |
-| **Lines Dictionary** | `dist/words-extra-lines.tsv` (ตัดชื่อเฉพาะ/โรงเรียน/คำประสมข่าวออกเพื่อให้พับบรรทัดได้ยืดหยุ่น) | CC0-1.0 | 9,218 คำ |
+| **Base Dictionary** | `data/words.txt` ของ thai-break (ราชบัณฑิตยสถาน) | Public Domain | 25,411 คำ |
+| **Extra Dictionary** | [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) `dist/words-extra.tsv` | CC0-1.0 | 14,331 คำ |
+| **Lines Dictionary** | `dist/words-extra-lines.tsv` (ตัดชื่อเฉพาะ/โรงเรียน/คำประสมข่าวออกเพื่อให้พับบรรทัดได้ยืดหยุ่น) | CC0-1.0 | 5,663 คำ |
 | **Bigram Model** (ไม่บังคับ ไม่อยู่ใน repo) | `thai-break-dict-extra/data/bigrams-prachathai.tsv` สกัดจาก Prachathai-67k (54,380 บทความ) | Apache-2.0 | 955,967 คู่คำ |
 
-**ผลลัพธ์หลังรวม:** `data/words.fst` = **41,017 คำ** (909 KB), `data/lines.fst` = **33,123 คำ** (699 KB)
+**ผลลัพธ์หลังรวม:** `data/words.fst` = **38,483 คำ** (848 KB), `data/lines.fst` = **30,582 คำ** (637 KB)
 
 ### การรีบิลด์พจนานุกรม
 ```bash
@@ -318,6 +318,8 @@ LST20 test split (38,454 ประโยค, 174,074 คำ) ผ่าน `POST 
 | พจนานุกรมรวม ไม่มี Bigram (ค่าเริ่มต้นของตัวอย่างนี้) | 83.7 | 92.0 |
 | พจนานุกรมรวม + Bigram Prachathai (alpha 2.0) | 83.3 | 91.7 |
 | (เทียบ) พจนานุกรมฐานอย่างเดียว ไม่มี Bigram | 86.1 | 93.3 |
+
+> ตัวเลขชุดนี้วัดก่อนลบคำที่มาจาก th_en_transliteration (CC BY 4.0) ออกจาก dict-extra ยังไม่ได้วัดซ้ำบน service
 
 - Bigram ลดคะแนนเล็กน้อยบน LST20 กับเอนจินรุ่นนี้ (ค่า alpha 2.0 ปรับไว้กับเอนจินรุ่นก่อน) จึงไม่เปิดเป็นค่าเริ่มต้น
 - พจนานุกรมรวมได้คะแนนระดับคำต่ำกว่าฐานอย่างเดียว เพราะ dict-extra มีคำประสมและชื่อเฉพาะที่ gold ของ LST20 แยกเป็นคำย่อย นี่เป็นการออกแบบที่ตั้งใจให้ค้นหาคำประสมได้ตรงตัว ดู `ROADMAP.md` ของ repo
