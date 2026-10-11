@@ -77,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   LST20 eval and test.
 
 ### Fixed
+- **A dictionary word can have up to 40 characters** (it was 25 in Rust, Go, TypeScript and PHP; the
+  Java engine of the OpenSearch plugin takes the limit from the dictionary). A longer word of a
+  user dictionary or of thai-break-dict-extra was never matched: the royal title
+  `พระบาทสมเด็จพระเจ้าอยู่หัว` has 26 characters and came out as `พระ|บาท|สมเด็จ|…` however it was
+  added. The base dictionary has no word over 19 characters, so its output does not change; the
+  lookup walks the dictionary only as far as a word can continue, so the limit costs no time.
 - **A word followed by a full stop is no longer read as an abbreviation.** The abbreviation pattern
   takes one to four consonant letters before a full stop, and อ ว ย count as consonants, so
   `ต่อไป.` came out as `ต่อ|ไป.`, `ได้.` as one token with its full stop, and a function word in

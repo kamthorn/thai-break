@@ -23,6 +23,9 @@ var letterNames = func() [][]rune {
 }()
 
 const (
+	// maxWordLen is the longest dictionary word that is looked up, in characters (a base word has at
+	// most 19, and the royal title พระบาทสมเด็จพระเจ้าอยู่หัว has 26).
+	maxWordLen = 40
 	// letterRunCostFactor is the cost of a run of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น),
 	// relative to the cost of the rarest word.
 	letterRunCostFactor = 1.0
@@ -327,7 +330,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 
 		if isThaiRune(runes[i]) {
 			// 1. Thai dictionary words starting at i
-			for _, m := range tok.trie.Prefixes(runes, i, 25) {
+			for _, m := range tok.trie.Prefixes(runes, i, maxWordLen) {
 				if j := m.End; j <= n && validPos[j] {
 					edges = append(edges, outEdge{j, string(runes[i:j]), math.Log(normalizer / m.Weight), false})
 				}

@@ -35,6 +35,9 @@ const OOV_BOUNDARY_WORDS: &[&str] = &[
 /// Function words that may still occur inside an out-of-vocabulary word: they are frequent
 /// syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
 const OOV_INNER_ALLOWED: &[&str] = &["มา", "มี"];
+/// The longest dictionary word that is looked up, in characters (a base word has at most 19, and the royal
+/// title พระบาทสมเด็จพระเจ้าอยู่หัว has 26).
+const MAX_WORD_LEN: usize = 40;
 /// Names of the letters of the Latin alphabet in Thai. A name that starts another one comes first
 /// (เอ็ม before เอ), so the longest name wins.
 const LETTER_NAMES: &[&str] = &[
@@ -301,7 +304,7 @@ impl Tokenizer {
 
             if is_thai_rune(chars[i]) {
                 // 1. Thai dictionary words starting at i
-                for m in self.trie.prefixes_from_chars(chars, i, 25) {
+                for m in self.trie.prefixes_from_chars(chars, i, MAX_WORD_LEN) {
                     if m.end <= n && valid_pos[m.end] {
                         edges.push(DagEdge {
                             to: m.end,

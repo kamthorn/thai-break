@@ -176,3 +176,15 @@ fn c_boundaries_round_trip() {
         assert!(thaibreak::c_ffi::thaibreak_boundaries(std::ptr::null(), &mut count).is_null());
     }
 }
+
+#[test]
+fn test_dictionary_words_of_up_to_40_characters_are_matched() {
+    // พระบาทสมเด็จพระเจ้าอยู่หัว has 26 characters, one more than the old limit of 25
+    let title = "พระบาทสมเด็จพระเจ้าอยู่หัว";
+    let long = "สมเด็จพระนางเจ้าสิริกิติ์พระบรมราชินีนาถ";
+    assert_eq!(long.chars().count(), 40);
+    let trie = ThaiTrie::load_tsv(format!("พระ\nบาท\nสมเด็จ\n{title}\n{long}\nเสด็จ\n").as_bytes()).unwrap();
+    let tokenizer = Tokenizer::new(trie, None);
+    assert_eq!(tokenizer.tokenize(&format!("{title}เสด็จ"), false), vec![title, "เสด็จ"]);
+    assert_eq!(tokenizer.tokenize(&format!("{long}เสด็จ"), false), vec![long, "เสด็จ"]);
+}

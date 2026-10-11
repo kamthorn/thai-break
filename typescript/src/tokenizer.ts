@@ -3,6 +3,11 @@ import { ThaiTrie } from './trie.js';
 import { BigramModel } from './bigram.js';
 
 /**
+ * The longest dictionary word that is looked up, in characters (a base word has at most 19, and the
+ * royal title พระบาทสมเด็จพระเจ้าอยู่หัว has 26).
+ */
+const MAX_WORD_LEN = 40;
+/**
  * Names of the letters of the Latin alphabet in Thai. A name that starts another one comes first
  * (เอ็ม before เอ), so the longest name wins.
  */
@@ -309,7 +314,7 @@ export class Tokenizer {
 
       if (isThaiRune(code)) {
         // 1. Thai dictionary words starting at i
-        for (const m of this.trie.prefixesFromChars(chars, i, 25)) {
+        for (const m of this.trie.prefixesFromChars(chars, i, MAX_WORD_LEN)) {
           if (m.end <= n && validPos[m.end]) {
             edges.push({ to: m.end, word: m.word, cost: Math.log(normalizer / m.weight), unknown: false });
           }

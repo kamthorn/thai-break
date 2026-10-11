@@ -110,3 +110,22 @@ func TestSegmentation(t *testing.T) {
 		}
 	}
 }
+
+func TestDictionaryWordsOfUpTo40CharactersAreMatched(t *testing.T) {
+	// พระบาทสมเด็จพระเจ้าอยู่หัว has 26 characters, one more than the old limit of 25
+	title := "พระบาทสมเด็จพระเจ้าอยู่หัว"
+	long := "สมเด็จพระนางเจ้าสิริกิติ์พระบรมราชินีนาถ"
+	if n := len([]rune(long)); n != 40 {
+		t.Fatalf("test word has %d characters", n)
+	}
+	trie, err := LoadTsv(strings.NewReader("พระ\nบาท\nสมเด็จ\n" + title + "\n" + long + "\nเสด็จ\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok := NewTokenizer(trie, nil)
+	for _, w := range []string{title, long} {
+		if got := strings.Join(tok.Tokenize(w+"เสด็จ", false), "|"); got != w+"|เสด็จ" {
+			t.Errorf("Tokenize(%qเสด็จ) = %q", w, got)
+		}
+	}
+}

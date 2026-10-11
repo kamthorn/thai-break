@@ -49,7 +49,7 @@ export class CompactDawg {
     }
   }
 
-  prefixesFromChars(chars: string[], start: number, maxLen: number = 25, weights?: Map<string, number>): PrefixMatch[] {
+  prefixesFromChars(chars: string[], start: number, maxLen: number = 40, weights?: Map<string, number>): PrefixMatch[] {
     const limit = Math.min(chars.length, start + maxLen);
     let state = 0;
     const matches: PrefixMatch[] = [];
@@ -210,7 +210,7 @@ export class ThaiTrie {
   /**
    * Find all matching dictionary words starting at character index `start`.
    */
-  prefixesFromChars(chars: string[], start: number, maxLen: number = 25): PrefixMatch[] {
+  prefixesFromChars(chars: string[], start: number, maxLen: number = 40): PrefixMatch[] {
     if (this.dawg) {
       const matches = this.dawg.prefixesFromChars(chars, start, maxLen, this.weights.size > 0 ? this.weights : undefined);
       if (this.overlay.size > 0) {

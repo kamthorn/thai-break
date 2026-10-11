@@ -68,7 +68,7 @@ class CompactDawg
      * @param  int          $maxLen   Maximum word length in characters
      * @return array<array{word: string, weight: float}>
      */
-    public function prefixesFromChars(array $chars, int $startPos = 0, int $maxLen = 25): array
+    public function prefixesFromChars(array $chars, int $startPos = 0, int $maxLen = 40): array
     {
         $len     = count($chars);
         $limit   = min($len, $startPos + $maxLen);

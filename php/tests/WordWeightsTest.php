@@ -31,6 +31,20 @@ class WordWeightsTest extends TestCase
         $flat->applyWeights("หมา\tx\n");
     }
 
+    public function testDictionaryWordsOfUpTo40CharactersAreMatched(): void
+    {
+        // พระบาทสมเด็จพระเจ้าอยู่หัว has 26 characters, one more than the old limit of 25
+        $title = 'พระบาทสมเด็จพระเจ้าอยู่หัว';
+        $long  = 'สมเด็จพระนางเจ้าสิริกิติ์พระบรมราชินีนาถ';
+        $this->assertSame(40, mb_strlen($long, 'UTF-8'));
+        $trie = new ThaiTrie();
+        $trie->addMany(['พระ', 'บาท', 'สมเด็จ', $title, $long, 'เสด็จ']);
+        $tokenizer = new ThaiTokenizer($trie);
+        foreach ([$title, $long] as $word) {
+            $this->assertSame([$word, 'เสด็จ'], $tokenizer->tokenize($word . 'เสด็จ'));
+        }
+    }
+
     public function testDefaultDictionaryHasWordWeights(): void
     {
         $trie = ThaiTokenizer::withDefaultDict()->getTrie();
