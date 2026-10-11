@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `tools/benchmark.py --weights` measures a dictionary with them.
 
 ### Changed
+- thai-break-dict-extra no longer contains entries selected from LST20, which is used only to measure
+  accuracy. The standard abbreviation lists (ranks, titles, addresses, units, months) are restored. The
+  base plus extra dictionary has 41,017 words, and `examples/service/data/*.fst` is rebuilt from it.
 - **An out-of-vocabulary word may not contain a frequent function word either**, only start or end
   with one was forbidden before, and `ไว้` joins the list (37 words). A name followed by a function
   word and a short word came out as one token (`ชวรัตน์ที่ลืมไว้`), because every word of the

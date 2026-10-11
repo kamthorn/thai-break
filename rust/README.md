@@ -342,12 +342,12 @@ ThaiBreak ได้รับการออกแบบให้มีควา�
 
 ### 1. ความแม่นยำในการตัดคำ (Accuracy Benchmark)
 
-วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,411 คำ พร้อมน้ำหนักคำจาก `data/word-weights.tsv` ซึ่งเป็นค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (40,911 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 17,696 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้ โดยคำของฐานใช้น้ำหนักชุดเดียวกัน):
+วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,411 คำ พร้อมน้ำหนักคำจาก `data/word-weights.tsv` ซึ่งเป็นค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (41,017 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 17,819 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้ โดยคำของฐานใช้น้ำหนักชุดเดียวกัน):
 
 | ชุดทดสอบ | ฐานอย่างเดียว Word F1 | Boundary F1 | ฐาน + dict-extra Word F1 | Boundary F1 |
 | :--- | :---: | :---: | :---: | :---: |
 | **LST20 test** (NECTEC, ข่าว) | **86.9%** | **93.8%** | 83.8% | 92.2% |
-| LST20 eval | 83.5% | 91.3% | 80.5% | 90.1% |
+| LST20 eval | 83.5% | 91.3% | 80.6% | 90.1% |
 | Blackboard Treebank (ระดับคำย่อย, ไม่รวมประโยคที่ซ้ำกับ LST20 train) | 86.6% | 94.0% | 84.2% | 93.0% |
 | Wisesight-1000 (โซเชียลมีเดีย, CC0) | 84.5% | 91.1% | 82.7%† | 90.3%† |
 
