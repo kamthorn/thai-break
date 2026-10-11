@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The accuracy tables report two dictionaries: the base dictionary alone, and the base plus
   thai-break-dict-extra (the set the OpenSearch plugin and the example service use). dict-extra keeps
   compounds and named entities whole on purpose, so word F1 on the gold corpora, which split them,
-  is lower (LST20 test 86.6 → 84.5, boundary F1 93.5 → 92.5). The numbers do not measure retrieval.
+  is lower (LST20 test 86.9 → 84.8, boundary F1 93.8 → 92.7). The numbers do not measure retrieval.
 
 ### Added
 - Rust: `BreakIterator`, a boundary iterator in the style of ICU `BreakIterator` and
