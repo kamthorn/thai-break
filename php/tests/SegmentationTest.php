@@ -33,6 +33,7 @@ class SegmentationTest extends TestCase
             'an unknown word does not swallow a conjunction' => ['ภานุวัฒน์ จินตะและสุทธินันท์', 'ภานุวัฒน์|จินตะ|และ|สุทธิ|นันท์'],
             'an unknown word does not swallow a function word inside it' => ['ชวรัตน์ที่ลืมไว้', 'ชวรัตน์|ที่|ลืม|ไว้'],
             'a transliterated name may contain มา' => ['อาห์มาดิเนจัดกล่าวว่า', 'อาห์มาดิเนจัด|กล่าว|ว่า'],
+            'an unknown name does not swallow the title before it' => ['พี่เต๋อมาแล้ว', 'พี่|เต๋อ|มา|แล้ว'],
             'a tone mark after sara am is matched before it, the text is kept' => ['นำ้ตาลทราย', 'นำ้ตาล|ทราย'],
             'nikhahit + sara aa + tone mark is matched as tone + sara am' => ['นํา้ตาลทราย', 'นํา้ตาล|ทราย'],
         ];

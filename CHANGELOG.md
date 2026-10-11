@@ -38,6 +38,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`ศุภชัย`, `กอร์ปศักดิ์`) and lost 0.7 points of word F1. Output changes for text with unknown
   words, so indices built from it should be reindexed. Rust, Go, TypeScript and PHP give
   identical tokens on LST20 eval and test.
+- **An out-of-vocabulary word may not swallow a title before a name either:** `นาย นาง พี่ น้อง
+  แพทย์ ตัว` join the function-word list (43 words), so `พี่เต๋อ` is `พี่|เต๋อ` and the name is
+  tokenized the same with and without its title. On LST20 test, unknown words that swallow a
+  dictionary word drop from 144 to 127, names tokenized the same alone and in context rise from
+  97.5% to 97.7%, and word F1 goes from 86.28 to 86.30 (eval 83.00 to 83.02, Blackboard sub-word
+  85.97 to 85.98, Wisesight-1000 83.90 to 83.97).
 
 ## [1.3.0] - 2026-10-04
 

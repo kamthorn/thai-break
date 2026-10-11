@@ -42,6 +42,8 @@ const OOV_BOUNDARY_WORDS = [
   'โดย', 'เพื่อ', 'แล้ว', 'อยู่', 'นี้', 'นั้น', 'ซึ่ง', 'การ', 'ความ',
   'ต่อ', 'ถึง', 'ยัง', 'เมื่อ', 'ทั้ง', 'ตาม', 'ด้วย', 'อีก', 'คือ',
   'ไว้',
+  // words that often come right before a name
+  'นาย', 'นาง', 'พี่', 'น้อง', 'แพทย์', 'ตัว',
 ];
 /**
  * Function words that may still occur inside an out-of-vocabulary word: they are frequent
