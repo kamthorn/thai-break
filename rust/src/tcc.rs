@@ -134,15 +134,9 @@ pub fn tcc_pos_array(chars: &[char]) -> Vec<bool> {
     let text: String = chars.iter().collect();
     let byte_len = text.len();
 
-    let mut byte_to_char_idx = vec![usize::MAX; byte_len + 1];
-    let mut offset = 0;
-    for (i, &ch) in chars.iter().enumerate() {
-        byte_to_char_idx[offset] = i;
-        offset += ch.len_utf8();
-    }
-    byte_to_char_idx[offset] = n;
-
+    // Matches end on character boundaries, so the character index advances by the characters of each match
     let mut byte_pos = 0;
+    let mut char_pos = 0;
     while byte_pos < byte_len {
         let sub = &text[byte_pos..];
 
@@ -152,22 +146,22 @@ pub fn tcc_pos_array(chars: &[char]) -> Vec<bool> {
                 let m_len = m.end();
                 if is_followed_by_lookahead_char(&sub[m_len..]) {
                     byte_pos += m_len;
-                    valid[byte_to_char_idx[byte_pos]] = true;
+                    char_pos += m.as_str().chars().count();
+                    valid[char_pos] = true;
                     continue;
                 }
             }
         }
 
         // Second, check general rules
-        if let Some(m) = TCC_GENERAL_REGEX.find(sub) {
-            byte_pos += cluster_len(m.as_str(), &sub[m.end()..]);
-            valid[byte_to_char_idx[byte_pos]] = true;
-        } else {
+        let len = match TCC_GENERAL_REGEX.find(sub) {
+            Some(m) => cluster_len(m.as_str(), &sub[m.end()..]),
             // Fallback: advance 1 char
-            let ch_len = sub.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
-            byte_pos += ch_len;
-            valid[byte_to_char_idx[byte_pos]] = true;
-        }
+            None => sub.chars().next().map(|c| c.len_utf8()).unwrap_or(1),
+        };
+        char_pos += sub[..len].chars().count();
+        byte_pos += len;
+        valid[char_pos] = true;
     }
 
     // Non-Thai characters are always valid boundaries
