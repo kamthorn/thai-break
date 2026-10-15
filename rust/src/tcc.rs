@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::collections::HashMap;
 
 static TCC_GENERAL_REGEX: Lazy<Regex> = Lazy::new(|| {
     let c = "[ก-ฮ]";
@@ -135,43 +134,39 @@ pub fn tcc_pos_array(chars: &[char]) -> Vec<bool> {
     let text: String = chars.iter().collect();
     let byte_len = text.len();
 
-    let mut byte_to_char_idx = HashMap::with_capacity(n + 1);
+    let mut byte_to_char_idx = vec![usize::MAX; byte_len + 1];
     let mut offset = 0;
     for (i, &ch) in chars.iter().enumerate() {
-        byte_to_char_idx.insert(offset, i);
+        byte_to_char_idx[offset] = i;
         offset += ch.len_utf8();
     }
-    byte_to_char_idx.insert(offset, n);
+    byte_to_char_idx[offset] = n;
 
     let mut byte_pos = 0;
     while byte_pos < byte_len {
         let sub = &text[byte_pos..];
 
-        // First, check lookahead rules
-        if let Some(m) = TCC_LOOKAHEAD_REGEX.find(sub) {
-            let m_len = m.end();
-            if is_followed_by_lookahead_char(&sub[m_len..]) {
-                byte_pos += m_len;
-                if let Some(&idx) = byte_to_char_idx.get(&byte_pos) {
-                    valid[idx] = true;
+        // First, check lookahead rules (all of them start with เ)
+        if sub.starts_with('เ') {
+            if let Some(m) = TCC_LOOKAHEAD_REGEX.find(sub) {
+                let m_len = m.end();
+                if is_followed_by_lookahead_char(&sub[m_len..]) {
+                    byte_pos += m_len;
+                    valid[byte_to_char_idx[byte_pos]] = true;
+                    continue;
                 }
-                continue;
             }
         }
 
         // Second, check general rules
         if let Some(m) = TCC_GENERAL_REGEX.find(sub) {
             byte_pos += cluster_len(m.as_str(), &sub[m.end()..]);
-            if let Some(&idx) = byte_to_char_idx.get(&byte_pos) {
-                valid[idx] = true;
-            }
+            valid[byte_to_char_idx[byte_pos]] = true;
         } else {
             // Fallback: advance 1 char
             let ch_len = sub.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
             byte_pos += ch_len;
-            if let Some(&idx) = byte_to_char_idx.get(&byte_pos) {
-                valid[idx] = true;
-            }
+            valid[byte_to_char_idx[byte_pos]] = true;
         }
     }
 
