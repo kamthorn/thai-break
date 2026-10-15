@@ -131,3 +131,45 @@ fn set_weight_replaces_the_weight_of_a_dictionary_word() {
         assert!(trie.apply_weights("หมา\tx\n".as_bytes()).is_err());
     }
 }
+
+/// `prefix_ends_from_chars` is `prefixes_from_chars` without the words, for every start.
+fn assert_prefix_ends_match(trie: &ThaiTrie, text: &str) {
+    let chars: Vec<char> = text.chars().collect();
+    let mut ends = Vec::new();
+    for start in 0..chars.len() {
+        for max_len in [1, 2, 3, 40] {
+            ends.clear();
+            trie.prefix_ends_from_chars(&chars, start, max_len, &mut ends);
+            let expected: Vec<(usize, f64)> =
+                trie.prefixes_from_chars(&chars, start, max_len).into_iter().map(|m| (m.end, m.weight)).collect();
+            assert_eq!(ends, expected, "start {start}, max_len {max_len} in {text:?}");
+        }
+    }
+}
+
+#[test]
+fn prefix_ends_match_prefixes() {
+    let tsv = "ก\nกา\nกาก\nกาแฟ\t4\nแมว\nแมวน้ำ\t2\nmail\nอีเมล\nอีเมลล์\nๆ\n";
+    let text = "กาแฟกากแมวน้ำอีเมลล์ mail กๆ ก";
+    let mut fst_bytes = Vec::new();
+    ThaiTrie::compile_tsv_to_fst(tsv.as_bytes(), &mut fst_bytes).unwrap();
+    let flat = ThaiTrie::load_tsv(tsv.as_bytes()).unwrap();
+    let fst = ThaiTrie::from_fst_bytes(fst_bytes.into()).unwrap();
+    for mut trie in [flat, fst] {
+        assert_prefix_ends_match(&trie, text);
+        trie.set_weight("แมว", 3.0);
+        trie.add("กาแฟเย็น", 2.0);
+        trie.add("กาแฟ", 5.0);
+        trie.add("ma", 1.0);
+        assert_prefix_ends_match(&trie, text);
+        assert_prefix_ends_match(&trie, "กาแฟเย็นmailma");
+    }
+}
+
+#[cfg(feature = "embedded-dict")]
+#[test]
+fn prefix_ends_match_prefixes_in_the_embedded_dictionary() {
+    let trie = ThaiTrie::embedded().unwrap();
+    assert_prefix_ends_match(&trie, "พระบาทสมเด็จพระเจ้าอยู่หัวเสด็จฯ ไปทรงเปิดงานที่กรุงเทพมหานคร เมื่อวันที่ 5 ธ.ค.");
+    assert_prefix_ends_match(&trie, "นํ้าแข็งใส่แก้ว Eucerin ค่ะ ไม่อยากก้ไม่ต้องกิน");
+}

@@ -137,18 +137,34 @@ fn is_oov_char(ch: char) -> bool {
 
 const _: () = assert!(OOV_BOUNDARY_WORDS.len() <= 64);
 
+static FUNCTION_WORD_CHARS: Lazy<Vec<Vec<char>>> =
+    Lazy::new(|| OOV_BOUNDARY_WORDS.iter().map(|f| f.chars().collect()).collect());
+/// Indices into `OOV_BOUNDARY_WORDS` by first character, as an offset from U+0E00.
+static FUNCTION_WORDS_BY_FIRST: Lazy<Vec<Vec<usize>>> = Lazy::new(|| {
+    let mut by_first = vec![Vec::new(); 0x80];
+    for (k, f) in FUNCTION_WORD_CHARS.iter().enumerate() {
+        by_first[f[0] as usize - 0x0E00].push(k);
+    }
+    by_first
+});
+
 /// For each character index p, bit k of `starts[p]` is set when `OOV_BOUNDARY_WORDS[k]` begins
 /// at p, and bit k of `ends[p]` when it ends at p.
 fn function_word_positions(chars: &[char]) -> (Vec<u64>, Vec<u64>) {
     let n = chars.len();
     let mut starts = vec![0u64; n + 1];
     let mut ends = vec![0u64; n + 1];
-    for (k, f) in OOV_BOUNDARY_WORDS.iter().enumerate() {
-        let len = f.chars().count();
-        for p in 0..=n.saturating_sub(len) {
-            if p + len <= n && chars[p..p + len].iter().copied().eq(f.chars()) {
+    for p in 0..n {
+        // Every function word starts with a Thai character
+        let first = (chars[p] as u32).wrapping_sub(0x0E00) as usize;
+        let Some(words) = FUNCTION_WORDS_BY_FIRST.get(first) else {
+            continue;
+        };
+        for &k in words {
+            let f = &FUNCTION_WORD_CHARS[k];
+            if chars[p..].starts_with(f) {
                 starts[p] |= 1 << k;
-                ends[p + len] |= 1 << k;
+                ends[p + f.len()] |= 1 << k;
             }
         }
     }
@@ -279,6 +295,7 @@ impl Tokenizer {
         dp[0] = 0.0;
 
         let mut edges: Vec<DagEdge> = Vec::new();
+        let mut prefixes: Vec<(usize, f64)> = Vec::new();
 
         for i in 0..=n {
             if !valid_pos[i] {
@@ -304,18 +321,22 @@ impl Tokenizer {
 
             if is_thai_rune(chars[i]) {
                 // 1. Thai dictionary words starting at i
-                for m in self.trie.prefixes_from_chars(chars, i, MAX_WORD_LEN) {
-                    if m.end <= n && valid_pos[m.end] {
+                prefixes.clear();
+                self.trie.prefix_ends_from_chars(chars, i, MAX_WORD_LEN, &mut prefixes);
+                for &(end, weight) in &prefixes {
+                    if end <= n && valid_pos[end] {
                         edges.push(DagEdge {
-                            to: m.end,
-                            cost: (normalizer / m.weight).ln(),
+                            to: end,
+                            cost: (normalizer / weight).ln(),
                             unknown: false,
                         });
                     }
                 }
 
-                // 2. Thai abbreviation patterns
-                if let Some(m) = PAT_ABBR.find(sub_text) {
+                // 2. Thai abbreviation patterns. A match has a full stop within its first five
+                // characters, so the regex only runs where there is one.
+                let has_stop = chars[i + 1..n.min(i + 5)].contains(&'.');
+                if let Some(m) = has_stop.then(|| PAT_ABBR.find(sub_text)).flatten() {
                     let m_str = m.as_str();
                     let abbr_len = m_str.chars().count();
                     let j = i + abbr_len;
@@ -332,10 +353,14 @@ impl Tokenizer {
                 // 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
                 let mut end = i;
                 let mut letters = 0;
-                while let Some(len) = LETTER_NAME_CHARS
-                    .iter()
-                    .filter(|_| end < n && starts_a_letter_name(chars[end]))
-                    .find(|name| end + name.len() <= n && chars[end..end + name.len()] == name[..] && valid_pos[end + name.len()])
+                while let Some(len) = chars
+                    .get(end)
+                    .filter(|&&c| starts_a_letter_name(c))
+                    .and_then(|&c| {
+                        LETTER_NAME_CHARS
+                            .iter()
+                            .find(|name| name[0] == c && chars[end..].starts_with(name) && valid_pos[end + name.len()])
+                    })
                     .map(|name| name.len())
                 {
                     end += len;

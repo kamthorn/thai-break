@@ -1,10 +1,10 @@
-use fst::raw::Output;
+use fst::raw::{CompiledAddr, Output};
 use fst::{Map, MapBuilder};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrefixMatch {
@@ -131,9 +131,85 @@ impl FlatTrie {
         matches
     }
 
+    /// Like `prefixes_from_chars`, but appends only `(end, weight)` of each match to `out`.
+    pub fn prefix_ends_from_chars(&self, chars: &[char], start: usize, max_len: usize, out: &mut Vec<(usize, f64)>) {
+        let limit = (start + max_len).min(chars.len());
+        let mut cur = String::new();
+        for (idx, &ch) in chars[start..limit].iter().enumerate() {
+            cur.push(ch);
+            match self.prefixes.get(&cur) {
+                None => break,
+                Some(&w) if w > 0.0 => out.push((start + idx + 1, w)),
+                Some(_) => {}
+            }
+        }
+    }
+
     #[inline]
     pub fn contains(&self, word: &str) -> bool {
         self.prefixes.get(word).copied().unwrap_or(0.0) > 0.0
+    }
+}
+
+/// The FST state after a key of one or two characters.
+#[derive(Debug, Clone, Copy)]
+struct PrefixStep {
+    addr: CompiledAddr,
+    /// The output so far
+    value: u64,
+    /// The word id when the key is a word
+    word: Option<u64>,
+}
+
+/// The FST states after one or two Thai characters, so a prefix lookup does not step through the
+/// three UTF-8 bytes of each of its first two characters node by node. More than half of the steps of
+/// a lookup in Thai text are in its first two characters.
+#[derive(Debug)]
+struct ThaiPrefixes {
+    steps: Vec<PrefixStep>,
+    /// Index into `steps` (or `NO_STEP`) of the key a (`index[a]`) and the key ab
+    /// (`index[THAI_BLOCK + a * THAI_BLOCK + b]`), with a and b as offsets from U+0E00.
+    index: Vec<u16>,
+}
+
+const THAI_BLOCK: usize = 0x80;
+const NO_STEP: u16 = u16::MAX;
+
+#[inline]
+fn thai_offset(ch: char) -> Option<usize> {
+    let off = (ch as u32).wrapping_sub(0x0E00) as usize;
+    (off < THAI_BLOCK).then_some(off)
+}
+
+impl ThaiPrefixes {
+    fn build(map: &Map<FstData>) -> Self {
+        let raw = map.as_fst();
+        let step = |from: (CompiledAddr, u64), ch: char| -> Option<PrefixStep> {
+            let mut node = raw.node(from.0);
+            let mut value = from.1;
+            for &b in ch.encode_utf8(&mut [0u8; 4]).as_bytes() {
+                let trans = node.transition(node.find_input(b)?);
+                value += trans.out.value();
+                node = raw.node(trans.addr);
+            }
+            let word = node.is_final().then(|| value + node.final_output().value());
+            Some(PrefixStep { addr: node.addr(), value, word })
+        };
+        let thai = |off: usize| char::from_u32(0x0E00 + off as u32);
+        let mut steps = Vec::new();
+        let mut index = vec![NO_STEP; THAI_BLOCK + THAI_BLOCK * THAI_BLOCK];
+        for a in 0..THAI_BLOCK {
+            let Some(first) = thai(a).and_then(|ch| step((raw.root().addr(), 0), ch)) else { continue };
+            index[a] = steps.len() as u16;
+            steps.push(first);
+            for b in 0..THAI_BLOCK {
+                if let Some(second) = thai(b).and_then(|ch| step((first.addr, first.value), ch)) {
+                    index[THAI_BLOCK + a * THAI_BLOCK + b] = steps.len() as u16;
+                    steps.push(second);
+                }
+            }
+        }
+        Self { steps, index }
     }
 }
 
@@ -141,12 +217,13 @@ impl FlatTrie {
 #[derive(Debug, Clone)]
 pub struct FstTrie {
     map: Map<FstData>,
+    /// Weights by word id; a word past the end weighs 1. `set_weight` changes them in place.
     weights: Vec<f64>,
     total_weight: f64,
     max_weight: f64,
     overlay: HashMap<String, f64>,
-    /// Weights set with `set_weight` for words of the FST, by word id
-    weight_overrides: HashMap<u64, f64>,
+    /// Built on the first prefix lookup and shared by clones, as `map` never changes
+    thai_prefixes: Arc<OnceLock<ThaiPrefixes>>,
 }
 
 impl FstTrie {
@@ -182,7 +259,7 @@ impl FstTrie {
                 total_weight,
                 max_weight,
                 overlay: HashMap::new(),
-                weight_overrides: HashMap::new(),
+                thai_prefixes: Arc::default(),
             })
         } else {
             // Raw FST binary
@@ -195,7 +272,7 @@ impl FstTrie {
                 total_weight: count as f64,
                 max_weight: 1.0,
                 overlay: HashMap::new(),
-                weight_overrides: HashMap::new(),
+                thai_prefixes: Arc::default(),
             })
         }
     }
@@ -246,8 +323,11 @@ impl FstTrie {
         let old = if let Some(entry) = self.overlay.get_mut(word).filter(|w| **w > 0.0) {
             std::mem::replace(entry, weight)
         } else if let Some(id) = self.map.get(word) {
-            let fst_weight = self.weights.get(id as usize).copied().unwrap_or(1.0);
-            self.weight_overrides.insert(id, weight).unwrap_or(fst_weight)
+            let id = id as usize;
+            if self.weights.len() <= id {
+                self.weights.resize(id + 1, 1.0);
+            }
+            std::mem::replace(&mut self.weights[id], weight)
         } else {
             return false;
         };
@@ -284,10 +364,7 @@ impl FstTrie {
             if node.is_final() {
                 let total_out = out.cat(node.final_output());
                 let word_id = total_out.value() as usize;
-                let weight = match self.weight_overrides.get(&(word_id as u64)) {
-                    Some(&w) => w,
-                    None => self.weights.get(word_id).copied().unwrap_or(1.0),
-                };
+                let weight = self.weights.get(word_id).copied().unwrap_or(1.0);
                 matches.push(PrefixMatch {
                     word: chars[start..=idx].iter().collect(),
                     end: idx + 1,
@@ -320,6 +397,76 @@ impl FstTrie {
         }
 
         matches
+    }
+
+    /// Like `prefixes_from_chars`, but appends only `(end, weight)` of each match to `out`.
+    pub fn prefix_ends_from_chars(&self, chars: &[char], start: usize, max_len: usize, out: &mut Vec<(usize, f64)>) {
+        let limit = (start + max_len).min(chars.len());
+        let first = out.len();
+        let weight = |word_id: u64| self.weights.get(word_id as usize).copied().unwrap_or(1.0);
+        let raw = self.map.as_fst();
+        let mut node = raw.root();
+        let mut value = 0u64;
+        let mut idx = start;
+
+        'walk: {
+            // Up to two leading Thai characters in one step each
+            let prefixes = self.thai_prefixes.get_or_init(|| ThaiPrefixes::build(&self.map));
+            let mut key = 0;
+            let mut last = None;
+            while idx < limit && idx < start + 2 {
+                let Some(off) = thai_offset(chars[idx]) else { break };
+                key = if idx == start { off } else { THAI_BLOCK + key * THAI_BLOCK + off };
+                let k = prefixes.index[key];
+                if k == NO_STEP {
+                    break 'walk;
+                }
+                let step = prefixes.steps[k as usize];
+                idx += 1;
+                if let Some(word_id) = step.word {
+                    out.push((idx, weight(word_id)));
+                }
+                last = Some(step);
+            }
+            if let Some(step) = last {
+                node = raw.node(step.addr);
+                value = step.value;
+            }
+
+            let mut buf = [0u8; 4];
+            for (idx, ch) in chars.iter().enumerate().take(limit).skip(idx) {
+                for &b in ch.encode_utf8(&mut buf).as_bytes() {
+                    let Some(trans_idx) = node.find_input(b) else {
+                        break 'walk;
+                    };
+                    let trans = node.transition(trans_idx);
+                    node = raw.node(trans.addr);
+                    value += trans.out.value();
+                }
+                if node.is_final() {
+                    out.push((idx + 1, weight(value + node.final_output().value())));
+                }
+            }
+        }
+
+        if !self.overlay.is_empty() {
+            let mut cur = String::new();
+            for (idx, &ch) in chars[start..limit].iter().enumerate() {
+                cur.push(ch);
+                match self.overlay.get(&cur) {
+                    None => break,
+                    Some(&w) if w > 0.0 => {
+                        let end = start + idx + 1;
+                        if let Some(existing) = out[first..].iter_mut().find(|m| m.0 == end) {
+                            existing.1 = w;
+                        } else {
+                            out.push((end, w));
+                        }
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
     }
 
     #[inline]
@@ -449,6 +596,15 @@ impl ThaiTrie {
         match self {
             Self::Flat(t) => t.prefixes_from_chars(chars, start, max_len),
             Self::Fst(t) => t.prefixes_from_chars(chars, start, max_len),
+        }
+    }
+
+    /// Like `prefixes_from_chars`, but appends only `(end, weight)` of each match to `out`, in the
+    /// same order, without building the matched words.
+    pub fn prefix_ends_from_chars(&self, chars: &[char], start: usize, max_len: usize, out: &mut Vec<(usize, f64)>) {
+        match self {
+            Self::Flat(t) => t.prefix_ends_from_chars(chars, start, max_len, out),
+            Self::Fst(t) => t.prefix_ends_from_chars(chars, start, max_len, out),
         }
     }
 
