@@ -116,14 +116,63 @@ class WeightedTokenizer
      */
     private const OOV_INNER_ALLOWED = ['มา', 'มี'];
 
-    /**
-     * Characters an out-of-vocabulary edge may cover: Thai letters, vowels and marks, but not ๆ, ฯ,
-     * digits or other symbols, which are tokens of their own.
-     */
-    private const PAT_OOV_CHAR = '/^[\x{0E01}-\x{0E2E}\x{0E30}-\x{0E3A}\x{0E40}-\x{0E45}\x{0E47}-\x{0E4E}]$/u';
-
     private ThaiTrie     $trie;
     private ?BigramModel $bigramModel;
+
+    /** @var array<string, true>|null Characters of the Thai block U+0E00-U+0E7F */
+    private static ?array $thaiChars = null;
+
+    /** @var array<string, true>|null Characters an out-of-vocabulary edge may cover (Thai letters, vowels and marks, but not ๆ, ฯ, digits or other symbols, which are tokens of their own) */
+    private static ?array $oovChars = null;
+
+    /**
+     * OOV_BOUNDARY_WORDS by first character, and their byte and character lengths, and the bit mask of
+     * those that may not occur inside an out-of-vocabulary word.
+     *
+     * @var array{byFirst: array<string, list<array{0: int, 1: list<string>, 2: int}>>, bytes: list<int>, lens: list<int>, inner: int}|null
+     */
+    private static ?array $functionWords = null;
+
+    /** @var array<string, list<string>>|null LETTER_NAMES by first character, in LETTER_NAMES order */
+    private static ?array $letterNames = null;
+
+    private static function initTables(): void
+    {
+        if (self::$functionWords !== null) {
+            return;
+        }
+        $thai = [];
+        for ($c = 0x0E00; $c <= 0x0E7F; $c++) {
+            $thai[mb_chr($c, 'UTF-8')] = true;
+        }
+        $oov = [];
+        foreach ([[0x0E01, 0x0E2E], [0x0E30, 0x0E3A], [0x0E40, 0x0E45], [0x0E47, 0x0E4E]] as [$lo, $hi]) {
+            for ($c = $lo; $c <= $hi; $c++) {
+                $oov[mb_chr($c, 'UTF-8')] = true;
+            }
+        }
+        $byFirst = [];
+        $bytes   = [];
+        $lens    = [];
+        $inner   = 0;
+        foreach (self::OOV_BOUNDARY_WORDS as $k => $f) {
+            $chars = mb_str_split($f, 1, 'UTF-8');
+            $byFirst[$chars[0]][] = [$k, $chars, count($chars)];
+            $bytes[$k] = strlen($f);
+            $lens[$k]  = count($chars);
+            if (!in_array($f, self::OOV_INNER_ALLOWED, true)) {
+                $inner |= 1 << $k;
+            }
+        }
+        $letters = [];
+        foreach (self::LETTER_NAMES as $name) {
+            $letters[mb_substr($name, 0, 1, 'UTF-8')][] = $name;
+        }
+        self::$thaiChars     = $thai;
+        self::$oovChars      = $oov;
+        self::$letterNames   = $letters;
+        self::$functionWords = ['byFirst' => $byFirst, 'bytes' => $bytes, 'lens' => $lens, 'inner' => $inner];
+    }
 
     public function __construct(ThaiTrie $trie, ?BigramModel $bigramModel = null)
     {
@@ -199,6 +248,41 @@ class WeightedTokenizer
         $text     = implode('', $chars);
         $validPos = ThaiTCC::tccPosArray($chars);
 
+        // A match at offset 0 marks the string as valid UTF-8, so the matches below at other offsets
+        // do not check the rest of the text again (that made each of them cost O(length))
+        preg_match('//u', $text);
+
+        self::initTables();
+        $thaiChars = self::$thaiChars;
+        $oovChars  = self::$oovChars;
+        $fw        = self::$functionWords;
+        $fwBytes   = $fw['bytes'];
+        $fwLens    = $fw['lens'];
+        $fwInner   = $fw['inner'];
+
+        // Bit k of $fwStarts[p] is set when OOV_BOUNDARY_WORDS[k] begins at character p, and bit k of
+        // $fwEnds[p] when it ends there (sparse arrays: only positions with a function word are set)
+        $fwStarts = [];
+        $fwEnds   = [];
+        for ($p = 0; $p < $n; $p++) {
+            if (!isset($fw['byFirst'][$chars[$p]])) {
+                continue;
+            }
+            foreach ($fw['byFirst'][$chars[$p]] as [$k, $fc, $flen]) {
+                if ($p + $flen > $n) {
+                    continue;
+                }
+                for ($t = 1; $t < $flen; $t++) {
+                    if ($chars[$p + $t] !== $fc[$t]) {
+                        continue 2;
+                    }
+                }
+                $bit = 1 << $k;
+                $fwStarts[$p]         = ($fwStarts[$p] ?? 0) | $bit;
+                $fwEnds[$p + $flen]   = ($fwEnds[$p + $flen] ?? 0) | $bit;
+            }
+        }
+
         // Precompute byte offsets of each character index for zero-copy regex matching
         $charByteOffsets = [0];
         $b = 0;
@@ -214,7 +298,7 @@ class WeightedTokenizer
         // ── Single-pass Viterbi DP ──────────────────────────────────────────
         // dp[j]    — minimum accumulated cost to position j
         // from[j]  — predecessor position
-        // word[j]  — word token on winning edge into j
+        // (every edge into j covers chars[from[j]..j), so no word is stored)
         // isUnk[j] — whether position j was reached via unknown fallback
         //
         // Positions are visited in order. When position i is reached, every
@@ -224,7 +308,6 @@ class WeightedTokenizer
         // text length.
         $dp    = array_fill(0, $n + 1, INF);
         $from  = array_fill(0, $n + 1, -1);
-        $word  = array_fill(0, $n + 1, '');
         $isUnk = array_fill(0, $n + 1, false);
         $dp[0] = 0.0;
 
@@ -239,7 +322,6 @@ class WeightedTokenizer
                     if ($dp[$k] < INF && $validPos[$k]) {
                         $dp[$i]    = $dp[$k] + self::UNKNOWN_COST_FACTOR * $rareCost;
                         $from[$i]  = $k;
-                        $word[$i]  = implode('', array_slice($chars, $k, $i - $k));
                         $isUnk[$i] = true;
                         break;
                     }
@@ -250,33 +332,41 @@ class WeightedTokenizer
                 break;
             }
 
-            // ── Edges starting at i: [end position, word, cost, out-of-vocabulary]
+            // ── Edges starting at i: [end position, cost, out-of-vocabulary]
             $edges   = [];
             $bytePos = $charByteOffsets[$i];
 
-            if ($this->isThai($chars[$i])) {
+            if (isset($thaiChars[$chars[$i]])) {
                 // ── 1. Thai dictionary words starting at position $i
                 foreach ($this->trie->prefixesFromChars($chars, $i) as $entry) {
                     $j = $i + mb_strlen($entry['word'], 'UTF-8');
                     if ($j <= $n && $validPos[$j]) {
-                        $edges[] = [$j, $entry['word'], log($normalizer / $entry['weight']), false];
+                        $edges[] = [$j, log($normalizer / $entry['weight']), false];
                     }
                 }
 
                 // ── 2. Thai abbreviation patterns (e.g. รพ., พญ., ด.ญ., มิ.ย., น., จ.)
-                if (preg_match(self::PAT_ABBR, $text, $mAbbr, 0, $bytePos) && $mAbbr[0] !== '') {
+                // The pattern needs a full stop within four characters
+                $dot = false;
+                for ($t = $i + 1, $tEnd = min($i + 4, $n - 1); $t <= $tEnd; $t++) {
+                    if ($chars[$t] === '.') {
+                        $dot = true;
+                        break;
+                    }
+                }
+                if ($dot && preg_match(self::PAT_ABBR, $text, $mAbbr, 0, $bytePos) && $mAbbr[0] !== '') {
                     $abbrLen = mb_strlen($mAbbr[0], 'UTF-8');
                     $j       = $i + $abbrLen;
                     if ($j <= $n && $validPos[$j] && !$this->abbreviationIsWords($chars, $j, $mAbbr[0])) {
                         $letters  = $abbrLen - substr_count($mAbbr[0], '.');
-                        $edges[]  = [$j, $mAbbr[0], (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost, false];
+                        $edges[]  = [$j, (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost, false];
                     }
                 }
 
                 // ── 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
                 for ($end = $i, $letters = 0; ;) {
                     $next = 0;
-                    foreach (self::LETTER_NAMES as $name) {
+                    foreach (($end < $n ? (self::$letterNames[$chars[$end]] ?? []) : []) as $name) {
                         $len = mb_strlen($name, 'UTF-8');
                         if ($end + $len <= $n && $validPos[$end + $len] && implode('', array_slice($chars, $end, $len)) === $name) {
                             $next = $end + $len;
@@ -288,13 +378,14 @@ class WeightedTokenizer
                     }
                     $end = $next;
                     if (++$letters >= 2) {
-                        $edges[] = [$end, implode('', array_slice($chars, $i, $end - $i)), self::LETTER_RUN_COST_FACTOR * $rareCost, false];
+                        $edges[] = [$end, self::LETTER_RUN_COST_FACTOR * $rareCost, false];
                     }
                 }
 
                 // ── 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
                 $clusters = 0;
-                for ($j = $i + 1; $j <= $n && preg_match(self::PAT_OOV_CHAR, $chars[$j - 1]); $j++) {
+                $fwHere   = $fwStarts[$i] ?? 0;
+                for ($j = $i + 1; $j <= $n && isset($oovChars[$chars[$j - 1]]); $j++) {
                     if (!$validPos[$j]) {
                         continue;
                     }
@@ -302,16 +393,31 @@ class WeightedTokenizer
                     if ($clusters > self::OOV_MAX_CLUSTERS) {
                         break;
                     }
-                    $oovWord = implode('', array_slice($chars, $i, $j - $i));
-                    if (self::bordersFunctionWord($oovWord)) {
-                        if (self::endsWithInnerFunctionWord($chars, $i, $j, $validPos)) {
-                            break;
+                    $fwEnd = $fwEnds[$j] ?? 0;
+                    $hits  = $fwHere | $fwEnd;
+                    if ($hits !== 0) {
+                        // The edge borders a function word that is shorter than the edge
+                        $edgeBytes = $charByteOffsets[$j] - $charByteOffsets[$i];
+                        $borders   = false;
+                        for ($k = 0; $hits !== 0; $k++, $hits >>= 1) {
+                            if (($hits & 1) === 1 && $edgeBytes > $fwBytes[$k]) {
+                                $borders = true;
+                                break;
+                            }
                         }
-                        continue;
+                        if ($borders) {
+                            // Every longer edge from $i would contain a function word that ends here
+                            $inner = $fwEnd & $fwInner;
+                            for ($k = 0; $inner !== 0; $k++, $inner >>= 1) {
+                                if (($inner & 1) === 1 && $j - $i > $fwLens[$k] && !empty($validPos[$j - $fwLens[$k]])) {
+                                    break 2;
+                                }
+                            }
+                            continue;
+                        }
                     }
                     $edges[] = [
                         $j,
-                        $oovWord,
                         (self::OOV_COST_FACTOR + self::OOV_CLUSTER_COST_FACTOR * ($clusters - 1)) * $rareCost,
                         true,
                     ];
@@ -321,16 +427,20 @@ class WeightedTokenizer
                 if (preg_match(self::PAT_NONTHAI, $text, $mNonThai, 0, $bytePos) && $mNonThai[0] !== '') {
                     $j = $i + mb_strlen($mNonThai[0], 'UTF-8');
                     if ($j <= $n && $validPos[$j]) {
-                        $edges[] = [$j, $mNonThai[0], $rareCost, false];
+                        $edges[] = [$j, $rareCost, false];
                     }
                 }
             }
 
             // ── Relax the edges
-            foreach ($edges as [$j, $w, $baseCost, $unknown]) {
+            $prev = ($this->bigramModel !== null && $from[$i] >= 0)
+                ? implode('', array_slice($chars, $from[$i], $i - $from[$i]))
+                : '';
+            foreach ($edges as [$j, $baseCost, $unknown]) {
                 // Apply bigram collocation bonus if bigram model is present
-                if ($this->bigramModel !== null && $word[$i] !== '') {
-                    $bonus    = $this->bigramModel->getBonus($word[$i], $w, $j - $i);
+                if ($prev !== '') {
+                    $w        = implode('', array_slice($chars, $i, $j - $i));
+                    $bonus    = $this->bigramModel->getBonus($prev, $w, $j - $i);
                     $edgeCost = max(0.01, $baseCost - $bonus);
                 } else {
                     $edgeCost = $baseCost;
@@ -342,7 +452,6 @@ class WeightedTokenizer
                 if ($newCost <= $dp[$j] + self::TIE_EPSILON) {
                     $dp[$j]    = $newCost;
                     $from[$j]  = $i;
-                    $word[$j]  = $w;
                     $isUnk[$j] = $unknown;
                 }
             }
@@ -353,28 +462,25 @@ class WeightedTokenizer
             return [implode('', $chars)];
         }
 
-        $rawTokens   = [];
-        $rawIsUnk    = [];
-        $pos         = $n;
+        $spans = [];
+        $pos   = $n;
         while ($pos > 0) {
-            $rawTokens[] = $word[$pos];
-            $rawIsUnk[]  = $isUnk[$pos];
-            $pos         = $from[$pos];
+            $spans[] = [$from[$pos], $pos, $isUnk[$pos]];
+            $pos     = $from[$pos];
             if ($pos < 0) {
                 break;
             }
         }
-
-        $rawTokens = array_reverse($rawTokens);
-        $rawIsUnk  = array_reverse($rawIsUnk);
+        $spans = array_reverse($spans);
 
         // ── Syllable-based OOV Chunking ──────────────────────────────────────
         // Merge adjacent unknown Thai TCC clusters into coherent OOV chunks
         $tokens   = [];
         $curChunk = '';
 
-        foreach ($rawTokens as $idx => $tok) {
-            if ($rawIsUnk[$idx] && preg_match('/^[\x{0E00}-\x{0E7F}]+$/u', $tok)) {
+        foreach ($spans as [$start, $end, $unk]) {
+            $tok = implode('', array_slice($chars, $start, $end - $start));
+            if ($unk && preg_match('/^[\x{0E00}-\x{0E7F}]+$/u', $tok)) {
                 $curChunk .= $tok;
             } else {
                 if ($curChunk !== '') {
@@ -478,47 +584,5 @@ class WeightedTokenizer
             && !$nextIsThai
             && $this->trie->has($first)
             && !$this->trie->has($abbr);
-    }
-
-    /** Whether $word is longer than, and starts or ends with, a word of OOV_BOUNDARY_WORDS. */
-    private static function bordersFunctionWord(string $word): bool
-    {
-        foreach (self::OOV_BOUNDARY_WORDS as $f) {
-            if (strlen($word) > strlen($f) && (str_starts_with($word, $f) || str_ends_with($word, $f))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Whether $chars[$start..$end) ends with a word of OOV_BOUNDARY_WORDS (other than
-     * OOV_INNER_ALLOWED) that starts at a cluster boundary after $start. Every longer
-     * out-of-vocabulary edge from $start would contain that word.
-     *
-     * @param list<string> $chars
-     * @param array<int, bool> $validPos
-     */
-    private static function endsWithInnerFunctionWord(array $chars, int $start, int $end, array $validPos): bool
-    {
-        foreach (self::OOV_BOUNDARY_WORDS as $f) {
-            if (in_array($f, self::OOV_INNER_ALLOWED, true)) {
-                continue;
-            }
-            $len = mb_strlen($f, 'UTF-8');
-            if ($end - $start > $len && !empty($validPos[$end - $len])
-                && implode('', array_slice($chars, $end - $len, $len)) === $f) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** Return true if the character is in the Thai Unicode block U+0E00-U+0E7F */
-    private function isThai(string $char): bool
-    {
-        return (bool) preg_match('/[\x{0E00}-\x{0E7F}]/u', $char);
     }
 }
