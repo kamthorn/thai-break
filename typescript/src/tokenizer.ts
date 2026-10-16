@@ -64,7 +64,25 @@ const OOV_BOUNDARY_WORDS = [
  * Function words that may still occur inside an out-of-vocabulary word: they are frequent
  * syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
  */
-const OOV_INNER_FUNCTION_WORDS = OOV_BOUNDARY_WORDS.filter((f) => f !== 'มา' && f !== 'มี').map((f) => Array.from(f));
+const OOV_INNER_ALLOWED = ['มา', 'มี'];
+
+/**
+ * Tables of OOV_BOUNDARY_WORDS. Word k is bit k of a mask; as bit operations have 32 bits, a mask is
+ * two numbers (words 0-31 and words 32 up).
+ */
+const FW_CHARS = OOV_BOUNDARY_WORDS.map((f) => Array.from(f));
+const FW_UTF16_LEN = OOV_BOUNDARY_WORDS.map((f) => f.length);
+/** By first character, as an offset from U+0E00 */
+const FW_BY_FIRST: { k: number; chars: string[] }[][] = Array.from({ length: 0x80 }, () => []);
+let FW_INNER_LO = 0;
+let FW_INNER_HI = 0;
+OOV_BOUNDARY_WORDS.forEach((f, k) => {
+  FW_BY_FIRST[FW_CHARS[k][0].charCodeAt(0) - 0x0e00].push({ k, chars: FW_CHARS[k] });
+  if (!OOV_INNER_ALLOWED.includes(f)) {
+    if (k < 32) FW_INNER_LO |= 1 << k;
+    else FW_INNER_HI |= 1 << (k - 32);
+  }
+});
 
 const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
 const PAT_ABBR = /^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u;
@@ -124,27 +142,17 @@ function isToneMark(ch: string): boolean {
   return ch >= '่' && ch <= '๋';
 }
 
-/** Whether `word` is longer than, and starts or ends with, a word of OOV_BOUNDARY_WORDS. */
-function bordersFunctionWord(word: string): boolean {
-  return OOV_BOUNDARY_WORDS.some((f) => word.length > f.length && (word.startsWith(f) || word.endsWith(f)));
+/** Letter names (LETTER_NAMES) by first character, as an offset from U+0E00, in LETTER_NAMES order */
+const LETTER_NAMES_BY_FIRST: string[][][] = Array.from({ length: 0x80 }, () => []);
+for (const name of LETTER_NAMES) {
+  LETTER_NAMES_BY_FIRST[name[0].charCodeAt(0) - 0x0e00].push(name);
 }
 
 /**
- * Whether `chars[start..end)` ends with a function word of OOV_INNER_FUNCTION_WORDS that starts at a
- * cluster boundary after `start`. Every longer out-of-vocabulary edge from `start` would contain it.
- */
-function endsWithInnerFunctionWord(chars: string[], start: number, end: number, validPos: boolean[]): boolean {
-  return OOV_INNER_FUNCTION_WORDS.some(
-    (f) => end - start > f.length && validPos[end - f.length] && f.every((c, k) => chars[end - f.length + k] === c),
-  );
-}
-
-/**
- * Characters an out-of-vocabulary edge may cover: Thai letters, vowels and marks, but not ๆ, ฯ,
+ * Whether an out-of-vocabulary edge may cover a character: Thai letters, vowels and marks, but not ๆ, ฯ,
  * digits or other symbols, which are tokens of their own.
  */
-function isOovChar(ch: string): boolean {
-  const code = ch.codePointAt(0) ?? 0;
+function isOovCode(code: number): boolean {
   return (
     (code >= 0x0e01 && code <= 0x0e2e) ||
     (code >= 0x0e30 && code <= 0x0e3a) ||
@@ -249,7 +257,10 @@ export class Tokenizer {
     return tokens;
   }
 
-  /** Run the Viterbi segmentation over chars and return all tokens, including whitespace. */
+  /**
+   * Run the Viterbi segmentation over chars and return all tokens, including whitespace. Every edge
+   * into j covers chars[from[j]..j), so the DP keeps no word and the tokens are cut out at the end.
+   */
   private segment(chars: string[]): string[] {
     const text = chars.join('');
     const n = chars.length;
@@ -258,6 +269,43 @@ export class Tokenizer {
     }
 
     const validPos = tccPosArray(chars);
+
+    const codes = new Int32Array(n);
+    for (let i = 0; i < n; i++) {
+      codes[i] = chars[i].codePointAt(0) ?? 0;
+    }
+
+    // Bit k of fwStartsLo/Hi[p] is set when OOV_BOUNDARY_WORDS[k] begins at character p, and bit k of
+    // fwEndsLo/Hi[p] when it ends there (Lo: words 0-31, Hi: words 32 up)
+    const fwStartsLo = new Int32Array(n + 1);
+    const fwStartsHi = new Int32Array(n + 1);
+    const fwEndsLo = new Int32Array(n + 1);
+    const fwEndsHi = new Int32Array(n + 1);
+    for (let p = 0; p < n; p++) {
+      const code = codes[p];
+      if (code < 0x0e00 || code > 0x0e7f) {
+        continue;
+      }
+      for (const { k, chars: fc } of FW_BY_FIRST[code - 0x0e00]) {
+        const e = p + fc.length;
+        if (e > n) continue;
+        let same = true;
+        for (let t = 1; t < fc.length; t++) {
+          if (chars[p + t] !== fc[t]) {
+            same = false;
+            break;
+          }
+        }
+        if (!same) continue;
+        if (k < 32) {
+          fwStartsLo[p] |= 1 << k;
+          fwEndsLo[e] |= 1 << k;
+        } else {
+          fwStartsHi[p] |= 1 << (k - 32);
+          fwEndsHi[e] |= 1 << (k - 32);
+        }
+      }
+    }
 
     // Precompute character index to code unit offset mapping
     const charOffsets: number[] = [0];
@@ -279,11 +327,15 @@ export class Tokenizer {
     // unreachable i gets an unknown-word edge, then the edges starting at i are
     // relaxed right away. Edges are never stored, so memory stays O(n) for any
     // text length.
-    const dp: number[] = new Array(n + 1).fill(Infinity);
-    const from: number[] = new Array(n + 1).fill(-1);
-    const word: string[] = new Array(n + 1).fill('');
-    const isUnk: boolean[] = new Array(n + 1).fill(false);
+    const dp = new Float64Array(n + 1).fill(Infinity);
+    const from = new Int32Array(n + 1).fill(-1);
+    const isUnk = new Uint8Array(n + 1);
     dp[0] = 0.0;
+
+    // The edges from the current position: end, cost, and whether it is out-of-vocabulary
+    const edgeTo: number[] = [];
+    const edgeCost: number[] = [];
+    const edgeUnk: boolean[] = [];
 
     for (let i = 0; i <= n; i++) {
       if (!validPos[i]) {
@@ -296,8 +348,7 @@ export class Tokenizer {
           if (isFinite(dp[k]) && validPos[k]) {
             dp[i] = dp[k] + UNKNOWN_COST_FACTOR * rareCost;
             from[i] = k;
-            word[i] = chars.slice(k, i).join('');
-            isUnk[i] = true;
+            isUnk[i] = 1;
             break;
           }
         }
@@ -308,45 +359,61 @@ export class Tokenizer {
       }
 
       // Edges starting at i
-      const edges: DagEdge[] = [];
-      const code = chars[i].codePointAt(0) ?? 0;
-      const subText = text.slice(charOffsets[i]);
+      let edges = 0;
+      const code = codes[i];
 
       if (isThaiRune(code)) {
         // 1. Thai dictionary words starting at i
         for (const m of this.trie.prefixesFromChars(chars, i, MAX_WORD_LEN)) {
           if (m.end <= n && validPos[m.end]) {
-            edges.push({ to: m.end, word: m.word, cost: Math.log(normalizer / m.weight), unknown: false });
+            edgeTo[edges] = m.end;
+            edgeCost[edges] = Math.log(normalizer / m.weight);
+            edgeUnk[edges++] = false;
           }
         }
 
-        // 2. Thai abbreviation patterns
-        const mAbbr = PAT_ABBR.exec(subText);
+        // 2. Thai abbreviation patterns (the pattern needs a full stop within four characters)
+        let dot = false;
+        for (let t = i + 1, tEnd = Math.min(i + 4, n - 1); t <= tEnd; t++) {
+          if (chars[t] === '.') {
+            dot = true;
+            break;
+          }
+        }
+        const mAbbr = dot ? PAT_ABBR.exec(text.slice(charOffsets[i])) : null;
         if (mAbbr && mAbbr[0].length > 0) {
           const mStr = mAbbr[0];
           const abbrLen = Array.from(mStr).length;
           const j = i + abbrLen;
           if (j <= n && validPos[j] && !this.abbreviationIsWords(chars, j, mStr)) {
             const letters = abbrLen - mStr.split('.').length + 1;
-            edges.push({ to: j, word: mStr, cost: (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost, unknown: false });
+            edgeTo[edges] = j;
+            edgeCost[edges] = (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost;
+            edgeUnk[edges++] = false;
           }
         }
 
         // 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
         for (let end = i, letters = 0; ; ) {
           const e = end;
-          const name = LETTER_NAMES.find((nm) => e + nm.length <= n && validPos[e + nm.length] && nm.every((c, k) => chars[e + k] === c));
+          const endCode = e < n ? codes[e] : 0;
+          const names = endCode >= 0x0e00 && endCode <= 0x0e7f ? LETTER_NAMES_BY_FIRST[endCode - 0x0e00] : [];
+          const name = names.find((nm) => e + nm.length <= n && validPos[e + nm.length] && nm.every((c, k) => chars[e + k] === c));
           if (!name) break;
           end += name.length;
           letters++;
           if (letters >= 2) {
-            edges.push({ to: end, word: chars.slice(i, end).join(''), cost: LETTER_RUN_COST_FACTOR * rareCost, unknown: false });
+            edgeTo[edges] = end;
+            edgeCost[edges] = LETTER_RUN_COST_FACTOR * rareCost;
+            edgeUnk[edges++] = false;
           }
         }
 
         // 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
         let clusters = 0;
-        for (let j = i + 1; j <= n && isOovChar(chars[j - 1]); j++) {
+        const startsLo = fwStartsLo[i];
+        const startsHi = fwStartsHi[i];
+        oov: for (let j = i + 1; j <= n && isOovCode(codes[j - 1]); j++) {
           if (!validPos[j]) {
             continue;
           }
@@ -354,47 +421,71 @@ export class Tokenizer {
           if (clusters > OOV_MAX_CLUSTERS) {
             break;
           }
-          const oovWord = chars.slice(i, j).join('');
-          if (bordersFunctionWord(oovWord)) {
-            if (endsWithInnerFunctionWord(chars, i, j, validPos)) {
-              break;
+          let hitsLo = startsLo | fwEndsLo[j];
+          let hitsHi = startsHi | fwEndsHi[j];
+          if ((hitsLo | hitsHi) !== 0) {
+            // The edge borders a function word that is shorter than the edge
+            const edgeLen = charOffsets[j] - charOffsets[i];
+            let borders = false;
+            for (; hitsLo !== 0; hitsLo ^= hitsLo & -hitsLo) {
+              if (edgeLen > FW_UTF16_LEN[31 - Math.clz32(hitsLo & -hitsLo)]) {
+                borders = true;
+                break;
+              }
             }
-            continue;
+            for (; !borders && hitsHi !== 0; hitsHi ^= hitsHi & -hitsHi) {
+              if (edgeLen > FW_UTF16_LEN[63 - Math.clz32(hitsHi & -hitsHi)]) {
+                borders = true;
+              }
+            }
+            if (borders) {
+              // Every longer edge from i would contain a function word that ends here
+              let innerLo = fwEndsLo[j] & FW_INNER_LO;
+              let innerHi = fwEndsHi[j] & FW_INNER_HI;
+              for (; innerLo !== 0; innerLo ^= innerLo & -innerLo) {
+                const len = FW_CHARS[31 - Math.clz32(innerLo & -innerLo)].length;
+                if (j - i > len && validPos[j - len]) break oov;
+              }
+              for (; innerHi !== 0; innerHi ^= innerHi & -innerHi) {
+                const len = FW_CHARS[63 - Math.clz32(innerHi & -innerHi)].length;
+                if (j - i > len && validPos[j - len]) break oov;
+              }
+              continue;
+            }
           }
-          edges.push({
-            to: j,
-            word: oovWord,
-            cost: (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1)) * rareCost,
-            unknown: true,
-          });
+          edgeTo[edges] = j;
+          edgeCost[edges] = (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1)) * rareCost;
+          edgeUnk[edges++] = true;
         }
       } else {
         // 5. Non-Thai tokens
-        const mNonThai = PAT_NONTHAI.exec(subText);
+        const mNonThai = PAT_NONTHAI.exec(text.slice(charOffsets[i]));
         if (mNonThai && mNonThai[0].length > 0) {
           const j = i + Array.from(mNonThai[0]).length;
           if (j <= n && validPos[j]) {
-            edges.push({ to: j, word: mNonThai[0], cost: rareCost, unknown: false });
+            edgeTo[edges] = j;
+            edgeCost[edges] = rareCost;
+            edgeUnk[edges++] = false;
           }
         }
       }
 
       // Relax the edges
-      for (const edge of edges) {
-        const j = edge.to;
-        let edgeCost = edge.cost;
-        if (this.bigramModel && word[i] !== '') {
-          const bonus = this.bigramModel.getBonus(word[i], edge.word, j - i);
-          edgeCost = Math.max(0.01, edge.cost - bonus);
+      const prev = this.bigramModel && from[i] >= 0 ? chars.slice(from[i], i).join('') : '';
+      for (let e = 0; e < edges; e++) {
+        const j = edgeTo[e];
+        let cost = edgeCost[e];
+        if (prev !== '') {
+          const bonus = this.bigramModel!.getBonus(prev, chars.slice(i, j).join(''), j - i);
+          cost = Math.max(0.01, cost - bonus);
         }
 
         // Ties go to the later start, i.e. the shorter last word (see TIE_EPSILON)
-        const newCost = dp[i] + edgeCost;
+        const newCost = dp[i] + cost;
         if (newCost <= dp[j] + TIE_EPSILON) {
           dp[j] = newCost;
           from[j] = i;
-          word[j] = edge.word;
-          isUnk[j] = edge.unknown;
+          isUnk[j] = edgeUnk[e] ? 1 : 0;
         }
       }
     }
@@ -404,28 +495,24 @@ export class Tokenizer {
       return [text];
     }
 
-    const rawTokens: string[] = [];
-    const rawIsUnk: boolean[] = [];
+    const spans: number[][] = [];
     let pos = n;
     while (pos > 0) {
-      rawTokens.push(word[pos]);
-      rawIsUnk.push(isUnk[pos]);
+      spans.push([from[pos], pos, isUnk[pos]]);
       pos = from[pos];
       if (pos < 0) {
         break;
       }
     }
-
-    rawTokens.reverse();
-    rawIsUnk.reverse();
+    spans.reverse();
 
     // Syllable-based OOV chunking: merge consecutive unknown Thai clusters
     const tokens: string[] = [];
     let curChunk = '';
 
-    for (let idx = 0; idx < rawTokens.length; idx++) {
-      const tokStr = rawTokens[idx];
-      if (rawIsUnk[idx] && isThaiString(tokStr)) {
+    for (const [start, end, unknown] of spans) {
+      const tokStr = chars.slice(start, end).join('');
+      if (unknown && isThaiString(tokStr)) {
         curChunk += tokStr;
       } else {
         if (curChunk.length > 0) {

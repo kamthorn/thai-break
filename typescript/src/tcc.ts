@@ -96,12 +96,12 @@ export function tccPosArray(chars: string[]): boolean[] {
     charOffsets.push(offset);
   }
 
-  const offsetToCharIdx = new Map<number, number>();
-  for (let i = 0; i <= n; i++) {
-    offsetToCharIdx.set(charOffsets[i], i);
-  }
-
   const totalLen = text.length;
+  // Character index at each code unit offset that starts a character, else -1
+  const offsetToCharIdx = new Int32Array(totalLen + 1).fill(-1);
+  for (let i = 0; i <= n; i++) {
+    offsetToCharIdx[charOffsets[i]] = i;
+  }
   let pos = 0;
 
   while (pos < totalLen) {
@@ -109,17 +109,17 @@ export function tccPosArray(chars: string[]): boolean[] {
     const m = pattern.exec(sub);
     if (m && m[0].length > 0) {
       pos += clusterLength(m[0], sub.slice(m[0].length));
-      const idx = offsetToCharIdx.get(pos);
-      if (idx !== undefined) {
+      const idx = offsetToCharIdx[pos];
+      if (idx >= 0) {
         valid[idx] = true;
       }
     } else {
       // Fallback: advance 1 Unicode character
-      const curIdx = offsetToCharIdx.get(pos) ?? 0;
+      const curIdx = Math.max(offsetToCharIdx[pos], 0);
       const chLen = chars[curIdx]?.length ?? 1;
       pos += chLen;
-      const idx = offsetToCharIdx.get(pos);
-      if (idx !== undefined) {
+      const idx = offsetToCharIdx[pos];
+      if (idx >= 0) {
         valid[idx] = true;
       }
     }
@@ -136,7 +136,7 @@ export function tccPosArray(chars: string[]): boolean[] {
 
   // Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
   for (let i = 1; i < n; i++) {
-    if (DEPENDENT.test(chars[i])) {
+    if (isDependentChar(chars[i])) {
       valid[i] = false;
     }
   }
@@ -146,6 +146,12 @@ export function tccPosArray(chars: string[]): boolean[] {
 
 /** Dependent vowels and marks that can never start a cluster: ะ ั า ำ ิ–ฺ ๅ ็–๎. */
 const DEPENDENT = /^[\u0e30-\u0e3a\u0e45\u0e47-\u0e4e]$/;
+
+function isDependentChar(ch: string): boolean {
+  if (ch.length !== 1) return false;
+  const code = ch.charCodeAt(0);
+  return (code >= 0x0e30 && code <= 0x0e3a) || code === 0x0e45 || (code >= 0x0e47 && code <= 0x0e4e);
+}
 
 /**
  * Length of a matched cluster. A final consonant followed by a dependent vowel

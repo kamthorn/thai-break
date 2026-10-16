@@ -53,8 +53,10 @@ export class CompactDawg {
     const limit = Math.min(chars.length, start + maxLen);
     let state = 0;
     const matches: PrefixMatch[] = [];
+    let word = '';
 
     for (let idx = start; idx < limit; idx++) {
+      word += chars[idx];
       const ch = chars[idx].charCodeAt(0);
       const off = this.offsets[state];
       const flags = this.data[off];
@@ -84,7 +86,6 @@ export class CompactDawg {
       state = nextState;
       const nextOff = this.offsets[state];
       if ((this.data[nextOff] & 0x80) !== 0) {
-        const word = chars.slice(start, idx + 1).join('');
         matches.push({ word, end: idx + 1, weight: weights?.get(word) ?? 1.0 });
       }
     }
