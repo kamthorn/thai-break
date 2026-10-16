@@ -14,7 +14,7 @@ Natural Thai word segmentation and typographic line breaking for [Typst](https:/
 ### Simple Document Show Rule
 
 ```typ
-#import "@preview/thaibreak:0.1.0": thai-break
+#import "@preview/thaibreak:0.2.0": thai-break
 
 #show: thai-break
 
@@ -25,7 +25,7 @@ Natural Thai word segmentation and typographic line breaking for [Typst](https:/
 ### Options
 
 ```typ
-#import "@preview/thaibreak:0.1.0": thai-break
+#import "@preview/thaibreak:0.2.0": thai-break
 
 // Mode "box" (default): wraps each Thai word in box()
 #show: thai-break.with(mode: "box")
@@ -37,7 +37,7 @@ Natural Thai word segmentation and typographic line breaking for [Typst](https:/
 ### Direct Functions
 
 ```typ
-#import "@preview/thaibreak:0.1.0": segment-words, break-lines
+#import "@preview/thaibreak:0.2.0": segment-words, break-lines
 
 #let words = segment-words("ฉันรักภาษาไทย")
 // => ("ฉัน", "รัก", "ภาษา", "ไทย")

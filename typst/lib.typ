@@ -36,7 +36,7 @@
 ///
 /// Example:
 /// ```typ
-/// #import "@preview/thaibreak:0.1.0": thai-break
+/// #import "@preview/thaibreak:0.2.0": thai-break
 /// #show: thai-break
 /// ```
 #let thai-break(body, mode: "box", marker: "\u{200B}") = {
