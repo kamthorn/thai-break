@@ -107,14 +107,39 @@ class LaravelIntegrationTest extends TestCase
     {
         $blade = $this->app->make('blade.compiler');
 
-        $compiledThaiBreak = $blade->compileString("@thaibreak('สวัสดีครับ', false)");
-        $this->assertStringContainsString("app('thaibreak')->insertLineBreaks('สวัสดีครับ', false)", $compiledThaiBreak);
+        $compiledThaiBreak = $blade->compileString("@thaibreak('สวัสดีครับ')");
+        $this->assertStringContainsString("ThaiBreakServiceProvider::escapedLineBreaks('สวัสดีครับ')", $compiledThaiBreak);
 
-        $compiledLineBreak = $blade->compileString("@thailinebreak('สวัสดีครับ', false)");
-        $this->assertStringContainsString("app('thaibreak')->insertLineBreaks('สวัสดีครับ', false)", $compiledLineBreak);
+        $compiledLineBreak = $blade->compileString("@thailinebreak('สวัสดีครับ', '<wbr>')");
+        $this->assertStringContainsString("ThaiBreakServiceProvider::escapedLineBreaks('สวัสดีครับ', '<wbr>')", $compiledLineBreak);
+
+        $compiledHtml = $blade->compileString("@thaibreakHtml('<b>สวัสดีครับ</b>')");
+        $this->assertStringContainsString("ThaiBreakServiceProvider::htmlLineBreaks('<b>สวัสดีครับ</b>')", $compiledHtml);
 
         $compiledWrap = $blade->compileString("@thaiwrap('สวัสดีครับ', 40)");
         $this->assertStringContainsString("app('thaibreak')->wrap('สวัสดีครับ', 40)", $compiledWrap);
+    }
+
+    public function testBladeLineBreakEscapesText(): void
+    {
+        $xss = '<img src=x onerror=alert(1)>สวัสดีครับ & "ลา"';
+        $expected = "&lt;img src=x onerror=alert(1)&gt;สวัสดี\u{200B}ครับ &amp; &quot;ลา&quot;";
+
+        $this->assertSame($expected, Blade::render('@thaibreak($text)', ['text' => $xss]));
+        $this->assertSame($expected, Blade::render('@thailinebreak($text)', ['text' => $xss]));
+        // The old ($text, $isHtml) form escapes too, and keeps the default marker
+        $this->assertSame($expected, Blade::render('@thaibreak($text, true)', ['text' => $xss]));
+        $this->assertSame(
+            '&lt;b&gt;สวัสดี<wbr>ครับ',
+            Blade::render("@thaibreak(\$text, '<wbr>')", ['text' => '<b>สวัสดีครับ'])
+        );
+        $this->assertSame('', Blade::render('@thaibreak($text)', ['text' => null]));
+
+        // Trusted HTML keeps its tags
+        $this->assertSame(
+            "<b>สวัสดี\u{200B}ครับ</b>",
+            Blade::render('@thaibreakHtml($html)', ['html' => '<b>สวัสดีครับ</b>'])
+        );
     }
 
     public function testPreloadConfiguration(): void

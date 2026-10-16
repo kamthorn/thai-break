@@ -108,8 +108,11 @@ $pdf   = Str::thaiWrap($text, 40);
 
 ใน Blade Template:
 ```blade
-{{-- แทรก Zero-Width Space เพื่อให้ Browser/PDF ตัดคำได้สวยงาม --}}
+{{-- แทรก Zero-Width Space เพื่อให้ Browser/PDF ตัดคำได้สวยงาม (escape HTML ให้เหมือน {{ }}) --}}
 @thaibreak($post->content)
+
+{{-- HTML ที่เชื่อถือได้เท่านั้น: คงแท็กไว้และไม่ escape (เหมือน {!! !!}) ห้ามใช้กับข้อมูลจากผู้ใช้ --}}
+@thaibreakHtml($trustedHtml)
 
 {{-- ตัดบรรทัดจำกัดความกว้าง 40 ตัวอักษร --}}
 @thaiwrap($report->summary, 40)
