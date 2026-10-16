@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use axum::{
     extract::DefaultBodyLimit,
-    http::header::HeaderName,
-    http::HeaderValue,
+    http::header::{HeaderName, CONTENT_TYPE},
+    http::{HeaderValue, Method},
     routing::{get, post},
     Router,
 };
@@ -29,6 +29,27 @@ use crate::handlers::{
     handle_words, handle_wrap, health_check,
 };
 use crate::service::ThaiBreakEngine;
+
+/// CORS policy: no origin unless configured, `*` for any origin.
+fn cors_layer(origins: &[String]) -> CorsLayer {
+    if origins.iter().any(|o| o.trim() == "*") {
+        return CorsLayer::permissive();
+    }
+    let allowed: Vec<HeaderValue> = origins
+        .iter()
+        .filter_map(|o| match HeaderValue::from_str(o.trim()) {
+            Ok(v) => Some(v),
+            Err(_) => {
+                tracing::warn!(origin = %o, "Ignoring invalid CORS origin");
+                None
+            }
+        })
+        .collect();
+    CorsLayer::new()
+        .allow_origin(allowed)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers([CONTENT_TYPE])
+}
 
 /// Builds the Axum router for thai-break-service
 pub fn create_router(engine: Arc<ThaiBreakEngine>, config: &Config) -> Router {
@@ -62,7 +83,7 @@ pub fn create_router(engine: Arc<ThaiBreakEngine>, config: &Config) -> Router {
             Duration::from_secs(config.request_timeout_secs),
         ))
         .layer(ConcurrencyLimitLayer::new(config.concurrency_limit))
-        .layer(CorsLayer::permissive())
+        .layer(cors_layer(&config.cors_allowed_origins))
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
         .with_state(engine)

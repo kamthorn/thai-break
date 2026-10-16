@@ -14,8 +14,8 @@ use crate::models::{
 use crate::service::SharedEngine;
 
 /// Maximum length limits to prevent resource exhaustion / amplification attacks
-pub const MAX_MARKER_LEN: usize = 64;
-pub const MAX_DELIMITER_LEN: usize = 64;
+pub const MAX_MARKER_LEN: usize = 16;
+pub const MAX_DELIMITER_LEN: usize = 16;
 pub const MAX_BATCH_SIZE: usize = 1_000;
 pub const MAX_TEXT_LEN: usize = 500_000;
 
@@ -41,7 +41,7 @@ pub fn validate_batch(texts: &[String]) -> Result<(), &'static str> {
 #[inline]
 pub fn validate_marker(marker: Option<&str>) -> Result<(), &'static str> {
     if marker.is_some_and(|m| m.chars().count() > MAX_MARKER_LEN) {
-        return Err("The 'marker' parameter exceeds maximum allowed limit of 64 characters");
+        return Err("The 'marker' parameter exceeds maximum allowed limit of 16 characters");
     }
     Ok(())
 }
@@ -49,7 +49,7 @@ pub fn validate_marker(marker: Option<&str>) -> Result<(), &'static str> {
 #[inline]
 pub fn validate_delimiter(delim: Option<&str>) -> Result<(), &'static str> {
     if delim.is_some_and(|d| d.chars().count() > MAX_DELIMITER_LEN) {
-        return Err("The 'delimiter' parameter exceeds maximum allowed limit of 64 characters");
+        return Err("The 'delimiter' parameter exceeds maximum allowed limit of 16 characters");
     }
     Ok(())
 }

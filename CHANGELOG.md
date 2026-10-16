@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Example service: CORS is closed by default. It sent `Access-Control-Allow-Origin: *`, so any web
+  page could call the API from a visitor's browser, which matters when the service runs inside a
+  network. Set `CORS_ALLOWED_ORIGINS` (comma-separated, or `*`) to allow browser calls. `marker`
+  and `delimiter` may be at most 16 characters (was 64), which limits how much larger than its
+  input a response can get.
+
 ### Fixed
 - Example service: `bahttext` with a text amount near the `i64` limit, such as
   `9223372036854775807.995`, overflowed when the rounded satang carried into the baht (a panic in

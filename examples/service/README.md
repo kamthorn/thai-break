@@ -172,8 +172,8 @@ curl -X POST http://localhost:8080/api/v1/break \
 | `text` | string | `null` | ข้อความเดี่ยวที่ต้องการประมวลผล |
 | `texts` | array of strings | `null` | อาเรย์ข้อความสำหรับประมวลผลแบบ Batch |
 | `is_html` | boolean | `false` | เปิดใช้การตัดคำแบบรักษาแท็ก HTML/XML และ Entity |
-| `marker` | string | `"\u200B"` | สัญลักษณ์ตัดบรรทัด (ใช้ในโหมด `lines`) |
-| `delimiter` | string | `"|"` | สัญลักษณ์คั่นคำ (ใช้ในโหมด `join`) |
+| `marker` | string | `"\u200B"` | สัญลักษณ์ตัดบรรทัด (ใช้ในโหมด `lines`) ยาวไม่เกิน 16 ตัวอักษร |
+| `delimiter` | string | `"|"` | สัญลักษณ์คั่นคำ (ใช้ในโหมด `join`) ยาวไม่เกิน 16 ตัวอักษร |
 | `width` | integer | `80` | ความกว้างคอลัมน์สูงสุด (ใช้ในโหมด `wrap`) |
 | `keep_whitespace` | boolean | `false` | เก็บช่องว่างไว้เป็นคำในผลลัพธ์หรือไม่ (โหมด `words`) |
 | `normalize` | boolean | `false` | ทำความสะอาดข้อความ (สระวิปริต, เสียงลาก, อักขระล่องหน) ก่อนประมวลผล |
@@ -343,6 +343,7 @@ LST20 test split (38,454 ประโยค, 174,074 คำ) ผ่าน `POST 
 | `MAX_BODY_MB` | `4` | ขนาด Request Body สูงสุด (MB) |
 | `CONCURRENCY_LIMIT` | `200` | จำนวน Request ที่ประมวลผลพร้อมกันสูงสุด |
 | `REQUEST_TIMEOUT_SECS` | `30` | Timeout ต่อ Request (วินาที) |
+| `CORS_ALLOWED_ORIGINS` | *(ว่าง)* | Origin ที่เบราว์เซอร์เรียก API ข้ามโดเมนได้ คั่นด้วย `,` เช่น `https://app.example.com` หรือ `*` เพื่ออนุญาตทุก Origin ค่าว่างคือไม่ส่ง CORS header (เรียกได้เฉพาะหน้าเว็บโดเมนเดียวกัน) |
 | `RUST_LOG` | `info` | ระดับการบันทึก Log (`trace`, `debug`, `info`, `warn`, `error`) |
 
 #### การใช้พจนานุกรม FST กำหนดเอง (Custom FST Dictionary):

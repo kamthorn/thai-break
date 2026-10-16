@@ -35,6 +35,12 @@ pub struct Config {
     #[arg(long, env = "REQUEST_TIMEOUT_SECS", default_value_t = 30)]
     pub request_timeout_secs: u64,
 
+    /// Origins allowed to call the API from a browser, comma-separated (e.g.
+    /// "https://app.example.com"). "*" allows any origin. Empty (default): no CORS headers,
+    /// so browsers only let same-origin pages use the API.
+    #[arg(long, env = "CORS_ALLOWED_ORIGINS", value_delimiter = ',')]
+    pub cors_allowed_origins: Vec<String>,
+
     /// Tracing / log level filter (e.g. "info", "debug", "warn")
     #[arg(long, env = "RUST_LOG", default_value = "info")]
     pub log_level: String,
