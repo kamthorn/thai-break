@@ -14,7 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `delimiter` may be at most 16 characters (was 64), which limits how much larger than its
   input a response can get.
 
+### Security
+- CI: the actions are pinned to commit SHAs (Dependabot keeps them current) and the workflows
+  have read-only `GITHUB_TOKEN` permissions.
+
 ### Fixed
+- Example service: the `docker-compose.yml` healthcheck called `curl`, which the image does not
+  have, so the container was always reported unhealthy. It uses `wget` now.
 - Example service: `bahttext` with a text amount near the `i64` limit, such as
   `9223372036854775807.995`, overflowed when the rounded satang carried into the baht (a panic in
   debug builds, a wrong amount in release builds). It now returns "Baht amount out of range".
