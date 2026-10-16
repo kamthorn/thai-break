@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have read-only `GITHUB_TOKEN` permissions.
 
 ### Fixed
+- PHP: `DictionaryLoader::fromFile()` ran any file ending in `.php` with `require`, and
+  `ThaiTokenizer::withDefaultDict()` also looked for `data/words.php` in the working directory, so
+  a dictionary path from the environment or a writable working directory could run code. `fromFile()`
+  now refuses `.php` (call `fromPhpFile()` for a trusted one), only the copies that ship with the
+  package are used as the default `words.php`, and a `dict_path` or bigram path that does not
+  exist is an error instead of an empty dictionary.
+- Example service: a dictionary or bigram path given by option or environment that cannot be loaded
+  stops the start-up with a message, instead of serving the embedded dictionary.
+- Rust: a TBF1 header whose word count overflows `count * 8` on a 32-bit target (wasm32) is an
+  error instead of a panic. The C header documents where the default dictionary is looked for.
 - Example service: the `docker-compose.yml` healthcheck called `curl`, which the image does not
   have, so the container was always reported unhealthy. It uses `wget` now.
 - Example service: `bahttext` with a text amount near the `i64` limit, such as

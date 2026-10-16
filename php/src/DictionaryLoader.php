@@ -37,6 +37,10 @@ class DictionaryLoader
     /**
      * Load an OPcache-preloaded or pre-compiled PHP dictionary array file (.php).
      *
+     * The file is executed with require, so it can run any code: only pass a file that
+     * comes from this package or that you built yourself (tools/build_php_dict.php), never
+     * a path from user input.
+     *
      * @param string $filePath Path to .php dictionary file
      */
     public static function fromPhpFile(string $filePath): ThaiTrie
@@ -50,14 +54,19 @@ class DictionaryLoader
     /**
      * Auto-detect and load dictionary by file extension and magic header.
      *
-     * @param string $filePath Path to dictionary file (.php, .dawg, .tsv, .txt)
+     * A .php file is not loaded here, as loading it runs it: call fromPhpFile() for that.
+     *
+     * @param string $filePath Path to dictionary file (.dawg, .tsv, .txt)
      */
     public static function fromFile(string $filePath): ThaiTrie
     {
         self::assertFileReadable($filePath);
 
         if (str_ends_with($filePath, '.php')) {
-            return self::fromPhpFile($filePath);
+            throw new \InvalidArgumentException(
+                "Refusing to run $filePath as a dictionary: call DictionaryLoader::fromPhpFile() "
+                . 'for a trusted .php dictionary, or use a .dawg, .tsv or .txt file'
+            );
         }
         if (str_ends_with($filePath, '.dawg')) {
             return self::fromDawgFile($filePath);
