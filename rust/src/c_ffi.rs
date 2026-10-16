@@ -192,9 +192,8 @@ pub unsafe extern "C" fn thaibreak_tokenize(
             c_tokens.push(c_string.into_raw());
         }
 
-        let ptr = c_tokens.as_mut_ptr();
-        std::mem::forget(c_tokens);
-        ptr
+        // A boxed slice has capacity == len, which thaibreak_free_tokens relies on
+        Box::into_raw(c_tokens.into_boxed_slice()) as *mut *mut c_char
     })
     .unwrap_or(std::ptr::null_mut())
 }
@@ -213,13 +212,12 @@ pub unsafe extern "C" fn thaibreak_free_tokens(tokens: *mut *mut c_char, count: 
         if tokens.is_null() {
             return;
         }
-        let slice = std::slice::from_raw_parts_mut(tokens, count);
-        for &mut ptr in slice.iter_mut() {
+        let slice = Box::from_raw(std::ptr::slice_from_raw_parts_mut(tokens, count));
+        for &ptr in slice.iter() {
             if !ptr.is_null() {
                 drop(CString::from_raw(ptr));
             }
         }
-        drop(Vec::from_raw_parts(tokens, count, count));
     });
 }
 
@@ -394,4 +392,31 @@ pub unsafe extern "C" fn thaibreak_free_boundaries(boundaries: *mut usize, count
             drop(Box::from_raw(std::ptr::slice_from_raw_parts_mut(boundaries, count)));
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    unsafe fn tokenize(text: &str) -> Vec<String> {
+        let text = CString::new(text).unwrap();
+        let mut count = 0usize;
+        let tokens = thaibreak_tokenize(text.as_ptr(), &mut count);
+        assert!(!tokens.is_null());
+        let words = (0..count)
+            .map(|i| CStr::from_ptr(*tokens.add(i)).to_str().unwrap().to_string())
+            .collect();
+        thaibreak_free_tokens(tokens, count);
+        words
+    }
+
+    #[test]
+    fn tokenize_and_free_round_trip() {
+        unsafe {
+            assert_eq!(tokenize("สวัสดีครับ").concat(), "สวัสดีครับ");
+            // Counts that are not powers of two, and no tokens at all
+            assert!(!tokenize("ฉันรักภาษาไทยมากเลยนะครับ").is_empty());
+            assert!(tokenize("").is_empty());
+        }
+    }
 }

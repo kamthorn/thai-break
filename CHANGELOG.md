@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Example service: `bahttext` with a text amount near the `i64` limit, such as
+  `9223372036854775807.995`, overflowed when the rounded satang carried into the baht (a panic in
+  debug builds, a wrong amount in release builds). It now returns "Baht amount out of range".
+- C: `thaibreak_tokenize` handed out a `Vec` buffer whose capacity may exceed its length, and
+  `thaibreak_free_tokens` rebuilt it assuming they are equal. The array is now a boxed slice, so
+  the free matches the allocation.
+
 ### Security
 - Laravel: `@thaibreak` and `@thailinebreak` printed their text unescaped, and HTML in it was kept
   as is, so `@thaibreak($post->content)` let user content inject markup and scripts (XSS). They now

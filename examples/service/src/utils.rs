@@ -103,7 +103,9 @@ pub fn bahttext_str(input: &str) -> Result<String, &'static str> {
     let mut total_baht = baht;
     let mut final_satang = satang;
     if final_satang >= 100 {
-        total_baht += final_satang / 100;
+        total_baht = total_baht
+            .checked_add(final_satang / 100)
+            .ok_or("Baht amount out of range")?;
         final_satang %= 100;
     }
 
@@ -297,6 +299,15 @@ mod tests {
         assert_eq!(bahttext_str("100").unwrap(), "หนึ่งร้อยบาทถ้วน");
         assert_eq!(bahttext_str("-500.00").unwrap(), "ลบห้าร้อยบาทถ้วน");
         assert!(bahttext_str("abc").is_err());
+    }
+
+    #[test]
+    fn test_bahttext_str_out_of_range() {
+        // Rounding the satang up carries into the baht, which must not overflow
+        assert!(bahttext_str("9223372036854775807.995").is_err());
+        assert!(bahttext_str("9223372036854775808").is_err());
+        assert!(bahttext_str("9223372036854775807.99").is_ok());
+        assert_eq!(bahttext_str("0.995").unwrap(), "หนึ่งบาทถ้วน");
     }
 
     #[test]
