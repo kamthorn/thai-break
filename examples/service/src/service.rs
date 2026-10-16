@@ -14,10 +14,6 @@ static PAT_HTML_DETECT: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"<[a-zA-Z/!?][^>]*>").expect("Failed to compile PAT_HTML_DETECT")
 });
 
-static PAT_HTML_TAGS: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[a-zA-Z/!?][^>]*>|&[a-zA-Z0-9#]+;))")
-        .expect("Failed to compile PAT_HTML_TAGS")
-});
 
 #[derive(Clone)]
 pub struct ThaiBreakEngine {
@@ -196,9 +192,7 @@ impl ThaiBreakEngine {
         let mut tokens = Vec::new();
         let mut last_idx = 0;
 
-        for m in PAT_HTML_TAGS.find_iter(text) {
-            let start = m.start();
-            let end = m.end();
+        for (start, end) in thaibreak::html::markup_spans(text) {
 
             if start > last_idx {
                 let plain = &text[last_idx..start];

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Laravel: `@thaibreak` and `@thailinebreak` printed their text unescaped, and HTML in it was kept
+  as is, so `@thaibreak($post->content)` let user content inject markup and scripts (XSS). They now
+  escape the text as `{{ }}` does. The second argument is the break marker; the old boolean
+  `$isHtml` argument is ignored. `@thaibreakHtml($html, $marker)` keeps the tags of trusted HTML
+  unescaped, like `{!! !!}`.
+- HTML mode (Rust, Go, TypeScript, PHP and the example service) took quadratic time on markup
+  without its terminator, such as many `<script>`, `<!--` or `<a` without `</script>`, `-->` or
+  `>`: 320 KB of `<script>` took about 13 s. A linear scanner replaces the regex and finds the same
+  tags, entities, comments and script and style blocks, so the output is unchanged. TypeScript
+  also detects HTML in linear time now.
+
 ## [1.4.0] - 2026-10-12
 
 ### Documentation

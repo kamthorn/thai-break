@@ -1,11 +1,9 @@
 import { Tokenizer } from './tokenizer.js';
+import { containsHtmlTag, markupSpans } from './html.js';
 import { ALLOWED, breakOpportunities } from './uax14.js';
 
 export const DEFAULT_BREAK_MARKER = '\u200B';
 
-const PAT_HTML_TAGS = /(<!--[\s\S]*?-->|<script\b[^>]*>[\s\S]*?<\/script>|<style\b[^>]*>[\s\S]*?<\/style>|<[a-zA-Z/!?][^>]*>|&[a-zA-Z0-9#]+;)/gi;
-/** Detects HTML markup: a tag starts with a letter, "/", "!" or "?" right after "<". */
-const PAT_HTML_DETECT = /<[a-zA-Z/!?][^>]*>/;
 const RE_THAI_COMBINING = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]/g;
 
 
@@ -76,7 +74,7 @@ export class LineBreaker {
   ): string {
     if (!text) return '';
 
-    if (isHtml || PAT_HTML_DETECT.test(text)) {
+    if (isHtml || containsHtmlTag(text)) {
       return this.processHtml(text, marker);
     }
     return this.processPlain(text, marker);
@@ -132,7 +130,13 @@ export class LineBreaker {
 
   private processHtml(html: string, marker: string): string {
     // Split into tags/entities and text chunks
-    const parts = html.split(PAT_HTML_TAGS);
+    const parts: string[] = [];
+    let last = 0;
+    for (const [start, end] of markupSpans(html)) {
+      parts.push(html.slice(last, start), html.slice(start, end));
+      last = end;
+    }
+    parts.push(html.slice(last));
     let res = '';
     for (const part of parts) {
       if (!part) continue;
