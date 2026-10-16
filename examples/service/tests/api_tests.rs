@@ -611,3 +611,30 @@ async fn test_cors_star_allows_any_origin() {
         Some("*")
     );
 }
+
+fn config_with_paths(words: Option<&str>, bigram: Option<&str>) -> Config {
+    Config {
+        host: "127.0.0.1".into(),
+        port: 8080,
+        words_fst_path: words.map(Into::into),
+        lines_fst_path: None,
+        bigram_path: bigram.map(Into::into),
+        max_body_mb: 4,
+        concurrency_limit: 100,
+        request_timeout_secs: 30,
+        cors_allowed_origins: vec![],
+        log_level: "error".into(),
+    }
+}
+
+#[test]
+#[should_panic(expected = "Cannot load the words FST dictionary")]
+fn test_missing_custom_dictionary_is_fatal() {
+    ThaiBreakEngine::new(&config_with_paths(Some("/nonexistent/words.fst"), None));
+}
+
+#[test]
+#[should_panic(expected = "Cannot load the bigram model")]
+fn test_missing_custom_bigram_model_is_fatal() {
+    ThaiBreakEngine::new(&config_with_paths(None, Some("/nonexistent/bigrams.tsv")));
+}

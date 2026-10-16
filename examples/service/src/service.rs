@@ -83,21 +83,14 @@ impl ThaiBreakEngine {
         embedded_bytes: &'static [u8],
         mode_label: &str,
     ) -> (ThaiTrie, usize) {
-        // 1. Try custom path if provided
+        // 1. A path that was asked for must load: a silent fallback would serve another dictionary
         if let Some(path_str) = custom_path {
-            let path = Path::new(path_str);
-            if path.exists() {
-                match ThaiTrie::load_fst_file(path) {
-                    Ok(trie) => {
-                        let count = trie.len();
-                        info!(mode = mode_label, path = path_str, count, "Loaded custom FST dictionary file");
-                        return (trie, count);
-                    }
-                    Err(e) => {
-                        tracing::warn!(mode = mode_label, path = path_str, error = %e, "Failed to load custom FST dictionary, trying candidates");
-                    }
-                }
-            }
+            let trie = ThaiTrie::load_fst_file(Path::new(path_str)).unwrap_or_else(|e| {
+                panic!("Cannot load the {mode_label} FST dictionary from {path_str}: {e}")
+            });
+            let count = trie.len();
+            info!(mode = mode_label, path = path_str, count, "Loaded custom FST dictionary file");
+            return (trie, count);
         }
 
         // 2. Try common relative filesystem paths
@@ -120,11 +113,10 @@ impl ThaiBreakEngine {
 
     fn load_bigrams(custom_path: Option<&str>) -> Option<BigramModel> {
         if let Some(path_str) = custom_path {
-            let path = Path::new(path_str);
-            if let Ok(b) = BigramModel::load_tsv_file(path, 2.0) {
-                info!(path = path_str, "Loaded bigram model");
-                return Some(b);
-            }
+            let b = BigramModel::load_tsv_file(Path::new(path_str), 2.0)
+                .unwrap_or_else(|e| panic!("Cannot load the bigram model from {path_str}: {e}"));
+            info!(path = path_str, "Loaded bigram model");
+            return Some(b);
         }
 
         // NOTE: only committed dictionaries are auto-discovered here.

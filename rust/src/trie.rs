@@ -238,10 +238,13 @@ impl FstTrie {
 
             let mut weights = Vec::new();
             if flags & 1 != 0 {
-                let weights_len = count * 8;
-                if len < offset + weights_len {
+                // checked: on 32-bit targets (wasm32) a large count in the header would wrap
+                let fits = count
+                    .checked_mul(8)
+                    .filter(|&weights_len| len >= offset + weights_len);
+                let Some(weights_len) = fits else {
                     return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid FST header weights size"));
-                }
+                };
                 weights.reserve(count);
                 for i in 0..count {
                     let w_bytes: [u8; 8] = bytes[offset + i * 8..offset + (i + 1) * 8].try_into().unwrap();

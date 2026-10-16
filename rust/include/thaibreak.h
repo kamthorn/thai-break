@@ -16,7 +16,14 @@ extern "C" {
 
 /**
  * Initialize ThaiBreak with dictionary and bigrams file paths.
- * @param dict_path Path to wordlist.tsv
+ *
+ * If this is never called, or dict_path is NULL, the first tokenize/lines/wrap call looks for
+ * data/words.fst, then words.txt, in the current working directory, ../ and ../../, and uses the
+ * first one it can read (with word-weights.tsv and bigrams.tsv next to it, if present), or the
+ * embedded dictionary when built with it. Anyone who can write a file at one of those places
+ * changes the segmentation, so pass an absolute dict_path for a process that does not control its
+ * working directory.
+ * @param dict_path Path to a dictionary: words.fst, words.txt or a word<TAB>weight file
  * @param bigram_path Path to bigrams.tsv (optional, pass NULL if not used)
  * @return 0 on success, -1 on error
  */

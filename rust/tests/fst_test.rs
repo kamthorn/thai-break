@@ -173,3 +173,14 @@ fn prefix_ends_match_prefixes_in_the_embedded_dictionary() {
     assert_prefix_ends_match(&trie, "พระบาทสมเด็จพระเจ้าอยู่หัวเสด็จฯ ไปทรงเปิดงานที่กรุงเทพมหานคร เมื่อวันที่ 5 ธ.ค.");
     assert_prefix_ends_match(&trie, "นํ้าแข็งใส่แก้ว Eucerin ค่ะ ไม่อยากก้ไม่ต้องกิน");
 }
+
+#[test]
+fn fst_header_with_impossible_weight_count_is_an_error() {
+    // "TBF1", flags = weights present, total/max weight, count = u32::MAX: the weights cannot fit
+    let mut bytes = b"TBF1".to_vec();
+    bytes.extend_from_slice(&[1, 0, 0, 0]);
+    bytes.extend_from_slice(&1f64.to_le_bytes());
+    bytes.extend_from_slice(&1f64.to_le_bytes());
+    bytes.extend_from_slice(&u32::MAX.to_le_bytes());
+    assert!(thaibreak::ThaiTrie::from_fst_bytes(bytes.into()).is_err());
+}
