@@ -2,13 +2,18 @@ package thaibreak
 
 import (
 	"regexp"
+	"regexp/syntax"
 	"strings"
 	"sync"
 	"unicode/utf8"
 )
 
 var (
-	tccGeneralPattern   *regexp.Regexp
+	tccGeneralPattern *regexp.Regexp
+	// tccGeneralByClass has, for each class of first rune (see tccFirstClass), the general rules that
+	// can start with it, in the order of tccGeneralPattern, so an alternative that cannot match is
+	// never tried. The result is the same as that of tccGeneralPattern.
+	tccGeneralByClass   [tccClasses]*regexp.Regexp
 	tccLookaheadPattern *regexp.Regexp
 	tccOnce             sync.Once
 )
@@ -78,6 +83,15 @@ func initTCCRegex() {
 		lookPatterns := expand(rawLookaheadRules)
 
 		tccGeneralPattern = regexp.MustCompile("^(" + strings.Join(genPatterns, "|") + ")")
+		for class := 0; class < tccClasses; class++ {
+			var sel []string
+			for _, p := range genPatterns {
+				if tccCanStartWith(p, class) {
+					sel = append(sel, p)
+				}
+			}
+			tccGeneralByClass[class] = regexp.MustCompile("^(" + strings.Join(sel, "|") + ")")
+		}
 		tccLookaheadPattern = regexp.MustCompile("^(" + strings.Join(lookPatterns, "|") + ")")
 	})
 }
@@ -99,6 +113,80 @@ func isFollowedByLookaheadChar(rest string) bool {
 	return false
 }
 
+// tccClasses is the number of classes of first rune of a TCC cluster: a consonant, เ, แ, โ, and ใ or ไ.
+const tccClasses = 5
+
+// tccFirstClass returns the class of r (see tccClasses), or -1 if no general rule starts with r.
+func tccFirstClass(r rune) int {
+	switch {
+	case r >= 0x0E01 && r <= 0x0E2E:
+		return 0
+	case r >= 0x0E40 && r <= 0x0E42:
+		return int(r-0x0E40) + 1
+	case r == 0x0E43 || r == 0x0E44:
+		return 4
+	}
+	return -1
+}
+
+// tccClassRange is the range of runes of a class of first rune.
+var tccClassRange = [tccClasses][2]rune{{0x0E01, 0x0E2E}, {0x0E40, 0x0E40}, {0x0E41, 0x0E41}, {0x0E42, 0x0E42}, {0x0E43, 0x0E44}}
+
+// tccCanStartWith reports whether the rule pattern can match a string that starts with a rune of the
+// class. It errs on the side of true.
+func tccCanStartWith(pattern string, class int) bool {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return true
+	}
+	ranges, ok := tccFirstRunes(re)
+	if !ok {
+		return true
+	}
+	lo, hi := tccClassRange[class][0], tccClassRange[class][1]
+	for _, r := range ranges {
+		if r[0] <= hi && lo <= r[1] {
+			return true
+		}
+	}
+	return false
+}
+
+// tccFirstRunes returns the ranges of runes a match of re can start with, or false if unknown.
+func tccFirstRunes(re *syntax.Regexp) ([][2]rune, bool) {
+	switch re.Op {
+	case syntax.OpLiteral:
+		if re.Flags&syntax.FoldCase != 0 || len(re.Rune) == 0 {
+			return nil, false
+		}
+		return [][2]rune{{re.Rune[0], re.Rune[0]}}, true
+	case syntax.OpCharClass:
+		var out [][2]rune
+		for i := 0; i+1 < len(re.Rune); i += 2 {
+			out = append(out, [2]rune{re.Rune[i], re.Rune[i+1]})
+		}
+		return out, true
+	case syntax.OpConcat:
+		return tccFirstRunes(re.Sub[0])
+	case syntax.OpCapture:
+		return tccFirstRunes(re.Sub[0])
+	case syntax.OpAlternate:
+		var out [][2]rune
+		for _, sub := range re.Sub {
+			r, ok := tccFirstRunes(sub)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, r...)
+		}
+		return out, true
+	}
+	return nil, false
+}
+
+// tccMaxRunes bounds the length of a match of the TCC patterns (the longest has 11 runes).
+const tccMaxRunes = 16
+
 // TCCPosArray computes valid TCC break positions for a slice of runes.
 func TCCPosArray(runes []rune) []bool {
 	n := len(runes)
@@ -114,45 +202,56 @@ func TCCPosArray(runes []rune) []bool {
 	text := string(runes)
 	byteLen := len(text)
 
-	byteToRune := make(map[int]int, n+1)
+	// Rune index at each rune start (by byte offset), and the byte offset of each rune
+	byteToRune := make([]int32, byteLen+1)
+	runeOffset := make([]int, n+1)
 	byteOffset := 0
 	for i, r := range runes {
-		byteToRune[byteOffset] = i
+		byteToRune[byteOffset] = int32(i)
+		runeOffset[i] = byteOffset
 		byteOffset += utf8.RuneLen(r)
 	}
-	byteToRune[byteOffset] = n
+	byteToRune[byteOffset] = int32(n)
+	runeOffset[n] = byteOffset
 
 	bytePos := 0
 	for bytePos < byteLen {
 		sub := text[bytePos:]
+		// No rule matches more than tccMaxRunes runes, so the patterns only see this window: the
+		// regexp package is much slower on a long input
+		window := text[bytePos:runeOffset[min(int(byteToRune[bytePos])+tccMaxRunes, n)]]
 
-		// First, test lookahead rules if applicable
-		if loc := tccLookaheadPattern.FindStringIndex(sub); loc != nil && loc[1] > 0 {
-			matchLen := loc[1]
-			if isFollowedByLookaheadChar(sub[matchLen:]) {
-				bytePos += matchLen
-				if idx, ok := byteToRune[bytePos]; ok {
-					valid[idx] = true
+		// First, test lookahead rules if applicable (all of them start with เ)
+		if sub[0] == 0xE0 && strings.HasPrefix(sub, "เ") {
+			if loc := tccLookaheadPattern.FindStringIndex(window); loc != nil && loc[1] > 0 {
+				matchLen := loc[1]
+				if isFollowedByLookaheadChar(sub[matchLen:]) {
+					bytePos += matchLen
+					valid[byteToRune[bytePos]] = true
+					continue
 				}
-				continue
 			}
 		}
 
 		// Second, test general rules
-		if loc := tccGeneralPattern.FindStringIndex(sub); loc != nil && loc[1] > 0 {
+		var general *regexp.Regexp
+		if class := tccFirstClass(runes[byteToRune[bytePos]]); class >= 0 {
+			general = tccGeneralByClass[class]
+		}
+		var loc []int
+		if general != nil {
+			loc = general.FindStringIndex(window)
+		}
+		if loc != nil && loc[1] > 0 {
 			bytePos += clusterLen(sub[:loc[1]], sub[loc[1]:])
-			if idx, ok := byteToRune[bytePos]; ok {
-				valid[idx] = true
-			}
+			valid[byteToRune[bytePos]] = true
 		} else {
 			_, size := utf8.DecodeRuneInString(sub)
 			if size <= 0 {
 				size = 1
 			}
 			bytePos += size
-			if idx, ok := byteToRune[bytePos]; ok {
-				valid[idx] = true
-			}
+			valid[byteToRune[bytePos]] = true
 		}
 	}
 

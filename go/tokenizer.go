@@ -2,6 +2,7 @@ package thaibreak
 
 import (
 	"math"
+	"math/bits"
 	"regexp"
 	"slices"
 	"strings"
@@ -73,6 +74,39 @@ var oovBoundaryWords = []string{
 // are frequent syllables of transliterated names (อาห์มาดิเนจัด, อะมีรุ้ลฮัจย์).
 var oovInnerAllowed = map[string]bool{"มา": true, "มี": true}
 
+// Derived tables of the function words, by index in oovBoundaryWords (at most 64: bit k of a mask
+// stands for word k).
+var (
+	// fwFirst holds the function words by first character, as an offset from U+0E00.
+	fwFirst [0x80][]functionWord
+	// fwBytes and fwLens are the length of each function word in bytes and in runes.
+	fwBytes, fwLens []int
+	// fwInner is the mask of the function words that may not occur inside an out-of-vocabulary word.
+	fwInner uint64
+	// letterFirst holds letterNames by first character, as an offset from U+0E00, in letterNames order.
+	letterFirst [0x80][][]rune
+)
+
+type functionWord struct {
+	runes []rune
+	bit   uint64
+}
+
+func init() {
+	for k, f := range oovBoundaryWords {
+		r := []rune(f)
+		fwFirst[r[0]-0x0E00] = append(fwFirst[r[0]-0x0E00], functionWord{r, 1 << k})
+		fwBytes = append(fwBytes, len(f))
+		fwLens = append(fwLens, len(r))
+		if !oovInnerAllowed[f] {
+			fwInner |= 1 << k
+		}
+	}
+	for _, name := range letterNames {
+		letterFirst[name[0]-0x0E00] = append(letterFirst[name[0]-0x0E00], name)
+	}
+}
+
 var (
 	patNonThai = regexp.MustCompile(`^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\x{0e00}-\x{0e7f}a-zA-Z0-9 \t\r\n])`)
 	patAbbr    = regexp.MustCompile(`^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+`)
@@ -115,32 +149,6 @@ func (tok *Tokenizer) abbreviationIsWords(runes []rune, end int, abbr string) bo
 	return strings.Count(abbr, ".") == 1 && strings.HasSuffix(abbr, ".") &&
 		utf8.RuneCountInString(first) >= 2 && strings.ContainsFunc(first, func(r rune) bool { return r < 'ก' || r > 'ฮ' }) && !nextIsThai &&
 		tok.trie.Contains(first) && !tok.trie.Contains(abbr)
-}
-
-// bordersFunctionWord reports whether w is longer than, and starts or ends with, an oovBoundaryWords word.
-func bordersFunctionWord(w string) bool {
-	for _, f := range oovBoundaryWords {
-		if len(w) > len(f) && (strings.HasPrefix(w, f) || strings.HasSuffix(w, f)) {
-			return true
-		}
-	}
-	return false
-}
-
-// endsWithInnerFunctionWord reports whether runes[start:end] ends with an oovBoundaryWords word
-// (other than oovInnerAllowed) that starts at a cluster boundary after start. Every longer
-// out-of-vocabulary edge from start would contain that word.
-func endsWithInnerFunctionWord(runes []rune, start, end int, validPos []bool) bool {
-	for _, f := range oovBoundaryWords {
-		if oovInnerAllowed[f] {
-			continue
-		}
-		l := utf8.RuneCountInString(f)
-		if end-start > l && validPos[end-l] && string(runes[end-l:end]) == f {
-			return true
-		}
-	}
-	return false
 }
 
 // isOOVRune reports whether an out-of-vocabulary edge may cover r: Thai letters, vowels and marks,
@@ -263,6 +271,22 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 
 	validPos := TCCPosArray(runes)
 
+	// Bit k of fwStarts[p] is set when oovBoundaryWords[k] begins at rune p, and bit k of fwEnds[p]
+	// when it ends there.
+	fwStarts := make([]uint64, n+1)
+	fwEnds := make([]uint64, n+1)
+	for p, r := range runes {
+		if r < 0x0E00 || r > 0x0E7F {
+			continue
+		}
+		for _, f := range fwFirst[r-0x0E00] {
+			if e := p + len(f.runes); e <= n && slices.Equal(runes[p:e], f.runes) {
+				fwStarts[p] |= f.bit
+				fwEnds[e] |= f.bit
+			}
+		}
+	}
+
 	// Precompute byte offsets for regex matching on string slices
 	charByteOffsets := make([]int, n+1)
 	b := 0
@@ -286,7 +310,6 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 	// text length.
 	dp := make([]float64, n+1)
 	from := make([]int, n+1)
-	word := make([]string, n+1)
 	isUnk := make([]bool, n+1)
 	for i := range dp {
 		dp[i] = math.Inf(1)
@@ -294,13 +317,14 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 	}
 	dp[0] = 0.0
 
+	// Every edge into j covers runes[from[j]:j], so the DP keeps no word.
 	type outEdge struct {
 		to      int
-		word    string
 		cost    float64
 		unknown bool // an out-of-vocabulary edge, merged with neighbouring unknown words
 	}
 	var edges []outEdge
+	var matchBuf []PrefixMatch
 
 	for i := 0; i <= n; i++ {
 		if !validPos[i] {
@@ -313,7 +337,6 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				if !math.IsInf(dp[k], 1) && validPos[k] {
 					dp[i] = dp[k] + unknownCostFactor*rareCost
 					from[i] = k
-					word[i] = string(runes[k:i])
 					isUnk[i] = true
 					break
 				}
@@ -330,26 +353,43 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 
 		if isThaiRune(runes[i]) {
 			// 1. Thai dictionary words starting at i
-			for _, m := range tok.trie.Prefixes(runes, i, maxWordLen) {
+			matchBuf = tok.trie.prefixesInto(matchBuf[:0], runes, i, maxWordLen)
+			for _, m := range matchBuf {
 				if j := m.End; j <= n && validPos[j] {
-					edges = append(edges, outEdge{j, string(runes[i:j]), math.Log(normalizer / m.Weight), false})
+					edges = append(edges, outEdge{j, math.Log(normalizer / m.Weight), false})
 				}
 			}
 
 			// 2. Thai abbreviation patterns
-			if loc := patAbbr.FindStringIndex(subText); loc != nil && loc[0] == 0 {
+			// (the pattern needs a full stop within four runes)
+			dot := false
+			for t, tEnd := i+1, min(i+4, n-1); t <= tEnd; t++ {
+				if runes[t] == '.' {
+					dot = true
+					break
+				}
+			}
+			var loc []int
+			if dot {
+				loc = patAbbr.FindStringIndex(subText)
+			}
+			if loc != nil && loc[0] == 0 {
 				mStr := subText[:loc[1]]
 				abbrLen := utf8.RuneCountInString(mStr)
 				if j := i + abbrLen; j <= n && validPos[j] && !tok.abbreviationIsWords(runes, i+abbrLen, mStr) {
 					letters := abbrLen - strings.Count(mStr, ".")
-					edges = append(edges, outEdge{j, mStr, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost, false})
+					edges = append(edges, outEdge{j, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost, false})
 				}
 			}
 
 			// 3. Runs of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น, ดีเอสไอ)
 			for end, letters := i, 0; ; {
 				next := 0
-				for _, name := range letterNames {
+				var names [][]rune
+				if end < n && runes[end] >= 0x0E00 && runes[end] <= 0x0E7F {
+					names = letterFirst[runes[end]-0x0E00]
+				}
+				for _, name := range names {
 					if e := end + len(name); e <= n && validPos[e] && slices.Equal(runes[end:e], name) {
 						next = e
 						break
@@ -361,7 +401,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				end = next
 				letters++
 				if letters >= 2 {
-					edges = append(edges, outEdge{end, string(runes[i:end]), letterRunCostFactor * rareCost, false})
+					edges = append(edges, outEdge{end, letterRunCostFactor * rareCost, false})
 				}
 			}
 
@@ -375,30 +415,48 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				if clusters > oovMaxClusters {
 					break
 				}
-				w := string(runes[i:j])
-				if bordersFunctionWord(w) {
-					if endsWithInnerFunctionWord(runes, i, j, validPos) {
-						break
+				if hits := fwStarts[i] | fwEnds[j]; hits != 0 {
+					// the edge borders a function word that is shorter than the edge
+					edgeBytes := charByteOffsets[j] - charByteOffsets[i]
+					borders := false
+					for h := hits; h != 0; h &= h - 1 {
+						if edgeBytes > fwBytes[bits.TrailingZeros64(h)] {
+							borders = true
+							break
+						}
 					}
-					continue
+					if borders {
+						// every longer edge from i would contain a function word that ends here
+						for h := fwEnds[j] & fwInner; h != 0; h &= h - 1 {
+							if l := fwLens[bits.TrailingZeros64(h)]; j-i > l && validPos[j-l] {
+								goto endOOV
+							}
+						}
+						continue
+					}
 				}
-				edges = append(edges, outEdge{j, w, (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
+				edges = append(edges, outEdge{j, (oovCostFactor + oovClusterCostFactor*float64(clusters-1)) * rareCost, true})
 			}
+		endOOV:
 		} else {
 			// 5. Non-Thai tokens
 			if loc := patNonThai.FindStringIndex(subText); loc != nil && loc[0] == 0 {
 				mStr := subText[:loc[1]]
 				if j := i + utf8.RuneCountInString(mStr); j <= n && validPos[j] {
-					edges = append(edges, outEdge{j, mStr, rareCost, false})
+					edges = append(edges, outEdge{j, rareCost, false})
 				}
 			}
 		}
 
 		// Relax the edges
+		prev := ""
+		if tok.bigrams != nil && from[i] >= 0 {
+			prev = string(runes[from[i]:i])
+		}
 		for _, e := range edges {
 			edgeCost := e.cost
-			if tok.bigrams != nil && word[i] != "" {
-				bonus := tok.bigrams.GetBonus(word[i], e.word, e.to-i)
+			if prev != "" {
+				bonus := tok.bigrams.GetBonus(prev, string(runes[i:e.to]), e.to-i)
 				edgeCost = math.Max(0.01, e.cost-bonus)
 			}
 
@@ -406,7 +464,6 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 			if newCost := dp[i] + edgeCost; newCost <= dp[e.to]+tieEpsilon {
 				dp[e.to] = newCost
 				from[e.to] = i
-				word[e.to] = e.word
 				isUnk[e.to] = e.unknown
 			}
 		}
@@ -417,30 +474,28 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 		return []string{text}
 	}
 
-	var rawTokens []string
-	var rawIsUnk []bool
+	type span struct {
+		start, end int
+		unknown    bool
+	}
+	var spans []span
 	pos := n
 	for pos > 0 {
-		rawTokens = append(rawTokens, word[pos])
-		rawIsUnk = append(rawIsUnk, isUnk[pos])
+		spans = append(spans, span{from[pos], pos, isUnk[pos]})
 		pos = from[pos]
 		if pos < 0 {
 			break
 		}
 	}
-
-	// Reverse
-	for l, r := 0, len(rawTokens)-1; l < r; l, r = l+1, r-1 {
-		rawTokens[l], rawTokens[r] = rawTokens[r], rawTokens[l]
-		rawIsUnk[l], rawIsUnk[r] = rawIsUnk[r], rawIsUnk[l]
-	}
+	slices.Reverse(spans)
 
 	// Syllable-based OOV chunking: merge consecutive unknown Thai clusters
 	var tokens []string
 	var curChunk strings.Builder
 
-	for idx, tokStr := range rawTokens {
-		if rawIsUnk[idx] && isThaiString(tokStr) {
+	for _, sp := range spans {
+		tokStr := string(runes[sp.start:sp.end])
+		if sp.unknown && isThaiString(tokStr) {
 			curChunk.WriteString(tokStr)
 		} else {
 			if curChunk.Len() > 0 {

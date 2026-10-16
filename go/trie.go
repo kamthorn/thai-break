@@ -278,6 +278,12 @@ func (t *ThaiTrie) MaxWeight() float64 {
 
 // Prefixes finds all matching dictionary words starting at rune position `start`.
 func (t *ThaiTrie) Prefixes(runes []rune, start int, maxLen int) []PrefixMatch {
+	return t.prefixesInto(nil, runes, start, maxLen)
+}
+
+// prefixesInto appends the matches of Prefixes to matches (which should be empty), so a caller can
+// reuse the buffer.
+func (t *ThaiTrie) prefixesInto(matches []PrefixMatch, runes []rune, start int, maxLen int) []PrefixMatch {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
@@ -286,12 +292,11 @@ func (t *ThaiTrie) Prefixes(runes []rune, start int, maxLen int) []PrefixMatch {
 		limit = start + maxLen
 	}
 
-	var matches []PrefixMatch
-
 	if t.dawg != nil {
 		state := 0
 		d := t.dawg
-		var key []byte // the word so far, to look up t.weights without allocating
+		var keyArr [128]byte
+		key := keyArr[:0] // the word so far, to look up t.weights without allocating
 
 		for idx := start; idx < limit; idx++ {
 			r := runes[idx]
