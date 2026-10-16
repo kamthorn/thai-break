@@ -82,17 +82,47 @@ class ThaiBreakServiceProvider extends ServiceProvider
 
         $blade = $this->app->make('blade.compiler');
 
-        // @thaibreak($text, $isHtml = false) or @thailinebreak($text, $isHtml = false)
+        // @thaibreak($text, $marker = ZWSP) or @thailinebreak($text, $marker = ZWSP)
+        // The text is escaped like {{ }}, so user content cannot inject markup.
         $bladeDirectiveLineBreak = function ($expression) {
-            return "<?php echo app('thaibreak')->insertLineBreaks({$expression}); ?>";
+            return "<?php echo \\ThaiBreak\\Laravel\\ThaiBreakServiceProvider::escapedLineBreaks({$expression}); ?>";
         };
         $blade->directive('thaibreak', $bladeDirectiveLineBreak);
         $blade->directive('thailinebreak', $bladeDirectiveLineBreak);
+
+        // @thaibreakHtml($html, $marker = ZWSP): trusted HTML only, printed unescaped like {!! !!}
+        $blade->directive('thaibreakHtml', function ($expression) {
+            return "<?php echo \\ThaiBreak\\Laravel\\ThaiBreakServiceProvider::htmlLineBreaks({$expression}); ?>";
+        });
 
         // @thaiwrap($text, $width = 60)
         $blade->directive('thaiwrap', function ($expression) {
             return "<?php echo e(app('thaibreak')->wrap({$expression})); ?>";
         });
+    }
+
+    /**
+     * Escape text for HTML, as {{ }} does, then insert line break markers
+     * between the words. Used by the @thaibreak and @thailinebreak directives.
+     *
+     * A boolean second argument is the old `$isHtml` form of the directive and
+     * is ignored: the text is escaped either way. Use @thaibreakHtml for trusted HTML.
+     */
+    public static function escapedLineBreaks(mixed $text, string|bool|null $marker = null): string
+    {
+        $marker = is_string($marker) ? $marker : ThaiLineBreaker::DEFAULT_MARKER;
+
+        // The escaped text has entities but no tags; the HTML mode keeps the entities whole
+        return app('thaibreak')->insertLineBreaks(e($text), $marker, true);
+    }
+
+    /**
+     * Insert line break markers into the text of trusted HTML, keeping its tags
+     * and entities. Used by the @thaibreakHtml directive. Never pass user input.
+     */
+    public static function htmlLineBreaks(?string $html, string $marker = ThaiLineBreaker::DEFAULT_MARKER): string
+    {
+        return app('thaibreak')->insertLineBreaks($html ?? '', $marker, true);
     }
 
     /**
