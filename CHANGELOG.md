@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Typst plugin 0.2.0: `typst/thaibreak.wasm` is rebuilt from the 1.4.1 core, so it has the out-of-vocabulary
-  words, word weights and bug fixes of 1.3.0-1.4.1 (it was built from the 1.0 core). For example
+  words, word weights and bug fixes of 1.3.0-1.4.1 (it was built before 1.3.0). For example
   `ชวรัตน์` and `เอทีเอ็ม` are one word. The file is 21 KB larger (1.38 MB).
 
 ## [1.4.1] - 2026-10-16
