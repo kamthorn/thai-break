@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-10-16
+
 ### Changed
+- **Faster segmentation, same tokens.** Rust is about 11 times faster (13.2 s to 1.2 s for 8M characters
+  of news): the `regex` crate is built with its DFA (`perf-dfa`; TCC took 70% of the time without it),
+  the DP keeps no word string per edge, function words are found once per text as bit masks, and the
+  dictionary walk reuses a buffer and caches the FST states after the first Thai characters. Go, TypeScript
+  and PHP use the same techniques and are 2-4 times faster; PHP no longer revalidates the UTF-8 of the
+  rest of the text at every match. The tokens are identical on 2.8M characters of news and random text
+  (`docs/performance.md`, `docs/performance-ports.md`). The Rust crate grows by about 100 KB with `perf-dfa`.
 - Example service: CORS is closed by default. It sent `Access-Control-Allow-Origin: *`, so any web
   page could call the API from a visitor's browser, which matters when the service runs inside a
   network. Set `CORS_ALLOWED_ORIGINS` (comma-separated, or `*`) to allow browser calls. `marker`
