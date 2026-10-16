@@ -1,5 +1,6 @@
 pub mod bigram;
 pub mod break_iterator;
+pub mod html;
 mod linebreak_data;
 pub mod linebreaker;
 pub mod normalizer;

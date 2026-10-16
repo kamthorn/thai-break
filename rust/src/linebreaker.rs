@@ -6,11 +6,6 @@ use crate::uax14;
 
 pub const DEFAULT_BREAK_MARKER: &str = "\u{200B}";
 
-static PAT_HTML_TAGS: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[a-zA-Z/!?][^>]*>|&[a-zA-Z0-9#]+;))")
-        .expect("Failed to compile PAT_HTML_TAGS")
-});
-
 /// Detects HTML markup: a tag starts with a letter, "/", "!" or "?" right after "<".
 static PAT_HTML_DETECT: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"<[a-zA-Z/!?][^>]*>").expect("Failed to compile PAT_HTML_DETECT")
@@ -139,9 +134,7 @@ impl LineBreaker {
         let mut res = String::with_capacity(html.len());
         let mut last_idx = 0;
 
-        for m in PAT_HTML_TAGS.find_iter(html) {
-            let start = m.start();
-            let end = m.end();
+        for (start, end) in crate::html::markup_spans(html) {
 
             // Text segment before tag
             if start > last_idx {

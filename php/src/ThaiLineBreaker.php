@@ -31,9 +31,6 @@ class ThaiLineBreaker
     /** Default break opportunity marker: Zero-Width Space (U+200B) */
     public const DEFAULT_MARKER = "\u{200B}";
 
-    /** Pattern matching HTML raw blocks (comments, scripts, styles), tags, and entities */
-    private const PAT_HTML_TAGS = '/(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[a-zA-Z\/!?][^>]*>|&[a-zA-Z0-9#]+;)/usi';
-
     /** Pattern detecting HTML markup: a tag starts with a letter, "/", "!" or "?" right after "<" */
     private const PAT_HTML_DETECT = '/<[a-zA-Z\/!?][^>]*>/u';
 
@@ -299,8 +296,8 @@ class ThaiLineBreaker
      */
     private function processHtmlText(string $html, string $breakMarker): string
     {
-        $parts = preg_split(self::PAT_HTML_TAGS, $html, -1, PREG_SPLIT_DELIM_CAPTURE);
-        if ($parts === false || count($parts) <= 1) {
+        $parts = self::splitMarkup($html);
+        if (count($parts) <= 1) {
             return $this->processPlainText($html, $breakMarker);
         }
 
@@ -319,5 +316,75 @@ class ThaiLineBreaker
         }
 
         return $out;
+    }
+
+    /**
+     * Split HTML into text chunks and the comments, script and style blocks,
+     * tags and entities between them, like preg_split() with
+     * PREG_SPLIT_DELIM_CAPTURE and the pattern
+     * `(<!--.*?-->|<script\b[^>]*>.*?<\/script>|<style\b[^>]*>.*?<\/style>|<[a-zA-Z\/!?][^>]*>|&[a-zA-Z0-9#]+;)`
+     * (flags `usi`), but in linear time: with that pattern, every `<script>`,
+     * `<!--` or `<a` whose terminator is missing scans to the end of the text again.
+     *
+     * @return list<string>
+     */
+    public static function splitMarkup(string $html): array
+    {
+        if (!mb_check_encoding($html, 'UTF-8')) {
+            return [$html]; // the /u pattern matches nothing in invalid UTF-8
+        }
+
+        // Next position of each terminator from the last lookup (false: none). Lookups
+        // come from increasing offsets, so a cached hit at or after the new offset is
+        // still the first one and a cached miss stays a miss.
+        $cache = [];
+        $find = static function (string $needle, int $from) use ($html, &$cache) {
+            if (array_key_exists($needle, $cache) && ($cache[$needle] === false || $cache[$needle] >= $from)) {
+                return $cache[$needle];
+            }
+            return $cache[$needle] = $from > strlen($html) ? false : stripos($html, $needle, $from);
+        };
+
+        $parts = [];
+        $last  = 0;
+        $n     = strlen($html);
+        for ($i = 0; $i < $n;) {
+            $end = null;
+            if ($html[$i] === '<') {
+                if (substr_compare($html, '<!--', $i, 4) === 0) {
+                    $j = $find('-->', $i + 4);
+                    $end = $j === false ? null : $j + 3;
+                }
+                foreach (['script', 'style'] as $raw) {
+                    $after = $i + strlen($raw) + 1;
+                    if ($end === null && substr_compare($html, "<$raw", $i, strlen($raw) + 1, true) === 0
+                        && preg_match('/^\w/u', mb_substr(substr($html, $after, 4), 0, 1, 'UTF-8')) !== 1) {
+                        $k = $find('>', $after);
+                        $j = $k === false ? false : $find("</$raw>", $k + 1);
+                        $end = $j === false ? null : $j + strlen($raw) + 3;
+                    }
+                }
+                $c = $html[$i + 1] ?? '';
+                if ($end === null && (($c >= 'a' && $c <= 'z') || ($c >= 'A' && $c <= 'Z') || $c === '/' || $c === '!' || $c === '?')) {
+                    $k = $find('>', $i + 1);
+                    $end = $k === false ? null : $k + 1;
+                }
+            } elseif ($html[$i] === '&') {
+                $run = strspn($html, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#', $i + 1);
+                if ($run > 0 && ($html[$i + 1 + $run] ?? '') === ';') {
+                    $end = $i + $run + 2;
+                }
+            }
+            if ($end === null) {
+                $i++;
+                continue;
+            }
+            $parts[] = substr($html, $last, $i - $last);
+            $parts[] = substr($html, $i, $end - $i);
+            $i = $last = $end;
+        }
+        $parts[] = substr($html, $last);
+
+        return $parts;
     }
 }

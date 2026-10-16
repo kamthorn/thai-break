@@ -13,7 +13,6 @@ const (
 )
 
 var (
-	reHtmlTags      = regexp.MustCompile(`(?si:(<!--.*?-->|<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>|<[a-zA-Z/!?][^>]*>|&[a-zA-Z0-9#]+;))`)
 	reHtmlDetect    = regexp.MustCompile(`<[a-zA-Z/!?][^>]*>`) // a tag starts with a letter, "/", "!" or "?" after "<"
 	reThaiCombining = regexp.MustCompile("[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E\u200B]")
 )
@@ -128,17 +127,17 @@ func (b *LineBreaker) breakSegments(text string) []string {
 }
 
 func (b *LineBreaker) processHtml(html string, marker string) string {
-	parts := reHtmlTags.Split(html, -1)
-	matches := reHtmlTags.FindAllString(html, -1)
-
 	var sb strings.Builder
-	for i, part := range parts {
-		if part != "" {
-			sb.WriteString(b.processPlain(part, marker))
+	last := 0
+	for _, span := range markupSpans(html) {
+		if span[0] > last {
+			sb.WriteString(b.processPlain(html[last:span[0]], marker))
 		}
-		if i < len(matches) {
-			sb.WriteString(matches[i]) // preserve HTML tag or entity intact
-		}
+		sb.WriteString(html[span[0]:span[1]]) // preserve HTML tag or entity intact
+		last = span[1]
+	}
+	if last < len(html) {
+		sb.WriteString(b.processPlain(html[last:], marker))
 	}
 	return sb.String()
 }
