@@ -52,11 +52,20 @@ class ThaiTokenizer
     public static function withDefaultDict(?string $dictPath = null, ?string $bigramPath = null): self
     {
         $path = $dictPath;
+        $bundledPhp = false;
+        if ($path === null) {
+            // words.php is run with require, so only the copies that ship with this package are
+            // looked for; the working directory is not
+            foreach ([__DIR__ . '/../../data/words.php', __DIR__ . '/../data/words.php'] as $c) {
+                if (file_exists($c)) {
+                    $path = $c;
+                    $bundledPhp = true;
+                    break;
+                }
+            }
+        }
         if ($path === null) {
             $candidates = [
-                __DIR__ . '/../../data/words.php',
-                __DIR__ . '/../data/words.php',
-                'data/words.php',
                 __DIR__ . '/../../data/words.dawg',
                 __DIR__ . '/../data/words.dawg',
                 'data/words.dawg',
@@ -72,8 +81,9 @@ class ThaiTokenizer
             }
         }
 
-        if ($path !== null && file_exists($path)) {
-            $trie = DictionaryLoader::fromFile($path);
+        // A path that was asked for must load: DictionaryLoader throws if it is missing
+        if ($path !== null) {
+            $trie = $bundledPhp ? DictionaryLoader::fromPhpFile($path) : DictionaryLoader::fromFile($path);
             // The default dictionary comes with the word weights next to it, if any;
             // words.php has them built in (tools/build_php_dict.php)
             $weightsFile = dirname($path) . '/word-weights.tsv';
@@ -85,7 +95,7 @@ class ThaiTokenizer
         }
 
         $bigramModel = null;
-        if ($bigramPath !== null && file_exists($bigramPath)) {
+        if ($bigramPath !== null) {
             $bigramModel = BigramModel::fromTsvFile($bigramPath);
         }
 

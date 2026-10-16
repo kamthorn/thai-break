@@ -8,8 +8,10 @@ return [
     | Custom Dictionary Path
     |--------------------------------------------------------------------------
     |
-    | Path to a custom dictionary file (format: word or word<TAB>weight).
+    | Path to a custom dictionary file: .dawg, or .tsv/.txt (word or word<TAB>weight).
+    | A .php dictionary is not accepted here because loading it runs it.
     | If set to null, the default built-in dictionary (data/words.txt) will be used.
+    | A path that does not exist is an error, not a fallback.
     |
     */
     'dict_path' => env('THAIBREAK_DICT_PATH', null),

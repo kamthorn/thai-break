@@ -75,4 +75,41 @@ class DawgAndOpcacheTest extends TestCase
         $this->assertTrue($trie->has('คำแปลกใหม่'));
         $this->assertContains('คำแปลกใหม่', $after);
     }
+
+    public function testFromFileDoesNotRunPhpFiles(): void
+    {
+        $marker = sys_get_temp_dir() . '/thaibreak-ran-' . bin2hex(random_bytes(4));
+        $file   = sys_get_temp_dir() . '/thaibreak-dict-' . bin2hex(random_bytes(4)) . '.php';
+        file_put_contents($file, "<?php file_put_contents('$marker', 'ran'); return ['prefixes' => [], 'totalWeight' => 0.0];");
+        try {
+            try {
+                DictionaryLoader::fromFile($file);
+                $this->fail('fromFile() accepted a .php file');
+            } catch (\InvalidArgumentException $e) {
+                $this->assertStringContainsString('fromPhpFile', $e->getMessage());
+            }
+            $this->assertFileDoesNotExist($marker, 'the .php file was executed');
+        } finally {
+            @unlink($file);
+            @unlink($marker);
+        }
+    }
+
+    public function testWithDefaultDictRejectsMissingPaths(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        ThaiTokenizer::withDefaultDict('/nonexistent/words.dawg');
+    }
+
+    public function testWithDefaultDictRejectsMissingBigramFile(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        ThaiTokenizer::withDefaultDict(null, '/nonexistent/bigrams.tsv');
+    }
+
+    public function testWithDefaultDictStillUsesTheBundledPhpDictionary(): void
+    {
+        $tok = ThaiTokenizer::withDefaultDict();
+        $this->assertSame(['สวัสดี', 'ครับ'], $tok->tokenize('สวัสดีครับ'));
+    }
 }

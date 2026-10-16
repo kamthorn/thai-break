@@ -7,7 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Example service: CORS is closed by default. It sent `Access-Control-Allow-Origin: *`, so any web
+  page could call the API from a visitor's browser, which matters when the service runs inside a
+  network. Set `CORS_ALLOWED_ORIGINS` (comma-separated, or `*`) to allow browser calls. `marker`
+  and `delimiter` may be at most 16 characters (was 64), which limits how much larger than its
+  input a response can get.
+
+### Security
+- CI: the actions are pinned to commit SHAs (Dependabot keeps them current) and the workflows
+  have read-only `GITHUB_TOKEN` permissions.
+
 ### Fixed
+- PHP: `DictionaryLoader::fromFile()` ran any file ending in `.php` with `require`, and
+  `ThaiTokenizer::withDefaultDict()` also looked for `data/words.php` in the working directory, so
+  a dictionary path from the environment or a writable working directory could run code. `fromFile()`
+  now refuses `.php` (call `fromPhpFile()` for a trusted one), only the copies that ship with the
+  package are used as the default `words.php`, and a `dict_path` or bigram path that does not
+  exist is an error instead of an empty dictionary.
+- Example service: a dictionary or bigram path given by option or environment that cannot be loaded
+  stops the start-up with a message, instead of serving the embedded dictionary.
+- Rust: a TBF1 header whose word count overflows `count * 8` on a 32-bit target (wasm32) is an
+  error instead of a panic. The C header documents where the default dictionary is looked for.
+- Example service: the `docker-compose.yml` healthcheck called `curl`, which the image does not
+  have, so the container was always reported unhealthy. It uses `wget` now.
 - Example service: `bahttext` with a text amount near the `i64` limit, such as
   `9223372036854775807.995`, overflowed when the rounded satang carried into the baht (a panic in
   debug builds, a wrong amount in release builds). It now returns "Baht amount out of range".

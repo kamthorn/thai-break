@@ -12,6 +12,10 @@ use thai_break_service::{
 };
 
 fn setup_app() -> axum::Router {
+    setup_app_with_cors(vec![])
+}
+
+fn setup_app_with_cors(cors_allowed_origins: Vec<String>) -> axum::Router {
     let config = Config {
         host: "127.0.0.1".into(),
         port: 8080,
@@ -21,6 +25,7 @@ fn setup_app() -> axum::Router {
         max_body_mb: 4,
         concurrency_limit: 100,
         request_timeout_secs: 30,
+        cors_allowed_origins,
         log_level: "error".into(),
     };
     let engine = Arc::new(ThaiBreakEngine::new(&config));
@@ -373,8 +378,8 @@ async fn test_mathematical_brackets_data_preservation() {
 async fn test_input_validation_limits() {
     let app = setup_app();
 
-    // 1. Marker too long (> 64 chars)
-    let long_marker = "A".repeat(65);
+    // 1. Marker too long (> 16 chars)
+    let long_marker = "A".repeat(17);
     let req = Request::builder()
         .method("POST")
         .uri("/api/v1/lines")
@@ -568,3 +573,68 @@ async fn test_validate_id_endpoint() {
 
 
 
+
+async fn allow_origin_header(app: axum::Router, origin: &str) -> Option<String> {
+    let req = Request::builder()
+        .uri("/health")
+        .header("origin", origin)
+        .body(Body::empty())
+        .unwrap();
+    let response = app.oneshot(req).await.unwrap();
+    response
+        .headers()
+        .get("access-control-allow-origin")
+        .map(|v| v.to_str().unwrap().to_string())
+}
+
+#[tokio::test]
+async fn test_cors_is_closed_by_default() {
+    let app = setup_app();
+    assert_eq!(allow_origin_header(app, "https://evil.example").await, None);
+}
+
+#[tokio::test]
+async fn test_cors_allows_only_configured_origins() {
+    let app = setup_app_with_cors(vec!["https://app.example.com".into()]);
+    assert_eq!(
+        allow_origin_header(app.clone(), "https://app.example.com").await.as_deref(),
+        Some("https://app.example.com")
+    );
+    assert_eq!(allow_origin_header(app, "https://evil.example").await, None);
+}
+
+#[tokio::test]
+async fn test_cors_star_allows_any_origin() {
+    let app = setup_app_with_cors(vec!["*".into()]);
+    assert_eq!(
+        allow_origin_header(app, "https://anything.example").await.as_deref(),
+        Some("*")
+    );
+}
+
+fn config_with_paths(words: Option<&str>, bigram: Option<&str>) -> Config {
+    Config {
+        host: "127.0.0.1".into(),
+        port: 8080,
+        words_fst_path: words.map(Into::into),
+        lines_fst_path: None,
+        bigram_path: bigram.map(Into::into),
+        max_body_mb: 4,
+        concurrency_limit: 100,
+        request_timeout_secs: 30,
+        cors_allowed_origins: vec![],
+        log_level: "error".into(),
+    }
+}
+
+#[test]
+#[should_panic(expected = "Cannot load the words FST dictionary")]
+fn test_missing_custom_dictionary_is_fatal() {
+    ThaiBreakEngine::new(&config_with_paths(Some("/nonexistent/words.fst"), None));
+}
+
+#[test]
+#[should_panic(expected = "Cannot load the bigram model")]
+fn test_missing_custom_bigram_model_is_fatal() {
+    ThaiBreakEngine::new(&config_with_paths(None, Some("/nonexistent/bigrams.tsv")));
+}
