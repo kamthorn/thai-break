@@ -49,6 +49,14 @@ fn starts_a_letter_name(ch: char) -> bool {
     matches!(ch, 'ด' | 'เ' | 'แ' | 'อ' | 'ค' | 'ซ' | 'จ' | 'ไ' | 'โ' | 'พ' | 'ย' | 'ว' | 'บ' | 'ท')
 }
 static LETTER_NAME_CHARS: Lazy<Vec<Vec<char>>> = Lazy::new(|| LETTER_NAMES.iter().map(|n| n.chars().collect()).collect());
+/// Letter names by first character, as an offset from U+0E00, in `LETTER_NAMES` order.
+static LETTER_NAMES_BY_FIRST: Lazy<Vec<Vec<usize>>> = Lazy::new(|| {
+    let mut by_first = vec![Vec::new(); 0x80];
+    for (k, name) in LETTER_NAME_CHARS.iter().enumerate() {
+        by_first[name[0] as usize - 0x0E00].push(k);
+    }
+    by_first
+});
 /// Cost of a run of two or more spelled-out letters (เอทีเอ็ม, ยูเอ็น), relative to the cost of the
 /// rarest word.
 const LETTER_RUN_COST_FACTOR: f64 = 1.0;
@@ -68,15 +76,6 @@ static PAT_ABBR: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+")
         .expect("Failed to compile abbreviation regex")
 });
-
-/// An edge from the current position to `to`.
-#[derive(Clone, Debug)]
-struct DagEdge {
-    to: usize,
-    cost: f64,
-    /// true for an out-of-vocabulary edge, which is merged with neighbouring unknown words
-    unknown: bool,
-}
 
 /// Normalize common Thai spelling variants for dictionary matching:
 /// เ + เ → แ, ํ + า → ำ, ํ + tone + า → tone + ำ (e.g. "นํ้า" → "น้ำ"), and a
@@ -139,6 +138,14 @@ const _: () = assert!(OOV_BOUNDARY_WORDS.len() <= 64);
 
 static FUNCTION_WORD_CHARS: Lazy<Vec<Vec<char>>> =
     Lazy::new(|| OOV_BOUNDARY_WORDS.iter().map(|f| f.chars().collect()).collect());
+/// Function words that end an OOV edge only when the edge has no room for them inside.
+static FUNCTION_WORD_INNER_MASK: Lazy<u64> = Lazy::new(|| {
+    OOV_BOUNDARY_WORDS
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| !OOV_INNER_ALLOWED.contains(f))
+        .fold(0, |m, (k, _)| m | (1 << k))
+});
 /// Indices into `OOV_BOUNDARY_WORDS` by first character, as an offset from U+0E00.
 static FUNCTION_WORDS_BY_FIRST: Lazy<Vec<Vec<usize>>> = Lazy::new(|| {
     let mut by_first = vec![Vec::new(); 0x80];
@@ -229,18 +236,12 @@ impl Tokenizer {
             return Vec::new();
         }
 
-        // Match against a normalized copy, but return the original characters
         let chars: Vec<char> = text.chars().collect();
-        let (norm, orig_pos) = normalize_for_matching(&chars);
-        let mut tokens = self.segment(&norm);
-        if norm != chars {
-            let mut pos = 0;
-            for tok in tokens.iter_mut() {
-                let end = pos + tok.chars().count();
-                *tok = chars[orig_pos[pos]..orig_pos[end]].iter().collect();
-                pos = end;
-            }
-        }
+        let mut tokens: Vec<String> = self
+            .token_spans(text, &chars)
+            .into_iter()
+            .map(|(start, end)| chars[start..end].iter().collect())
+            .collect();
 
         if !keep_whitespace {
             tokens.retain(|t| !t.trim().is_empty());
@@ -248,12 +249,54 @@ impl Tokenizer {
         tokens
     }
 
-    /// Run the Viterbi segmentation over `chars` and return all tokens,
+    /// Byte offsets of the token boundaries of `text`, whitespace included, from 0 to the text
+    /// length: the boundaries of `tokenize(text, true)`, without building the token strings.
+    pub(crate) fn boundaries(&self, text: &str) -> Vec<usize> {
+        let mut out = vec![0];
+        if text.is_empty() {
+            return out;
+        }
+        let chars: Vec<char> = text.chars().collect();
+        let spans = self.token_spans(text, &chars);
+        out.reserve(spans.len());
+        let (mut byte, mut ci) = (0, 0);
+        for (_, end) in spans {
+            byte += chars[ci..end].iter().map(|c| c.len_utf8()).sum::<usize>();
+            ci = end;
+            out.push(byte);
+        }
+        out.dedup();
+        out
+    }
+
+    /// Tokens as character ranges of `chars` (the characters of `text`), whitespace included.
+    /// Matching runs on a normalized copy; token boundaries never fall inside a replaced pair,
+    /// so the ranges map back to exact slices of the original characters.
+    fn token_spans(&self, text: &str, chars: &[char]) -> Vec<(usize, usize)> {
+        let (norm, orig_pos) = normalize_for_matching(chars);
+        if norm == chars {
+            return self.segment(&norm, Some(text));
+        }
+        let mut spans = self.segment(&norm, None);
+        for span in spans.iter_mut() {
+            *span = (orig_pos[span.0], orig_pos[span.1]);
+        }
+        spans
+    }
+
+    /// Run the Viterbi segmentation over `chars` and return all tokens as character ranges,
     /// including whitespace. Every edge covers `chars[i..j]`, so the DP keeps
     /// only the predecessor of each position and slices the words at the end.
-    fn segment(&self, chars: &[char]) -> Vec<String> {
-        let text: String = chars.iter().collect();
-        let text = text.as_str();
+    /// `source` is the text of `chars`, if the caller has it.
+    fn segment(&self, chars: &[char], source: Option<&str>) -> Vec<(usize, usize)> {
+        let owned: String;
+        let text = match source {
+            Some(text) => text,
+            None => {
+                owned = chars.iter().collect();
+                owned.as_str()
+            }
+        };
         let n = chars.len();
         if n == 0 {
             return Vec::new();
@@ -261,12 +304,7 @@ impl Tokenizer {
 
         let valid_pos = tcc_pos_array(chars);
         let (fw_starts, fw_ends) = function_word_positions(chars);
-        let inner_mask: u64 = OOV_BOUNDARY_WORDS
-            .iter()
-            .enumerate()
-            .filter(|(_, f)| !OOV_INNER_ALLOWED.contains(f))
-            .fold(0, |m, (k, _)| m | (1 << k));
-        let char_len: Vec<usize> = OOV_BOUNDARY_WORDS.iter().map(|f| f.chars().count()).collect();
+        let inner_mask = *FUNCTION_WORD_INNER_MASK;
 
         // Precompute character index to byte offset mapping
         let mut char_byte_offsets = Vec::with_capacity(n + 1);
@@ -294,7 +332,6 @@ impl Tokenizer {
         let mut is_unk = vec![false; n + 1];
         dp[0] = 0.0;
 
-        let mut edges: Vec<DagEdge> = Vec::new();
         let mut prefixes: Vec<(usize, f64)> = Vec::new();
 
         for i in 0..=n {
@@ -315,8 +352,30 @@ impl Tokenizer {
                 break;
             }
 
-            // Edges starting at i
-            edges.clear();
+            // Edges starting at i are relaxed as they are found: they all end after i, and
+            // finding them reads no dp state, so only the order of relaxation matters.
+            let prev: String = match &self.bigram_model {
+                Some(_) if from[i] != usize::MAX => chars[from[i]..i].iter().collect(),
+                _ => String::new(),
+            };
+            let has_prev = from[i] != usize::MAX;
+            let dp_i = dp[i];
+            let mut relax = |j: usize, cost: f64, unknown: bool| {
+                let edge_cost = match &self.bigram_model {
+                    Some(bigrams) if has_prev => {
+                        let word: String = chars[i..j].iter().collect();
+                        (cost - bigrams.get_bonus(&prev, &word, j - i)).max(0.01)
+                    }
+                    _ => cost,
+                };
+                // Ties go to the later start, i.e. the shorter last word (see TIE_EPSILON)
+                let new_cost = dp_i + edge_cost;
+                if new_cost <= dp[j] + TIE_EPSILON {
+                    dp[j] = new_cost;
+                    from[j] = i;
+                    is_unk[j] = unknown;
+                }
+            };
             let sub_text = &text[char_byte_offsets[i]..];
 
             if is_thai_rune(chars[i]) {
@@ -325,11 +384,7 @@ impl Tokenizer {
                 self.trie.prefix_ends_from_chars(chars, i, MAX_WORD_LEN, &mut prefixes);
                 for &(end, weight) in &prefixes {
                     if end <= n && valid_pos[end] {
-                        edges.push(DagEdge {
-                            to: end,
-                            cost: (normalizer / weight).ln(),
-                            unknown: false,
-                        });
+                        relax(end, (normalizer / weight).ln(), false);
                     }
                 }
 
@@ -342,11 +397,7 @@ impl Tokenizer {
                     let j = i + abbr_len;
                     if j <= n && valid_pos[j] && !self.abbreviation_is_words(chars, i + abbr_len, m_str) {
                         let letters = abbr_len - m_str.matches('.').count();
-                        edges.push(DagEdge {
-                            to: j,
-                            cost: (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters as f64) * rare_cost,
-                            unknown: false,
-                        });
+                        relax(j, (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters as f64) * rare_cost, false);
                     }
                 }
 
@@ -357,20 +408,17 @@ impl Tokenizer {
                     .get(end)
                     .filter(|&&c| starts_a_letter_name(c))
                     .and_then(|&c| {
-                        LETTER_NAME_CHARS
+                        LETTER_NAMES_BY_FIRST[c as usize - 0x0E00]
                             .iter()
-                            .find(|name| name[0] == c && chars[end..].starts_with(name) && valid_pos[end + name.len()])
+                            .map(|&k| &LETTER_NAME_CHARS[k])
+                            .find(|name| chars[end..].starts_with(name) && valid_pos[end + name.len()])
                     })
                     .map(|name| name.len())
                 {
                     end += len;
                     letters += 1;
                     if letters >= 2 {
-                        edges.push(DagEdge {
-                            to: end,
-                            cost: LETTER_RUN_COST_FACTOR * rare_cost,
-                            unknown: false,
-                        });
+                        relax(end, LETTER_RUN_COST_FACTOR * rare_cost, false);
                     }
                 }
 
@@ -401,7 +449,7 @@ impl Tokenizer {
                         while inner != 0 {
                             let k = inner.trailing_zeros() as usize;
                             inner &= inner - 1;
-                            let len = char_len[k];
+                            let len = FUNCTION_WORD_CHARS[k].len();
                             inner_hit |= j - i > len && valid_pos[j - len];
                         }
                         if inner_hit {
@@ -409,52 +457,20 @@ impl Tokenizer {
                         }
                         continue;
                     }
-                    edges.push(DagEdge {
-                        to: j,
-                        cost: (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1) as f64) * rare_cost,
-                        unknown: true,
-                    });
+                    relax(j, (OOV_COST_FACTOR + OOV_CLUSTER_COST_FACTOR * (clusters - 1) as f64) * rare_cost, true);
                 }
             } else if let Some(m) = PAT_NONTHAI.find(sub_text) {
                 // 5. Non-Thai tokens
                 let j = i + m.as_str().chars().count();
                 if j <= n && valid_pos[j] {
-                    edges.push(DagEdge {
-                        to: j,
-                        cost: rare_cost,
-                        unknown: false,
-                    });
-                }
-            }
-
-            // Relax the edges
-            let prev: String = match &self.bigram_model {
-                Some(_) if from[i] != usize::MAX => chars[from[i]..i].iter().collect(),
-                _ => String::new(),
-            };
-            for edge in edges.drain(..) {
-                let j = edge.to;
-                let edge_cost = match &self.bigram_model {
-                    Some(bigrams) if from[i] != usize::MAX => {
-                        let word: String = chars[i..j].iter().collect();
-                        (edge.cost - bigrams.get_bonus(&prev, &word, j - i)).max(0.01)
-                    }
-                    _ => edge.cost,
-                };
-
-                // Ties go to the later start, i.e. the shorter last word (see TIE_EPSILON)
-                let new_cost = dp[i] + edge_cost;
-                if new_cost <= dp[j] + TIE_EPSILON {
-                    dp[j] = new_cost;
-                    from[j] = i;
-                    is_unk[j] = edge.unknown;
+                    relax(j, rare_cost, false);
                 }
             }
         }
 
         // Traceback
         if dp[n].is_infinite() {
-            return vec![text.to_string()];
+            return vec![(0, n)];
         }
 
         let mut spans = Vec::new();
@@ -468,25 +484,18 @@ impl Tokenizer {
         }
         spans.reverse();
 
-        // Syllable-based OOV chunking
-        let mut tokens = Vec::new();
-        let mut cur_chunk = String::new();
-
+        // Syllable-based OOV chunking: consecutive unknown Thai edges are one token
+        let mut tokens = Vec::with_capacity(spans.len());
+        let mut chunk: Option<(usize, usize)> = None;
         for (start, end, unk) in spans {
-            let tok: String = chars[start..end].iter().collect();
             if unk && chars[start..end].iter().all(|&c| is_thai_rune(c)) {
-                cur_chunk.push_str(&tok);
+                chunk = Some((chunk.map_or(start, |c| c.0), end));
             } else {
-                if !cur_chunk.is_empty() {
-                    tokens.push(cur_chunk.clone());
-                    cur_chunk.clear();
-                }
-                tokens.push(tok);
+                tokens.extend(chunk.take());
+                tokens.push((start, end));
             }
         }
-        if !cur_chunk.is_empty() {
-            tokens.push(cur_chunk);
-        }
+        tokens.extend(chunk);
 
         tokens
     }

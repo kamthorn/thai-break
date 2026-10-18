@@ -17,14 +17,10 @@ pub struct BreakIterator {
 impl BreakIterator {
     /// Segment `text` and put the iterator at its start.
     pub fn new(tokenizer: &Tokenizer, text: &str) -> Self {
-        let mut boundaries = vec![0];
-        let mut pos = 0;
-        for token in tokenizer.tokenize(text, true) {
-            pos += token.len();
-            boundaries.push(pos);
+        Self {
+            boundaries: tokenizer.boundaries(text),
+            index: 0,
         }
-        boundaries.dedup();
-        Self { boundaries, index: 0 }
     }
 
     /// All boundary offsets in bytes, from 0 to the text length.
