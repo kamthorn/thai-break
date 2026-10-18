@@ -71,9 +71,14 @@ pub fn typescript_source() -> String {
     )
 }
 
-/// Values below 0x10000 as a Java string literal, split over several lines.
+/// Values below 0x10000 as a Java string literal, split over several lines. Small values are octal
+/// escapes: Java turns `"` and `\u000a` into a quote and a line break before it reads the
+/// literal.
 fn java_chars(values: impl IntoIterator<Item = u16>) -> String {
-    let escaped: Vec<String> = values.into_iter().map(|v| format!("\\u{v:04x}")).collect();
+    let escaped: Vec<String> = values
+        .into_iter()
+        .map(|v| if v < 0x100 { format!("\\{v:03o}") } else { format!("\\u{v:04x}") })
+        .collect();
     escaped
         .chunks(16)
         .map(|chunk| format!("            \"{}\"", chunk.concat()))

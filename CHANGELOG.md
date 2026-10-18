@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Faster segmentation again, same tokens.** Thai character clusters are matched with a DFA built from the
+  same cluster rules, instead of a regular expression: in Rust at first use (157 states, 9 KB, 0.7 ms), in
+  Go and TypeScript from tables that the new `thaibreak_gen_tcc` writes into `go/tcc_dfa.go` and
+  `typescript/src/tcc_dfa.ts` (a Rust test fails when they are out of date). Rust `boundaries` no longer
+  builds a string per word. On news text: Rust `thaibreak_boundaries` 1.34x faster (within 12% of libthai),
+  Go 1.7x, TypeScript 1.16x. PHP keeps PCRE, which is already fast there. The tokens are identical on 65,014
+  news paragraphs, short sentences and 150,000 random lines (`docs/performance.md`,
+  `docs/performance-ports.md`).
 - Typst plugin 0.2.0: `typst/thaibreak.wasm` is rebuilt from the 1.4.1 core, so it has the out-of-vocabulary
   words, word weights and bug fixes of 1.3.0-1.4.1 (it was built before 1.3.0). For example
   `ชวรัตน์` and `เอทีเอ็ม` are one word. The file is 21 KB larger (1.38 MB).
