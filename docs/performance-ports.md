@@ -148,7 +148,7 @@ PHP ได้น้อยเพราะ PCRE JIT เร็วอยู่แล
 
 ทำตามข้อ 1–4 ของแผน ข้าม PHP (ข้อ 5) เพราะ PCRE JIT เร็วพออยู่แล้ว
 
-- `thaibreak_gen_tcc` (ไฟล์ `rust/src/bin/thaibreak_gen_tcc.rs`, โค้ดสร้างซอร์สอยู่ใน `rust/src/tcc_gen.rs`) เขียน `go/tcc_dfa.go`, `typescript/src/tcc_dfa.ts` และ (เมื่อให้ `--java <path>`) `ThaiTccDfa.java` ของปลั๊กอิน `rust/tests/tcc_gen_test.rs` จะ fail ถ้าไฟล์ Go/TS ที่ commit ไว้ไม่ตรงกับกฎปัจจุบัน
+- `thaibreak_gen_tcc` (example ที่ `rust/examples/thaibreak_gen_tcc.rs` รันด้วย `cargo run --example thaibreak_gen_tcc` ไม่อยู่ใน crate ที่ publish, โค้ดสร้างซอร์สอยู่ใน `rust/src/tcc_gen.rs`) เขียน `go/tcc_dfa.go`, `typescript/src/tcc_dfa.ts` และ (เมื่อให้ `--java <path>`) `ThaiTccDfa.java` ของปลั๊กอิน `rust/tests/tcc_gen_test.rs` จะ fail ถ้าไฟล์ Go/TS ที่ commit ไว้ไม่ตรงกับกฎปัจจุบัน
 - ทุกภาษาเก็บ regex เดิมไว้ใน test เป็นตัวอ้างอิง แล้วเทียบบนสตริงสุ่ม 100,000 ชุด: `go/tcc_test.go`, `typescript/tests/tcc.test.ts` (ใช้ `getTCCPattern()` ซึ่งยังเป็น API เดิม) และ `ThaiTCCTests` ของปลั๊กอิน กฎใน test เป็นของภาษานั้นเอง จึงจับได้ทั้งตารางเก่าและกฎที่ไม่ตรงกับ Rust
 - Java: string literal ของตารางใช้ octal escape สำหรับค่าต่ำกว่า 256 เพราะ Java แปลง `\u0022` และ `\u000a` เป็นเครื่องหมายคำพูดและขึ้นบรรทัดก่อนอ่าน literal (ลองแบบ `\uXXXX` ก่อนแล้ว compile ไม่ผ่าน)
 

@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Faster segmentation again, same tokens.** Thai character clusters are matched with a DFA built from the
   same cluster rules, instead of a regular expression: in Rust at first use (157 states, 9 KB, 0.7 ms), in
-  Go and TypeScript from tables that the new `thaibreak_gen_tcc` writes into `go/tcc_dfa.go` and
+  Go and TypeScript from tables that `cargo run --example thaibreak_gen_tcc` writes into `go/tcc_dfa.go` and
   `typescript/src/tcc_dfa.ts` (a Rust test fails when they are out of date). Rust `boundaries` no longer
   builds a string per word. On news text: Rust `thaibreak_boundaries` 1.34x faster (within 12% of libthai),
   Go 1.7x, TypeScript 1.16x. PHP keeps PCRE, which is already fast there. The tokens are identical on 65,014

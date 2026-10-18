@@ -49,7 +49,3 @@ panic = "abort"
 [[bin]]
 name = "thaibreak_compile_fst"
 path = "src/bin/thaibreak_compile_fst.rs"
-
-[[bin]]
-name = "thaibreak_gen_tcc"
-path = "src/bin/thaibreak_gen_tcc.rs"

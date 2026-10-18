@@ -1,7 +1,10 @@
 //! Write the TCC DFA tables into the sources of the Go and TypeScript ports, and optionally of
 //! the OpenSearch plugin.
 //!
-//! Usage: thaibreak_gen_tcc [<thai-break repository root>] [--java <path of ThaiTccDfa.java>]
+//! Usage, in `rust/`:
+//! cargo run --example thaibreak_gen_tcc [-- [<thai-break repository root>] [--java <path of ThaiTccDfa.java>]]
+//!
+//! A development tool: examples are not part of the published crate.
 
 use std::path::PathBuf;
 use thaibreak::tcc_gen;

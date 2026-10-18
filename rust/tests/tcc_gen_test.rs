@@ -1,5 +1,5 @@
 //! The generated TCC tables of the other ports must match the rules in `src/tcc.rs`. Run
-//! `cargo run --bin thaibreak_gen_tcc` after changing the rules.
+//! `cargo run --example thaibreak_gen_tcc` after changing the rules.
 
 use std::path::Path;
 use thaibreak::tcc_gen;
@@ -10,7 +10,7 @@ fn check(relative: &str, generated: String) {
     let Ok(committed) = std::fs::read_to_string(&path) else {
         return;
     };
-    assert!(committed == generated, "{relative} is out of date: run `cargo run --bin thaibreak_gen_tcc`");
+    assert!(committed == generated, "{relative} is out of date: run `cargo run --example thaibreak_gen_tcc`");
 }
 
 #[test]
