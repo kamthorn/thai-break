@@ -6,68 +6,112 @@
  * at TCC boundaries.
  */
 
+import { TCC_DFA_AFTER_LOOKAHEAD, TCC_DFA_BEFORE_LOOKAHEAD, type TccDfaTables } from './tcc_dfa.js';
+
+const C = '[ก-ฮ]';
+const T = '[่-๋]?';
+const D = '[ุู]';
+const K = '([ก-ฮ][ก-ฮ]?[ุูิ]?์)?';
+
+/** Cluster rules in order; the first rule that matches wins. */
+const RAW_RULES = [
+  // Mai Han-akat always has a final: -ัวะ, or a consonant (with or without a tone mark).
+  'cั[่-๋]?วะ',
+  'cั[่-๋]?ck',
+  'cั[่-๋]?',
+  'เc็ck',
+  'เcctาะk',
+  'เccีtยะk',
+  'เccีtย(?=[เ-ไก-ฮ]|$|\\s)k',
+  'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$|\\s)k',
+  'เ(?:c[รลว]|หc)็ck',
+  'เcิc์ck',
+  // A true cluster or ห-led onset between เ and the vowel belongs to the syllable (เครื่อง, เพลิง, เปล่า).
+  'เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])ิtck',
+  'เcิtck',
+  'เcีtยะ?k',
+  'เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])ืtอะ?k',
+  'เcืtอะk',
+  'เcืtอ?k',
+  'เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])tาk',
+  'เctา?ะ?k',
+  'c[ึื]tck',
+  'c[ะ-ู]tk',
+  'c[ิุู]์',
+  'cรรc์',
+  'c็',
+  'ct[ะาำ]?k',
+  'แc็ck',
+  'แcc์k',
+  'แctะk',
+  'แ(?:c[รลว]|หc)็ck',
+  'แccc์k',
+  'โctะk',
+  '[เ-ไ]ctk',
+  'ก็',
+  'อึ',
+  'หึ',
+];
+
+/** Index in RAW_RULES of the two lookahead rules (-ีย before a syllable start or a space). */
+const LOOKAHEAD_AT = 6;
+
+function expandRule(rule: string): string {
+  return rule.replaceAll('k', K).replaceAll('c', C).replaceAll('t', T).replaceAll('d', D);
+}
+
 let tccPattern: RegExp | null = null;
 
+/** The cluster rules as one regular expression anchored at the start of the string. */
 export function getTCCPattern(): RegExp {
-  if (tccPattern !== null) {
-    return tccPattern;
+  if (tccPattern === null) {
+    tccPattern = new RegExp(`^(?:${RAW_RULES.map(expandRule).join('|')})`, 'u');
   }
-
-  const c = '[ก-ฮ]';
-  const t = '[่-๋]?';
-  const d = '[ุู]';
-  const k = '([ก-ฮ][ก-ฮ]?[ุูิ]?์)?';
-
-  const rawRules = [
-    // Mai Han-akat always has a final: -ัวะ, or a consonant (with or without a tone mark).
-    'cั[่-๋]?วะ',
-    'cั[่-๋]?ck',
-    'cั[่-๋]?',
-    'เc็ck',
-    'เcctาะk',
-    'เccีtยะk',
-    'เccีtย(?=[เ-ไก-ฮ]|$|\\s)k',
-    'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$|\\s)k',
-    'เ(?:c[รลว]|หc)็ck',
-    'เcิc์ck',
-    // A true cluster or ห-led onset between เ and the vowel belongs to the syllable (เครื่อง, เพลิง, เปล่า).
-    'เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])ิtck',
-    'เcิtck',
-    'เcีtยะ?k',
-    'เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])ืtอะ?k',
-    'เcืtอะk',
-    'เcืtอ?k',
-    'เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])tาk',
-    'เctา?ะ?k',
-    'c[ึื]tck',
-    'c[ะ-ู]tk',
-    'c[ิุู]์',
-    'cรรc์',
-    'c็',
-    'ct[ะาำ]?k',
-    'แc็ck',
-    'แcc์k',
-    'แctะk',
-    'แ(?:c[รลว]|หc)็ck',
-    'แccc์k',
-    'โctะk',
-    '[เ-ไ]ctk',
-    'ก็',
-    'อึ',
-    'หึ',
-  ];
-
-  const patterns = rawRules.map((rule) => {
-    return rule
-      .replaceAll('k', k)
-      .replaceAll('c', c)
-      .replaceAll('t', t)
-      .replaceAll('d', d);
-  });
-
-  tccPattern = new RegExp(`^(?:${patterns.join('|')})`, 'u');
   return tccPattern;
 }
+
+/** The two lookahead rules, sticky so they match at `lastIndex`. */
+const LOOKAHEAD_PATTERN = new RegExp(
+  `(?:${RAW_RULES.slice(LOOKAHEAD_AT, LOOKAHEAD_AT + 2).map(expandRule).join('|')})`,
+  'uy',
+);
+
+/** A DFA over classes of U+0E00..U+0E7F with its tables in typed arrays. */
+class TccDfa {
+  private readonly classes: number;
+  private readonly start: number;
+  private readonly cls: Uint8Array;
+  private readonly trans: Uint16Array;
+  private readonly isMatch: Uint8Array;
+
+  constructor(tables: TccDfaTables) {
+    this.classes = tables.classes;
+    this.start = tables.start;
+    this.cls = Uint8Array.from(tables.class);
+    this.trans = Uint16Array.from(tables.trans);
+    this.isMatch = Uint8Array.from(tables.match);
+  }
+
+  /** End of the match that starts at `codes[start]`, or -1. */
+  find(codes: Int32Array, start: number): number {
+    let state = this.start;
+    let found = -1;
+    for (let p = start; p < codes.length; p++) {
+      const off = codes[p] - 0x0e00;
+      if (off < 0 || off >= 128) break;
+      state = this.trans[state * this.classes + this.cls[off]];
+      if (state === 0) break;
+      if (this.isMatch[state]) found = p + 1;
+    }
+    return found;
+  }
+}
+
+// The rules before and after the lookahead rules, as DFAs generated from the rules of the Rust core
+// (tcc_dfa.ts). Trying the three groups in order gives the match of the whole alternation: the
+// match of the first rule that matches.
+const BEFORE_LOOKAHEAD = new TccDfa(TCC_DFA_BEFORE_LOOKAHEAD);
+const AFTER_LOOKAHEAD = new TccDfa(TCC_DFA_AFTER_LOOKAHEAD);
 
 /**
  * Computes a boolean array of valid TCC break positions for the given character array.
@@ -85,58 +129,43 @@ export function tccPosArray(chars: string[]): boolean[] {
     return valid;
   }
 
-  const pattern = getTCCPattern();
-  const text = chars.join('');
-
-  // Build character index to UTF-16 code unit offset mapping
-  const charOffsets: number[] = [0];
-  let offset = 0;
-  for (const ch of chars) {
-    offset += ch.length;
-    charOffsets.push(offset);
-  }
-
-  const totalLen = text.length;
-  // Character index at each code unit offset that starts a character, else -1
-  const offsetToCharIdx = new Int32Array(totalLen + 1).fill(-1);
-  for (let i = 0; i <= n; i++) {
-    offsetToCharIdx[charOffsets[i]] = i;
-  }
-  let pos = 0;
-
-  while (pos < totalLen) {
-    const sub = text.slice(pos);
-    const m = pattern.exec(sub);
-    if (m && m[0].length > 0) {
-      pos += clusterLength(m[0], sub.slice(m[0].length));
-      const idx = offsetToCharIdx[pos];
-      if (idx >= 0) {
-        valid[idx] = true;
-      }
-    } else {
-      // Fallback: advance 1 Unicode character
-      const curIdx = Math.max(offsetToCharIdx[pos], 0);
-      const chLen = chars[curIdx]?.length ?? 1;
-      pos += chLen;
-      const idx = offsetToCharIdx[pos];
-      if (idx >= 0) {
-        valid[idx] = true;
-      }
-    }
-  }
-
-  // Non-Thai characters are always safe break positions
+  const codes = new Int32Array(n);
   for (let i = 0; i < n; i++) {
-    const code = chars[i].codePointAt(0) ?? 0;
+    codes[i] = chars[i].codePointAt(0) ?? 0;
+  }
+  // The text and the UTF-16 offset of each character, for the lookahead rules only
+  let text: string | null = null;
+  let offsets: Int32Array | null = null;
+
+  let pos = 0;
+  while (pos < n) {
+    let end = BEFORE_LOOKAHEAD.find(codes, pos);
+    if (end < 0 && codes[pos] === 0x0e40) {
+      if (text === null || offsets === null) {
+        text = chars.join('');
+        offsets = new Int32Array(n + 1);
+        for (let i = 0; i < n; i++) offsets[i + 1] = offsets[i] + chars[i].length;
+      }
+      LOOKAHEAD_PATTERN.lastIndex = offsets[pos];
+      const m = LOOKAHEAD_PATTERN.exec(text);
+      // The rules match Thai characters only, one UTF-16 unit each
+      if (m) end = pos + m[0].length;
+    }
+    if (end < 0) {
+      end = AFTER_LOOKAHEAD.find(codes, pos);
+    }
+    pos = end >= 0 ? clusterEnd(codes, pos, end) : pos + 1;
+    valid[pos] = true;
+  }
+
+  for (let i = 0; i < n; i++) {
+    const code = codes[i];
     if (code < 0x0e00 || code > 0x0e7f) {
+      // Non-Thai characters are always safe break positions
       valid[i] = true;
       valid[i + 1] = true;
-    }
-  }
-
-  // Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
-  for (let i = 1; i < n; i++) {
-    if (isDependentChar(chars[i])) {
+    } else if (i > 0 && isDependentCode(code)) {
+      // Never a boundary before a dependent vowel or mark (e.g. inside "เมื่อ")
       valid[i] = false;
     }
   }
@@ -145,24 +174,22 @@ export function tccPosArray(chars: string[]): boolean[] {
 }
 
 /** Dependent vowels and marks that can never start a cluster: ะ ั า ำ ิ–ฺ ๅ ็–๎. */
-const DEPENDENT = /^[\u0e30-\u0e3a\u0e45\u0e47-\u0e4e]$/;
-
-function isDependentChar(ch: string): boolean {
-  if (ch.length !== 1) return false;
-  const code = ch.charCodeAt(0);
+function isDependentCode(code: number): boolean {
   return (code >= 0x0e30 && code <= 0x0e3a) || code === 0x0e45 || (code >= 0x0e47 && code <= 0x0e4e);
 }
 
 /**
- * Length of a matched cluster. A final consonant followed by a dependent vowel
- * or mark starts the next cluster instead: "รึยัง" is "รึ" + "ยัง", not
- * "รึย" + "ัง". Except ว before ะ, which is part of the vowel -ัวะ ("ผัวะ").
+ * End of a matched cluster `codes[start..end)`. A final consonant followed by a dependent vowel
+ * or mark starts the next cluster instead: "รึยัง" is "รึ" + "ยัง", not "รึย" + "ัง". Except ว
+ * before ะ, which is part of the vowel -ัวะ ("ผัวะ").
  */
-function clusterLength(match: string, rest: string): number {
-  const last = match[match.length - 1];
-  const next = rest[0] ?? '';
-  if (match.length > 1 && last >= 'ก' && last <= 'ฮ' && DEPENDENT.test(next) && !(last === 'ว' && next === 'ะ')) {
-    return match.length - 1;
+function clusterEnd(codes: Int32Array, start: number, end: number): number {
+  if (end < codes.length && end - start > 1) {
+    const last = codes[end - 1];
+    const next = codes[end];
+    if (last >= 0x0e01 && last <= 0x0e2e && isDependentCode(next) && !(last === 0x0e27 && next === 0x0e30)) {
+      return end - 1;
+    }
   }
-  return match.length;
+  return end;
 }

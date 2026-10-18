@@ -5,6 +5,8 @@ mod linebreak_data;
 pub mod linebreaker;
 pub mod normalizer;
 pub mod tcc;
+#[doc(hidden)]
+pub mod tcc_gen;
 pub mod tokenizer;
 pub mod trie;
 mod uax14;

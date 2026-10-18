@@ -334,6 +334,43 @@ impl Dfa {
 static GENERAL: Lazy<Dfa> = Lazy::new(|| Dfa::new(GENERAL_RULES));
 static LOOKAHEAD: Lazy<Dfa> = Lazy::new(|| Dfa::new(LOOKAHEAD_RULES));
 
+/// Tables of a TCC DFA, written into the sources of the other ports by `thaibreak_gen_tcc`.
+#[doc(hidden)]
+pub struct DfaTables {
+    pub classes: usize,
+    pub start: u16,
+    /// Class of each character of U+0E00..U+0E7F
+    pub class: [u8; 128],
+    /// `trans[state * classes + class]`, state 0 is dead
+    pub trans: Vec<u16>,
+    pub is_match: Vec<bool>,
+}
+
+impl From<Dfa> for DfaTables {
+    fn from(d: Dfa) -> Self {
+        Self {
+            classes: d.classes,
+            start: d.start,
+            class: d.class,
+            trans: d.trans,
+            is_match: d.is_match,
+        }
+    }
+}
+
+/// DFA of the general rules in `range` (all of them for the Rust, Go and Java ports).
+#[doc(hidden)]
+pub fn general_dfa_tables(range: impl std::ops::RangeBounds<usize>) -> DfaTables {
+    let bounds = (range.start_bound().cloned(), range.end_bound().cloned());
+    Dfa::new(&GENERAL_RULES[bounds]).into()
+}
+
+/// DFA of the lookahead rules.
+#[doc(hidden)]
+pub fn lookahead_dfa_tables() -> DfaTables {
+    Dfa::new(LOOKAHEAD_RULES).into()
+}
+
 #[inline]
 fn is_thai_consonant(ch: char) -> bool {
     ('ก'..='ฮ').contains(&ch)
