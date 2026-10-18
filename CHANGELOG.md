@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **The base dictionary has 391 more words** (25,411 to 25,802): the names, abbreviations and spellings that
+  tripped the segmenter most often on news text, taken from the lists of `thai-break-dict-extra` that
+  are our own or CC0 (PyThaiNLP): `เว็บไซต์`, `สหรัฐอเมริกา`, `เกาหลีเหนือ`, `เกาหลีใต้`, `กรุงเทพฯ`,
+  `กรุงเทพมหานคร`, `พระนครศรีอยุธยา`, `เด็กชาย`, `เด็กหญิง`, `ส.ส.`, `อบต.`, country names, common abbreviations,
+  frequent misspellings (`เฟสบุ๊ค`, `อนุญาติ`), and car and shop brands. Word F1 on the base dictionary goes up on every
+  test set: LST20 test 86.9 to 87.1, LST20 eval 83.5 to 83.8, Blackboard 86.6 to 86.8, Wisesight-1000 84.5 to 84.7.
+  On 65,014 news paragraphs 3,068 are segmented differently, always because of one of the new words; the
+  base plus dict-extra scores are unchanged because dict-extra already had these words. **Tokens change,
+  so reindex if you search on `words()` output.** A single dictionary word wider than the line is cut at cluster boundaries
+  when `wrap(..., cutLongWords)` is used, so `กรุงเทพมหานคร` in a 4-column line is now `กรุง|เทพม|หานค|ร`
+  instead of `กรุง|เทพ|มหา|นคร`.
 - **Faster segmentation again, same tokens.** Thai character clusters are matched with a DFA built from the
   same cluster rules, instead of a regular expression: in Rust at first use (157 states, 9 KB, 0.7 ms), in
   Go and TypeScript from tables that `cargo run --example thaibreak_gen_tcc` writes into `go/tcc_dfa.go` and

@@ -83,8 +83,9 @@ class LineBreakerTest extends TestCase
 
     public function testCutLongWordsKeepsThaiCharacterClusters(): void
     {
+        // A single dictionary word wider than the line is cut greedily, at cluster boundaries only
         $wrapped = ThaiTokenizer::getDefault()->wrap('กรุงเทพมหานคร', 4, "\n", true);
-        $this->assertSame(['กรุง', 'เทพ', 'มหา', 'นคร'], explode("\n", $wrapped));
+        $this->assertSame(['กรุง', 'เทพม', 'หานค', 'ร'], explode("\n", $wrapped));
     }
 
     public function testMandatoryBreaks(): void

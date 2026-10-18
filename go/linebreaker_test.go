@@ -85,7 +85,8 @@ func TestCutLongWordsKeepsThaiCharacterClusters(t *testing.T) {
 		width int
 		want  []string
 	}{
-		{"กรุงเทพมหานคร", 4, []string{"กรุง", "เทพ", "มหา", "นคร"}},
+		// A single dictionary word wider than the line is cut greedily, at cluster boundaries only
+		{"กรุงเทพมหานคร", 4, []string{"กรุง", "เทพม", "หานค", "ร"}},
 	}
 	for _, c := range cases {
 		got := strings.Split(GetDefaultLineBreaker().Wrap(c.input, c.width, "\n", true), "\n")

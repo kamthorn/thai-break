@@ -12,7 +12,7 @@ It implements the **Unicode Line Breaking Algorithm (UAX #14)** and **W3C Thai L
 ## Features
 
 - ⚡ **Ultra Fast:** ~0.3 ms per sentence in Node.js (~25,000 sentences/sec per core).
-- 💾 **Compact DAWG Dictionary (v1.1.0):** 167 KB binary Directed Acyclic Word Graph (`words.dawg`), 0.7 ms instant load, < 0.3 MB RAM, and 31.8M lookups/sec with zero external dependencies.
+- 💾 **Compact DAWG Dictionary (v1.1.0):** 171 KB binary Directed Acyclic Word Graph (`words.dawg`), 0.7 ms instant load, < 0.3 MB RAM, and 31.8M lookups/sec with zero external dependencies.
 - 🎯 **High Accuracy:** Viterbi dynamic programming on a Directed Acyclic Graph (DAG) with Bigram transition scoring, achieving high word-boundary F1-score.
 - 📐 **Unicode UAX #14 Typographic Rules:**
   - **LB13:** Never break before punctuation, closing brackets, or solidus (`/`).
@@ -20,7 +20,7 @@ It implements the **Unicode Line Breaking Algorithm (UAX #14)** and **W3C Thai L
   - Attached leading vowels (`เ`, `แ`, `โ`, `ใ`, `ไ`) to initial consonants.
 - 📏 **Thai Visual Display Width:** Accurately computes visual terminal/column width by treating above/below combining vowels and tone marks as zero-width.
 - 🏷️ **HTML Safe:** Safely inserts soft breaks inside HTML strings while preserving tags, comments, and scripts (`<script>`, `<style>`).
-- 🛡️ **Clean & Open:** Public Domain word list (25,411 entries) with word weights counted on the Prachathai-67k news corpus (Apache-2.0), all released under Apache-2.0.
+- 🛡️ **Clean & Open:** Public Domain word list (25,802 entries) with word weights counted on the Prachathai-67k news corpus (Apache-2.0), all released under Apache-2.0.
 
 ---
 
@@ -81,7 +81,7 @@ console.log(wrapped);
 
 ### 4. Custom Dictionary & Initialization
 
-By default, ThaiBreak loads the bundled 167 KB `words.dawg` dictionary automatically. You can also customize the dictionary:
+By default, ThaiBreak loads the bundled 171 KB `words.dawg` dictionary automatically. You can also customize the dictionary:
 
 ```typescript
 import { init } from 'thai-break';

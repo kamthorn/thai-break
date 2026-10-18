@@ -11,11 +11,11 @@
 
 ระบบตัดคำและตัดแบ่งบรรทัดภาษาไทยประสิทธิภาพสูงแบบ **Multi-Language Engine** รองรับ **PHP / Laravel**, **Go**, **TypeScript / Node.js**, **Rust Core**, **C / C++**, **Python**, และ **WebAssembly**  
 
-ใช้อัลกอริทึม **Shortest Path Viterbi DAG** ร่วมกับ **Theeramunkong 30-Rule Thai Character Cluster (TCC)** บนพจนานุกรมมาตรฐานภาษาไทย (`data/words.txt` 25,402 คำ)
+ใช้อัลกอริทึม **Shortest Path Viterbi DAG** ร่วมกับ **Theeramunkong 30-Rule Thai Character Cluster (TCC)** บนพจนานุกรมมาตรฐานภาษาไทย (`data/words.txt` 25,802 คำ)
 
 🚀 **Zero External Corpus Dependency:** ไม่พึ่งพาคลังข้อความที่มีข้อจำกัดทางลิขสิทธิ์ เป็น Open Source Apache-2.0 แท้ 100% ใช้งานเชิงพาณิชย์ได้อย่างสบายใจ  
 ⚡ **ความเร็วสูงระดับไมโครวินาที:** ~30-45 µs ใน Go/Rust, ~0.3 ms ใน PHP/Node.js (~25,000 ประโยค/วินาทีต่อ core)  
-💾 **Ultra-Lightweight & Low Memory:** พจนานุกรมบีบอัดแบบ **Compact DAWG (167 KB)** และ **FST (289 KB)** ใช้ RAM ต่ำกว่า 0.2–0.5 MB (ลดลง 95%)  
+💾 **Ultra-Lightweight & Low Memory:** พจนานุกรมบีบอัดแบบ **Compact DAWG (171 KB)** และ **FST (296 KB)** ใช้ RAM ต่ำกว่า 0.2–0.5 MB (ลดลง 95%)  
 📄 **Typographic Line Breaker & Soft Wrapping:** ตัดแบ่งบรรทัดป้องกันสระลอย/ตกขอบ ตาม **Unicode UAX #14 (Unicode 16.0) ครบทุกกฎ** ผ่านชุดทดสอบทางการของ Unicode และ **W3C tlreq** สำหรับ PDF (dompdf, mPDF, TCPDF, Typst) และ Web  
 🔥 **พร้อมใช้งานกับ Laravel:** Auto-Discovery, Facade, Blade Directives (`@thaibreak`, `@thaiwrap`), `Str` Macros
 
@@ -25,7 +25,7 @@
 
 1. **Shortest Path Graph Viterbi Algorithm:** อัลกอริทึมค้นหาเส้นทางคำที่เหมาะสมที่สุดบนกราฟ ค้นหาคำที่ยาวและถูกต้องสมบูรณ์ตามธรรมชาติ
 2. **Theeramunkong et al. TCC Grammar (30 Rules):** คำนวณจุดตัดคลัสเตอร์ภาษาไทยระดับไบต์ออฟเซ็ต ป้องกันการตัดแยกสระ สระบน-ล่าง วรรณยุกต์ หรือพยัญชนะนำ 100%
-3. **FST & Compact DAWG Dictionary Architecture (v1.1.0):** โครงสร้างข้อมูลพจนานุกรม Finite State Transducer / Minimal Acyclic DFA บีบอัดคลังคำ 25,402 คำเหลือเพียง 167 KB โหลดทันใจระดับไมโครวินาที (0.04 ms ใน Go, 0.7 ms ใน Node.js, 0.00 ms ใน Rust/OPcache) พร้อมรองรับ Dynamic Overlay เมื่อมีการเพิ่มคำใหม่ขณะรันไทม์
+3. **FST & Compact DAWG Dictionary Architecture (v1.1.0):** โครงสร้างข้อมูลพจนานุกรม Finite State Transducer / Minimal Acyclic DFA บีบอัดคลังคำ 25,802 คำเหลือเพียง 171 KB โหลดทันใจระดับไมโครวินาที (0.04 ms ใน Go, 0.7 ms ใน Node.js, 0.00 ms ใน Rust/OPcache) พร้อมรองรับ Dynamic Overlay เมื่อมีการเพิ่มคำใหม่ขณะรันไทม์
 4. **Smart OOV & Abbreviation Handling:** รู้จักคำย่อภาษาไทย (`รพ.`, `พ.ศ.`, `มิ.ย.`), ตัวเลขคั่นจุลภาค (`10,000`), ทศนิยม (`3.14`), เปอร์เซ็นต์ (`40%`)
 5. **ThaiLineBreaker (UAX #14 & W3C Thai Text Layout):** ตัดแบ่งบรรทัดสำหรับทำ PDF หรือเว็บด้วย Unicode Line Breaking Algorithm ครบทุกกฎ (LB1–LB31) ใช้พจนานุกรมตัดคำเฉพาะภายในช่วงอักษรไทย ไม่ตัดกลางคำ ตัวเลข คำย่อ หรืออีเมล ไม่ทิ้งวรรคไว้หน้าบรรทัดใหม่ ป้องกันเครื่องหมายตกค้าง (`ๆ`, `ฯ`, วงเล็บ, อัญประกาศ)
 6. **HTML / EPUB Safe:** รักษาแท็ก HTML (`<p>`, `<b>`, `<span>`) และ HTML Entities (`&amp;`, `&quot;`) ให้คงอยู่สมบูรณ์ ไม่แทรกสัญลักษณ์ตัดคำเข้าไปภายในแท็ก
@@ -34,11 +34,11 @@
 
 ## รองรับหลายภาษาโปรแกรม (Multi-Language Architecture)
 
-ThaiBreak ได้รับการออกแบบสถาปัตยกรรมแบบ Monorepo เพื่อรองรับการใช้งานในทุก Stack โดยใช้คลังคำศัพท์มาตรฐาน (`data/words.txt`: 25,402 คำ) เป็น Single Source of Truth:
+ThaiBreak ได้รับการออกแบบสถาปัตยกรรมแบบ Monorepo เพื่อรองรับการใช้งานในทุก Stack โดยใช้คลังคำศัพท์มาตรฐาน (`data/words.txt`: 25,802 คำ) เป็น Single Source of Truth:
 
 ```
 thai-break/
-├── data/                 # Shared Dictionaries (words.dawg: 167 KB, words.fst: 289 KB, words.php, words.txt)
+├── data/                 # Shared Dictionaries (words.dawg: 171 KB, words.fst: 296 KB, words.php, words.txt)
 ├── php/                  # Native PHP & Laravel Package (Composer: kamthorn/thai-break)
 │   ├── src/              # PHP Source & Laravel Integration
 │   ├── tests/            # PHPUnit & Integration Tests
@@ -116,7 +116,7 @@ $pdf   = Str::thaiWrap($text, 40);
 use ThaiBreak\DictionaryLoader;
 use ThaiBreak\ThaiTokenizer;
 
-// ตัวเลือกที่ 1: Compact DAWG 167 KB (แนะนำ - โหลดใน 0.3 ms แรม < 0.5 MB)
+// ตัวเลือกที่ 1: Compact DAWG 171 KB (แนะนำ - โหลดใน 0.3 ms แรม < 0.5 MB)
 $trie = DictionaryLoader::fromDawgFile('data/words.dawg');
 
 // ตัวเลือกที่ 2: OPcache Preload (0.00 ms โหลด แรม 0 MB ต่อ worker)
@@ -209,7 +209,7 @@ console.log(displayWidth('ภาษาไทย')); // 7
 thaibreak = "1"
 ```
 
-พจนานุกรมพื้นฐาน (`words.fst`, 289 KB) ฝังอยู่ในไลบรารีแล้ว (feature `embedded-dict` เปิดเป็นค่าเริ่มต้น) จึงเรียก `words()` ได้ทันทีโดยไม่ต้องมีไฟล์ หากต้องการใช้พจนานุกรมของตัวเองเท่านั้น ให้ใช้ `default-features = false`
+พจนานุกรมพื้นฐาน (`words.fst`, 296 KB) ฝังอยู่ในไลบรารีแล้ว (feature `embedded-dict` เปิดเป็นค่าเริ่มต้น) จึงเรียก `words()` ได้ทันทีโดยไม่ต้องมีไฟล์ หากต้องการใช้พจนานุกรมของตัวเองเท่านั้น ให้ใช้ `default-features = false`
 
 ```rust
 use thaibreak::{words, lines, wrap, display_width, DEFAULT_BREAK_MARKER};
@@ -342,14 +342,14 @@ ThaiBreak ได้รับการออกแบบให้มีควา�
 
 ### 1. ความแม่นยำในการตัดคำ (Accuracy Benchmark)
 
-วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,411 คำ พร้อมน้ำหนักคำจาก `data/word-weights.tsv` ซึ่งเป็นค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (38,483 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 14,331 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้ โดยคำของฐานใช้น้ำหนักชุดเดียวกัน):
+วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,802 คำ พร้อมน้ำหนักคำจาก `data/word-weights.tsv` ซึ่งเป็นค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (38,514 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 14,362 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้ โดยคำของฐานใช้น้ำหนักชุดเดียวกัน):
 
 | ชุดทดสอบ | ฐานอย่างเดียว Word F1 | Boundary F1 | ฐาน + dict-extra Word F1 | Boundary F1 |
 | :--- | :---: | :---: | :---: | :---: |
-| **LST20 test** (NECTEC, ข่าว) | **86.9%** | **93.8%** | 83.7% | 92.2% |
-| LST20 eval | 83.5% | 91.3% | 80.6% | 90.1% |
-| Blackboard Treebank (ระดับคำย่อย, ไม่รวมประโยคที่ซ้ำกับ LST20 train) | 86.6% | 94.0% | 84.2% | 93.0% |
-| Wisesight-1000 (โซเชียลมีเดีย, CC0) | 84.5% | 91.1% | 82.7%† | 90.3%† |
+| **LST20 test** (NECTEC, ข่าว) | **87.1%** | **93.8%** | 83.7% | 92.2% |
+| LST20 eval | 83.8% | 91.5% | 80.6% | 90.1% |
+| Blackboard Treebank (ระดับคำย่อย, ไม่รวมประโยคที่ซ้ำกับ LST20 train) | 86.8% | 94.1% | 84.2% | 93.0% |
+| Wisesight-1000 (โซเชียลมีเดีย, CC0) | 84.7% | 91.2% | 82.7%† | 90.3%† |
 
 - **Word F1:** นับคำที่ตำแหน่งต้นและท้ายตรงกับคำตอบ **Boundary F1:** เทียบตำแหน่งจุดตัดระหว่างคำ ข้อความแบ่งเป็นท่อนที่ช่องว่างและขอบเขตประโยค และไม่นับช่องว่าง
 - **ทำไมสองคอลัมน์:** gold ของ LST20 และ Blackboard แยกคำประสมและชื่อเป็นหน่วยย่อย ส่วน dict-extra เก็บคำประสมและชื่อเฉพาะไว้เป็นคำเดียวโดยตั้งใจ เพื่อให้การค้นหาด้วยคำประสมตรงตัวได้น้ำหนักมากขึ้น (ค้นด้วยคำย่อยได้ผ่านโหมด decompound ของ plugin) คะแนนระดับคำจึงต่ำลงเมื่อใช้ dict-extra: บน LST20 test จุดตัดที่ทำนายแม่นขึ้น (precision 90.1% → 90.8%) แต่พบจุดตัดของ gold ได้น้อยลง (recall 97.7% → 93.7%) ตัวเลขนี้วัดการตัดคำเทียบ gold เท่านั้น **ไม่ได้วัดคุณภาพการค้นหา** ถ้าจะใช้ตัดคำให้ตรงกับแนวทางของคลังข้อความแบบ LST20 ให้ใช้ฐานอย่างเดียว ส่วนการตัดบรรทัดใช้ชุด `words-extra-lines` ที่ตัดชื่อเฉพาะและคำประสมออกแล้ว
@@ -377,7 +377,7 @@ python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
 
 > [!NOTE]
 > **Clean & Safe for Commercial Use:**
-> ThaiBreak ใช้รายการคำ **Public Domain (ราชบัณฑิตยสถาน 25,411 คำ)** และน้ำหนักความถี่ของคำที่ใช้บ่อย 3,000 คำ (`data/word-weights.tsv`) ซึ่งนับจากคลังข่าว [Prachathai-67k](https://huggingface.co/datasets/wannaphong/prachathai67k) (Apache-2.0, ดูไฟล์ NOTICE) ทำให้ซอร์สโค้ดและข้อมูลทั้งหมดอยู่ภายใต้สัญญาอนุญาต **Apache-2.0** ไม่มีข้อมูลจากคลังข้อมูลที่มีข้อจำกัด (เช่น LST20) รวมอยู่ในโปรเจกต์ คลังข้อมูลเหล่านั้นใช้เพื่อวัดผลเท่านั้น
+> ThaiBreak ใช้รายการคำ **Public Domain (ราชบัณฑิตยสถาน 25,411 คำ บวกคำที่เขียนเองหรือเป็น CC0 อีก 391 คำ)** และน้ำหนักความถี่ของคำที่ใช้บ่อย 3,000 คำ (`data/word-weights.tsv`) ซึ่งนับจากคลังข่าว [Prachathai-67k](https://huggingface.co/datasets/wannaphong/prachathai67k) (Apache-2.0, ดูไฟล์ NOTICE) ทำให้ซอร์สโค้ดและข้อมูลทั้งหมดอยู่ภายใต้สัญญาอนุญาต **Apache-2.0** ไม่มีข้อมูลจากคลังข้อมูลที่มีข้อจำกัด (เช่น LST20) รวมอยู่ในโปรเจกต์ คลังข้อมูลเหล่านั้นใช้เพื่อวัดผลเท่านั้น
 
 ### 2. ประสิทธิภาพและการใช้ทรัพยากร (Performance & Resource Benchmarks)
 
@@ -387,10 +387,10 @@ python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
 
 | ภาษา / รูปแบบพจนานุกรม | ไฟล์จัดเก็บ | ขนาดไฟล์ | เวลาโหลด (Startup) | RAM Heap ต่อ Worker | Throughput ค้นหาคำ |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Rust** (Native FST) | `data/words.fst` | 289.8 KB | **~0.00 ms** (Zero-copy) | **0 Bytes** (Buffer) | **17.8 ล้าน lookups/s** |
-| **Go** (Compact DAWG) | `data/words.dawg` | **167.4 KB** | **0.04 ms** (48 µs) | **< 0.2 MB** | **24.5 ล้าน lookups/s** |
-| **TypeScript / Node** (Compact DAWG) | `data/words.dawg` | **167.4 KB** | **0.70 ms** | **< 0.3 MB** | **31.8 ล้าน lookups/s** |
-| **PHP** (Compact DAWG) | `data/words.dawg` | **167.4 KB** | **0.30 ms** | **< 0.5 MB** | **1.75 ล้าน lookups/s** |
+| **Rust** (Native FST) | `data/words.fst` | 296.2 KB | **~0.00 ms** (Zero-copy) | **0 Bytes** (Buffer) | **17.8 ล้าน lookups/s** |
+| **Go** (Compact DAWG) | `data/words.dawg` | **171.4 KB** | **0.04 ms** (48 µs) | **< 0.2 MB** | **24.5 ล้าน lookups/s** |
+| **TypeScript / Node** (Compact DAWG) | `data/words.dawg` | **171.4 KB** | **0.70 ms** | **< 0.3 MB** | **31.8 ล้าน lookups/s** |
+| **PHP** (Compact DAWG) | `data/words.dawg` | **171.4 KB** | **0.30 ms** | **< 0.5 MB** | **1.75 ล้าน lookups/s** |
 | **PHP** (OPcache Preload Array) | `data/words.php` | 2.5 MB | **0.00 ms** (Preload) | **0 MB** (Shared Memory) | **6.5 ล้าน lookups/s** |
 | **PHP** (Flat TSV Fallback) | `data/words.txt` | 492.5 KB | 21.6 ms | ~7.0 MB | 6.5 ล้าน lookups/s |
 
