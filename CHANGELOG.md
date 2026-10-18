@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-18
+
 ### Changed
 - **The base dictionary has 391 more words** (25,411 to 25,802): the names, abbreviations and spellings that
   tripped the segmenter most often on news text, taken from the lists of `thai-break-dict-extra` that
