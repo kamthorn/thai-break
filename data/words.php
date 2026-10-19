@@ -1,13 +1,13 @@
 <?php
 /**
  * Auto-generated OPcache Preload Dictionary.
- * Words: 25803, Prefix Entries: 75345
+ * Words: 25804, Prefix Entries: 75346
  */
 declare(strict_types=1);
 
 return [
-    'totalWeight' => 31611.36229999999,
-    'wordCount' => 25803,
+    'totalWeight' => 31612.36229999999,
+    'wordCount' => 25804,
     'prefixes' => [
         'ก' => 0,
         'กก' => 1,
@@ -63678,6 +63678,7 @@ return [
         'เรสซิเดนซ' => 0,
         'เรสซิเดนซ์' => 1,
         'เรอ' => 1,
+        'เรอะ' => 1,
         'เรอู' => 0,
         'เรอูว' => 0,
         'เรอูว์' => 0,
