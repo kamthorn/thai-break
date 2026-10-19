@@ -2,7 +2,6 @@
 /**
  * Auto-generated OPcache Preload Dictionary.
  * Words: 25803, Prefix Entries: 75345
- * Generated on 2026-10-19 03:41:50
  */
 declare(strict_types=1);
 

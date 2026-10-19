@@ -6,14 +6,14 @@
  * at TCC boundaries.
  */
 
-import { TCC_DFA_AFTER_LOOKAHEAD, TCC_DFA_BEFORE_LOOKAHEAD, type TccDfaTables } from './tcc_dfa.js';
+import { TCC_DFA_GENERAL, TCC_DFA_LOOKAHEAD, type TccDfaTables } from './tcc_dfa.js';
 
 const C = '[ก-ฮ]';
 const T = '[่-๋]?';
 const D = '[ุู]';
 const K = '([ก-ฮ][ก-ฮ]?[ุูิ]?์)?';
 
-/** Cluster rules in order; the first rule that matches wins. */
+/** The general cluster rules in order; the first rule that matches wins. */
 const RAW_RULES = [
   // Mai Han-akat always has a final: -ัวะ, or a consonant (with or without a tone mark).
   'cั[่-๋]?วะ',
@@ -22,8 +22,6 @@ const RAW_RULES = [
   'เc็ck',
   'เcctาะk',
   'เccีtยะk',
-  'เccีtย(?=[เ-ไก-ฮ]|$|\\s)k',
-  'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$|\\s)k',
   'เ(?:c[รลว]|หc)็ck',
   'เcิc์ck',
   // A true cluster or ห-led onset between เ and the vowel belongs to the syllable (เครื่อง, เพลิง, เปล่า).
@@ -53,16 +51,20 @@ const RAW_RULES = [
   'หึ',
 ];
 
-/** Index in RAW_RULES of the two lookahead rules (-ีย before a syllable start or a space). */
-const LOOKAHEAD_AT = 6;
+/**
+ * Rules that apply only when the next character can start a syllable (see canFollowLookaheadCluster);
+ * they are tried before the general rules.
+ */
+const LOOKAHEAD_RULES = ['เccีtยk', 'เc[ิีุู]tยk'];
 
 function expandRule(rule: string): string {
   return rule.replaceAll('k', K).replaceAll('c', C).replaceAll('t', T).replaceAll('d', D);
 }
 
 let tccPattern: RegExp | null = null;
+let lookaheadPattern: RegExp | null = null;
 
-/** The cluster rules as one regular expression anchored at the start of the string. */
+/** The general cluster rules as one regular expression anchored at the start of the string. */
 export function getTCCPattern(): RegExp {
   if (tccPattern === null) {
     tccPattern = new RegExp(`^(?:${RAW_RULES.map(expandRule).join('|')})`, 'u');
@@ -70,11 +72,13 @@ export function getTCCPattern(): RegExp {
   return tccPattern;
 }
 
-/** The two lookahead rules, sticky so they match at `lastIndex`. */
-const LOOKAHEAD_PATTERN = new RegExp(
-  `(?:${RAW_RULES.slice(LOOKAHEAD_AT, LOOKAHEAD_AT + 2).map(expandRule).join('|')})`,
-  'uy',
-);
+/** The lookahead rules as one regular expression anchored at the start of the string. */
+export function getTCCLookaheadPattern(): RegExp {
+  if (lookaheadPattern === null) {
+    lookaheadPattern = new RegExp(`^(?:${LOOKAHEAD_RULES.map(expandRule).join('|')})`, 'u');
+  }
+  return lookaheadPattern;
+}
 
 /** A DFA over classes of U+0E00..U+0E7F with its tables in typed arrays. */
 class TccDfa {
@@ -107,11 +111,20 @@ class TccDfa {
   }
 }
 
-// The rules before and after the lookahead rules, as DFAs generated from the rules of the Rust core
-// (tcc_dfa.ts). Trying the three groups in order gives the match of the whole alternation: the
-// match of the first rule that matches.
-const BEFORE_LOOKAHEAD = new TccDfa(TCC_DFA_BEFORE_LOOKAHEAD);
-const AFTER_LOOKAHEAD = new TccDfa(TCC_DFA_AFTER_LOOKAHEAD);
+// DFAs generated from the rules of the Rust core (tcc_dfa.ts): a match is the match of the first rule
+// that matches, as with a regular expression of the rules in order.
+const GENERAL = new TccDfa(TCC_DFA_GENERAL);
+const LOOKAHEAD = new TccDfa(TCC_DFA_LOOKAHEAD);
+
+/**
+ * Whether a lookahead cluster (-ีย) may end before codes[i]: at the end of the text, or before a
+ * consonant (ก-ฮ), a leading vowel (เ-ไ) or a character outside the Thai block.
+ */
+function canFollowLookaheadCluster(codes: Int32Array, i: number): boolean {
+  if (i === codes.length) return true;
+  const r = codes[i];
+  return (r >= 0x0e01 && r <= 0x0e2e) || (r >= 0x0e40 && r <= 0x0e44) || r < 0x0e00 || r > 0x0e7f;
+}
 
 /**
  * Computes a boolean array of valid TCC break positions for the given character array.
@@ -133,27 +146,20 @@ export function tccPosArray(chars: string[]): boolean[] {
   for (let i = 0; i < n; i++) {
     codes[i] = chars[i].codePointAt(0) ?? 0;
   }
-  // The text and the UTF-16 offset of each character, for the lookahead rules only
-  let text: string | null = null;
-  let offsets: Int32Array | null = null;
-
   let pos = 0;
   while (pos < n) {
-    let end = BEFORE_LOOKAHEAD.find(codes, pos);
-    if (end < 0 && codes[pos] === 0x0e40) {
-      if (text === null || offsets === null) {
-        text = chars.join('');
-        offsets = new Int32Array(n + 1);
-        for (let i = 0; i < n; i++) offsets[i + 1] = offsets[i] + chars[i].length;
+    // First, the lookahead rules (all of them start with เ)
+    if (codes[pos] === 0x0e40) {
+      const end = LOOKAHEAD.find(codes, pos);
+      if (end >= 0 && canFollowLookaheadCluster(codes, end)) {
+        pos = end;
+        valid[pos] = true;
+        continue;
       }
-      LOOKAHEAD_PATTERN.lastIndex = offsets[pos];
-      const m = LOOKAHEAD_PATTERN.exec(text);
-      // The rules match Thai characters only, one UTF-16 unit each
-      if (m) end = pos + m[0].length;
     }
-    if (end < 0) {
-      end = AFTER_LOOKAHEAD.find(codes, pos);
-    }
+
+    // Second, the general rules; otherwise advance one character
+    const end = GENERAL.find(codes, pos);
     pos = end >= 0 ? clusterEnd(codes, pos, end) : pos + 1;
     valid[pos] = true;
   }

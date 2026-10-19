@@ -61,3 +61,29 @@ func TestDawgDynamicAdd(t *testing.T) {
 		t.Errorf("Expected dynamically added word 'คำแปลกใหม่' to be segmented, got %v (was %v)", words2, words1)
 	}
 }
+
+func TestLoadDawgRejectsCorruptData(t *testing.T) {
+	header := func(numStates uint32, body ...byte) []byte {
+		data := []byte{'T', 'B', 'D', '1', byte(numStates), byte(numStates >> 8), byte(numStates >> 16), byte(numStates >> 24), 0, 0, 0, 0}
+		return append(data, body...)
+	}
+	cases := map[string][]byte{
+		"more states than bytes":      header(0xFFFFFFFF, 0),
+		"no states":                   header(0),
+		"state runs past the end":     header(1, 3, 'a', 0, 0, 0),
+		"edge to a state that is not": header(1, 1, 'a', 0, 5, 0),
+		"truncated":                   header(2, 0),
+	}
+	for name, data := range cases {
+		if _, err := LoadDawg(data); err == nil {
+			t.Errorf("%s: LoadDawg accepted corrupt data", name)
+		}
+	}
+	// The bundled dictionary and a minimal valid one still load
+	if _, err := LoadDawg(defaultDawgData); err != nil {
+		t.Errorf("bundled DAWG rejected: %v", err)
+	}
+	if _, err := LoadDawg(header(1, 0)); err != nil {
+		t.Errorf("minimal DAWG rejected: %v", err)
+	}
+}

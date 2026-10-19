@@ -112,4 +112,24 @@ class DawgAndOpcacheTest extends TestCase
         $tok = ThaiTokenizer::withDefaultDict();
         $this->assertSame(['สวัสดี', 'ครับ'], $tok->tokenize('สวัสดีครับ'));
     }
+
+    public function testCorruptDawgIsRejected(): void
+    {
+        $header = static fn (int $numStates, string $body = ''): string => 'TBD1' . pack('V', $numStates) . pack('V', 0) . $body;
+        $cases = [
+            'more states than bytes'   => $header(0xFFFFFFFF, "\0"),
+            'no states'                => $header(0),
+            'state runs past the end'  => $header(1, "\3a\0\0\0"),
+            'truncated'                => $header(2, "\0"),
+        ];
+        foreach ($cases as $name => $data) {
+            try {
+                new CompactDawg($data);
+                $this->fail("$name: CompactDawg accepted corrupt data");
+            } catch (\InvalidArgumentException $e) {
+                $this->assertStringContainsString('DAWG', $e->getMessage(), $name);
+            }
+        }
+        $this->assertSame(1, (new CompactDawg($header(1, "\0")))->getNumStates());
+    }
 }

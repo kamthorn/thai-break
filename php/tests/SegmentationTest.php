@@ -47,6 +47,12 @@ class SegmentationTest extends TestCase
             'a run of abbreviations stays whole' => ['ก.พ.', 'ก.พ.'],
             'a tone mark after sara am is matched before it, the text is kept' => ['นำ้ตาลทราย', 'นำ้ตาล|ทราย'],
             'nikhahit + sara aa + tone mark is matched as tone + sara am' => ['นํา้ตาลทราย', 'นํา้ตาล|ทราย'],
+            'Thai digits join ASCII digits in one token' => ['ราคา 1๐.๐๐ บาท', 'ราคา|1๐.๐๐|บาท'],
+            'Thai digits after ASCII digits' => ['ปี 2567๑', 'ปี|2567๑'],
+            'a -ีย vowel before a non-Thai character is one cluster' => ['ค่าเฉลี่ย)', 'ค่า|เฉลี่ย|)'],
+            'a -ีย vowel before an ASCII digit is one cluster' => ['ค่าเฉลี่ย1', 'ค่า|เฉลี่ย|1'],
+            'U+0085 is white space and is dropped' => ["เขา\u{85}กิน", 'เขา|กิน'],
+            'a -ีย vowel before a space is one cluster' => ['แนวทางไกร่เกลี่ย หรือแก', 'แนวทาง|ไกร่เกลี่ย|หรือ|แก'],
         ];
     }
 

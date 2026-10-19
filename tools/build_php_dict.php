@@ -80,7 +80,7 @@ if ($weightsFile !== null) {
 }
 
 // Write to PHP file with var_export for fastest opcache parsing
-$header = "<?php\n/**\n * Auto-generated OPcache Preload Dictionary.\n * Words: $wordCount, Prefix Entries: " . count($prefixes) . "\n * Generated on " . date('Y-m-d H:i:s') . "\n */\ndeclare(strict_types=1);\n\nreturn [\n    'totalWeight' => " . var_export($totalWeight, true) . ",\n    'wordCount' => $wordCount,\n    'prefixes' => [\n";
+$header = "<?php\n/**\n * Auto-generated OPcache Preload Dictionary.\n * Words: $wordCount, Prefix Entries: " . count($prefixes) . "\n */\ndeclare(strict_types=1);\n\nreturn [\n    'totalWeight' => " . var_export($totalWeight, true) . ",\n    'wordCount' => $wordCount,\n    'prefixes' => [\n";
 
 $fp = fopen($outputFile, 'w');
 fwrite($fp, $header);

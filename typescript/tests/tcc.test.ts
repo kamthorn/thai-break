@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import * as assert from 'node:assert';
-import { tccPosArray, getTCCPattern } from '../dist/index.js';
+import { tccPosArray, getTCCPattern, getTCCLookaheadPattern } from '../dist/index.js';
 
 const DEPENDENT = /^[ะ-ฺๅ็-๎]$/;
 
@@ -12,6 +12,7 @@ function referenceTccPosArray(chars: string[]): boolean[] {
   valid[n] = true;
   if (n === 0) return valid;
   const pattern = getTCCPattern();
+  const lookahead = getTCCLookaheadPattern();
   const text = chars.join('');
   const offsetToCharIdx = new Map<number, number>();
   let offset = 0;
@@ -23,6 +24,17 @@ function referenceTccPosArray(chars: string[]): boolean[] {
   let pos = 0;
   while (pos < text.length) {
     const sub = text.slice(pos);
+    // A lookahead cluster (-ีย) ends before a consonant, a leading vowel, a non-Thai character or the end
+    const la = sub.startsWith('เ') ? lookahead.exec(sub) : null;
+    if (la) {
+      const next = sub.codePointAt(la[0].length);
+      if (next === undefined || (next >= 0x0e01 && next <= 0x0e2e) || (next >= 0x0e40 && next <= 0x0e44) || next < 0x0e00 || next > 0x0e7f) {
+        pos += la[0].length;
+        const idx = offsetToCharIdx.get(pos);
+        if (idx !== undefined) valid[idx] = true;
+        continue;
+      }
+    }
     const m = pattern.exec(sub);
     if (m && m[0].length > 0) {
       const match = m[0];
@@ -71,7 +83,7 @@ test('tccPosArray matches the regular expression rules on random strings', () =>
 });
 
 test('tccPosArray keeps the lookahead rules of the -ีย vowel', () => {
-  for (const text of ['เสียง', 'เปลี่ยน', 'เขียน ', 'เมีย', 'เสีย)', 'เกี่ยว', 'เลี้ยง']) {
+  for (const text of ['เสียง', 'เปลี่ยน', 'เขียน ', 'เมีย', 'เสีย)', 'เฉลี่ย)', 'เสีย1', 'เกี่ยว', 'เลี้ยง', 'เสียะ', 'เสีย๑']) {
     const chars = Array.from(text);
     assert.deepStrictEqual(tccPosArray(chars), referenceTccPosArray(chars), text);
   }

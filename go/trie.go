@@ -35,6 +35,12 @@ func NewCompactDawg(data []byte) (*CompactDawg, error) {
 	numStates := int(binary.LittleEndian.Uint32(data[4:8]))
 	numWords := int(binary.LittleEndian.Uint32(data[8:12]))
 
+	// Every state takes at least one byte, so a header that claims more states than that is corrupt;
+	// checking first keeps a forged header from allocating gigabytes
+	if numStates < 1 || numStates > len(data)-12 {
+		return nil, fmt.Errorf("corrupted DAWG header: %d states in %d bytes", numStates, len(data))
+	}
+
 	offsets := make([]uint32, numStates)
 	curr := 12
 	for i := 0; i < numStates; i++ {
@@ -43,7 +49,17 @@ func NewCompactDawg(data []byte) (*CompactDawg, error) {
 		}
 		offsets[i] = uint32(curr)
 		numEdges := int(data[curr] & 0x7F)
-		curr += 1 + numEdges*4
+		end := curr + 1 + numEdges*4
+		if end > len(data) {
+			return nil, fmt.Errorf("corrupted DAWG data: state %d runs past the end", i)
+		}
+		for e := 0; e < numEdges; e++ {
+			// An edge is a 2-byte character and a 2-byte target state
+			if target := int(binary.LittleEndian.Uint16(data[curr+1+e*4+2:])); target >= numStates {
+				return nil, fmt.Errorf("corrupted DAWG data: state %d has an edge to state %d of %d", i, target, numStates)
+			}
+		}
+		curr = end
 	}
 
 	return &CompactDawg{

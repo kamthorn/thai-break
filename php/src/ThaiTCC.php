@@ -54,8 +54,8 @@ class ThaiTCC
             'เc็ck',
             'เcctาะk',
             'เccีtยะk',
-            'เccีtย(?=[เ-ไก-ฮ]|$)k',
-            'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$)k',
+            'เccีtย(?=[เ-ไก-ฮ]|$|[^\x{0E00}-\x{0E7F}])k',
+            'เc[ิีุู]tย(?=[เ-ไก-ฮ]|$|[^\x{0E00}-\x{0E7F}])k',
             'เ(?:c[รลว]|หc)็ck',
             'เcิc์ck',
             // A true cluster or ห-led onset between เ and the vowel belongs to the syllable (เครื่อง, เพลิง, เปล่า).

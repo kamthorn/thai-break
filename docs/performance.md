@@ -120,7 +120,7 @@
 - `cargo test` (debug) ผ่านทั้งหมด รวม test ใหม่ที่เทียบ `prefix_ends_from_chars` กับ `prefixes_from_chars` ทุกตำแหน่ง ทั้ง FlatTrie, FST, overlay (`add`) และ `set_weight`
 - `tcc_pos_array` ใหม่ให้ผลตรงกับอัลกอริทึมเดิมบนข้อความทั้งสองชุด และบนสตริงสุ่ม 3 ล้านสตริง (อักษรในบล็อกไทยสุ่ม และส่วนของคลังที่สุ่มแก้ 1 ตัวอักษร)
 - `cargo clippy --all-targets` ไม่มี warning, `cargo check` ผ่านทั้ง `--features wasm` และ `typst-plugin` บน `wasm32-unknown-unknown`
-- `cargo test --release` ใช้ไม่ได้ทั้งก่อนและหลังการเปลี่ยนนี้ เพราะ `panic = "abort"` ใน profile release ขัดกับ test harness (CI ใช้ `cargo test` แบบ debug)
+- `cargo test --release` ใช้ไม่ได้ทั้งก่อนและหลังการเปลี่ยนนี้ เพราะ `panic = "abort"` ใน profile release ขัดกับ test harness (CI ใช้ `cargo test` แบบ debug) (หมายเหตุ 2026-10-19: ถอด `panic = "abort"` ออกแล้ว `cargo test --release` รันได้)
 
 ### สิ่งที่ลองแล้วไม่ได้ใส่
 

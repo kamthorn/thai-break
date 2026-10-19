@@ -84,7 +84,9 @@ OOV_BOUNDARY_WORDS.forEach((f, k) => {
   }
 });
 
-const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\d+(?:,\d+)*(?:\.\d+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
+const PAT_NONTHAI = /^(?:[a-zA-Z]+(?:[-_'][a-zA-Z0-9]+)*|\p{Nd}+(?:,\p{Nd}+)*(?:\.\p{Nd}+)?%?|[ \t]+|\r?\n|[^\u0e00-\u0e7fa-zA-Z0-9 \t\r\n])/u;
+/** A token that is not made of white space only; String.trim() differs from Unicode White_Space (U+0085, U+FEFF). */
+const NOT_ONLY_SPACE = /[^\p{White_Space}]/u;
 const PAT_ABBR = /^(?:(?:[เแโใไ]?[ก-ฮ][ัิีึืุู็่้๊๋]?|[ก-ฮ]{1,4})\.)+/u;
 
 /** An edge from the current position to `to`. */
@@ -252,7 +254,7 @@ export class Tokenizer {
     }
 
     if (!keepWhitespace) {
-      return tokens.filter((t) => t.trim().length > 0);
+      return tokens.filter((t) => NOT_ONLY_SPACE.test(t));
     }
     return tokens;
   }

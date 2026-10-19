@@ -44,7 +44,6 @@ typst-plugin = ["dep:wasm-minimal-protocol", "embedded-dict"]
 opt-level = 3
 lto = true
 codegen-units = 1
-panic = "abort"
 
 [[bin]]
 name = "thaibreak_compile_fst"

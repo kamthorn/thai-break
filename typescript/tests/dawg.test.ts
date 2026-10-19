@@ -48,4 +48,26 @@ describe('DAWG / FST Trie in TypeScript', () => {
 
     assert.ok(after.includes('คำแปลกใหม่'), `Expected 'คำแปลกใหม่' in ${after.join('|')}`);
   });
+
+  it('rejects corrupt DAWG data instead of reading past it', () => {
+    const header = (numStates: number, ...body: number[]) => {
+      const data = new Uint8Array(12 + body.length);
+      data.set([0x54, 0x42, 0x44, 0x31]);
+      new DataView(data.buffer).setUint32(4, numStates, true);
+      data.set(body, 12);
+      return data;
+    };
+    const cases: Record<string, Uint8Array> = {
+      'more states than bytes': header(0xffffffff, 0),
+      'no states': header(0),
+      'state runs past the end': header(1, 3, 0x61, 0, 0, 0),
+      'edge to a state that is not': header(1, 1, 0x61, 0, 5, 0),
+      truncated: header(2, 0),
+    };
+    for (const [name, data] of Object.entries(cases)) {
+      assert.throws(() => ThaiTrie.fromBinary(data), /DAWG/, name);
+    }
+    assert.doesNotThrow(() => ThaiTrie.fromBinary(header(1, 0)));
+    assert.doesNotThrow(() => ThaiTrie.fromBinary(fs.readFileSync(dawgPath)));
+  });
 });

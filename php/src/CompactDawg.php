@@ -29,12 +29,28 @@ class CompactDawg
         $this->numStates = unpack('V', substr($data, 4, 4))[1];
         $this->numWords  = unpack('V', substr($data, 8, 4))[1];
 
+        // Every state takes at least one byte, so a header that claims more states than that is
+        // corrupt; checking first keeps a forged header from allocating gigabytes
+        $size = strlen($data);
+        if ($this->numStates < 1 || $this->numStates > $size - 12) {
+            throw new \InvalidArgumentException("Corrupted DAWG header: {$this->numStates} states in $size bytes");
+        }
+
+        // An edge to a state that does not exist is not checked here (that would triple the load
+        // time): the lookup of the state throws, as SplFixedArray rejects an index out of range
         $this->offsets = new \SplFixedArray($this->numStates);
         $curr          = 12;
         for ($i = 0; $i < $this->numStates; $i++) {
+            if ($curr >= $size) {
+                throw new \InvalidArgumentException("Corrupted DAWG data at state $i");
+            }
             $this->offsets[$i] = $curr;
             $numEdges          = ord($data[$curr]) & 0x7F;
-            $curr             += 1 + $numEdges * 4;
+            $end               = $curr + 1 + $numEdges * 4;
+            if ($end > $size) {
+                throw new \InvalidArgumentException("Corrupted DAWG data: state $i runs past the end");
+            }
+            $curr = $end;
         }
     }
 

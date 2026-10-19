@@ -2,8 +2,11 @@
 # data/ is the single source of the dictionary. Some packages need their own
 # copy inside the package directory so they can be built or published alone.
 #
+#   tools/sync_dict.sh rebuild build words.dawg, words.fst and words.php from data/words.txt, then stage
 #   tools/sync_dict.sh stage   copy data/ into go/data (committed) and rust/data (gitignored)
 #   tools/sync_dict.sh check   fail if a committed copy differs from data/
+#
+# After editing data/words.txt run `tools/sync_dict.sh rebuild`; it needs python3, php and cargo.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,6 +26,12 @@ STAGED=(
 )
 
 case "${1:-}" in
+  rebuild)
+    python3 tools/build_dawg.py data/words.txt data/words.dawg
+    (cd rust && cargo run -q --bin thaibreak_compile_fst -- ../data/words.txt ../data/words.fst)
+    php tools/build_php_dict.php
+    exec "$0" stage
+    ;;
   stage)
     for pair in "${COMMITTED[@]}" "${STAGED[@]}"; do
       set -- $pair
@@ -51,7 +60,7 @@ case "${1:-}" in
     exit "$status"
     ;;
   *)
-    echo "usage: $0 stage|check" >&2
+    echo "usage: $0 rebuild|stage|check" >&2
     exit 2
     ;;
 esac

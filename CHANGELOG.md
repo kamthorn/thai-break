@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.0] - 2026-10-18
 
+### Fixed
+- **A Rust panic no longer aborts the host process.** `panic = "abort"` is gone from the release profile, so
+  the `catch_unwind` in the C API and the PyO3 binding work: a panic returns an error (NULL / a Python
+  exception) instead of killing the Python, PHP or C program that loaded the library. The library is 59 KB
+  (3%) larger and about 2% slower; the Typst wasm is unchanged (wasm always aborts). `cargo test --release`
+  works now.
+- **Go, TypeScript and PHP check a DAWG file when they load it.** A header with more states than the file has
+  bytes, a state that runs past the end, or (Go, TypeScript) an edge to a state that does not exist is an error
+  now. A forged header (`numStates = 0xFFFFFFFF`) used to allocate gigabytes. PHP load time is unchanged (0.4 ms).
+- **The ports tokenize like the Rust core.** Go and TypeScript counted Thai digits as separate from ASCII digits
+  (`1๐.๐๐` was five tokens, now one as in Rust and PHP); TypeScript kept U+0085 as a token and cut the -ีย vowel
+  before a non-Thai character differently; PHP did that before a space. Go, TypeScript and PHP now give the
+  same tokens as Rust on 2,299 short sentences, 150,000 random lines and 65,014 news paragraphs (before: Go
+  differed on 4 news paragraphs and 428 random lines, TypeScript on 69 and 451, PHP on 2 random lines).
+  `getTCCPattern()` in TypeScript now returns the general rules only; `getTCCLookaheadPattern()` returns the
+  lookahead rules.
+
 ### Changed
 - **The base dictionary has 392 more words** (25,411 to 25,803): the names, abbreviations and spellings that
   tripped the segmenter most often on news text, taken from the lists of `thai-break-dict-extra` that
@@ -32,6 +49,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typst plugin 0.2.0: `typst/thaibreak.wasm` is rebuilt from the 1.4.1 core, so it has the out-of-vocabulary
   words, word weights and bug fixes of 1.3.0-1.4.1 (it was built before 1.3.0). For example
   `ชวรัตน์` and `เอทีเอ็ม` are one word. The file is 21 KB larger (1.38 MB).
+- `tools/sync_dict.sh rebuild` builds `words.dawg`, `words.fst` and `words.php` from `data/words.txt` and stages
+  the copies; `words.php` no longer holds its build time, so a rebuild gives the same file.
 
 ## [1.4.1] - 2026-10-16
 

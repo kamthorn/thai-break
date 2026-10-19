@@ -40,12 +40,32 @@ export class CompactDawg {
     this.numStates = this.view.getUint32(4, true);
     this.numWords = this.view.getUint32(8, true);
 
+    // Every state takes at least one byte, so a header that claims more states than that is corrupt;
+    // checking first keeps a forged header from allocating gigabytes
+    if (this.numStates < 1 || this.numStates > this.data.length - 12) {
+      throw new Error(`Corrupted DAWG header: ${this.numStates} states in ${this.data.length} bytes`);
+    }
+
     this.offsets = new Uint32Array(this.numStates);
     let curr = 12;
     for (let i = 0; i < this.numStates; i++) {
+      if (curr >= this.data.length) {
+        throw new Error(`Corrupted DAWG data at state ${i}`);
+      }
       this.offsets[i] = curr;
-      const numEdges = this.data[curr] & 0x7F;
-      curr += 1 + numEdges * 4;
+      const numEdges = this.data[curr] & 0x7f;
+      const end = curr + 1 + numEdges * 4;
+      if (end > this.data.length) {
+        throw new Error(`Corrupted DAWG data: state ${i} runs past the end`);
+      }
+      for (let e = 0; e < numEdges; e++) {
+        // An edge is a 2-byte character and a 2-byte target state
+        const target = this.view.getUint16(curr + 1 + e * 4 + 2, true);
+        if (target >= this.numStates) {
+          throw new Error(`Corrupted DAWG data: state ${i} has an edge to state ${target} of ${this.numStates}`);
+        }
+      }
+      curr = end;
     }
   }
 
