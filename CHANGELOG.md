@@ -10,10 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.5.0] - 2026-10-18
 
 ### Changed
-- **The base dictionary has 391 more words** (25,411 to 25,802): the names, abbreviations and spellings that
+- **The base dictionary has 392 more words** (25,411 to 25,803): the names, abbreviations and spellings that
   tripped the segmenter most often on news text, taken from the lists of `thai-break-dict-extra` that
   are our own or CC0 (PyThaiNLP): `เว็บไซต์`, `สหรัฐอเมริกา`, `เกาหลีเหนือ`, `เกาหลีใต้`, `กรุงเทพฯ`,
-  `กรุงเทพมหานคร`, `พระนครศรีอยุธยา`, `เด็กชาย`, `เด็กหญิง`, `ส.ส.`, `อบต.`, country names, common abbreviations,
+  `กรุงเทพมหานคร`, `พระนครศรีอยุธยา`, `เด็กชาย`, `เด็กหญิง`, `ส.ส.`, `อบต.`, `เสธ.`, country names, common abbreviations,
   frequent misspellings (`เฟสบุ๊ค`, `อนุญาติ`), and car and shop brands. Word F1 on the base dictionary goes up on every
   test set: LST20 test 86.9 to 87.1, LST20 eval 83.5 to 83.8, Blackboard 86.6 to 86.8, Wisesight-1000 84.5 to 84.7.
   On 65,014 news paragraphs 3,068 are segmented differently, always because of one of the new words; the

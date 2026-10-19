@@ -21,7 +21,7 @@
   - Keeps leading vowels (`เ`, `แ`, `โ`, `ใ`, `ไ`) attached to their initial consonants.
 - 📏 **Thai Visual Display Width:** Accurately calculates visual column width by treating upper/lower combining vowels and tone marks as zero-width.
 - 🏷️ **HTML Preservation:** Safely inserts break markers in HTML content while ignoring tags, comments, and scripts (`<script>`, `<style>`).
-- 🛡️ **Clean & Open:** Public Domain word list (25,802 entries) with word weights counted on the Prachathai-67k news corpus (Apache-2.0), all released under Apache-2.0.
+- 🛡️ **Clean & Open:** Public Domain word list (25,803 entries) with word weights counted on the Prachathai-67k news corpus (Apache-2.0), all released under Apache-2.0.
 
 ---
 

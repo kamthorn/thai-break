@@ -1,14 +1,14 @@
 <?php
 /**
  * Auto-generated OPcache Preload Dictionary.
- * Words: 25802, Prefix Entries: 75343
- * Generated on 2026-10-18 16:23:04
+ * Words: 25803, Prefix Entries: 75345
+ * Generated on 2026-10-19 03:41:50
  */
 declare(strict_types=1);
 
 return [
-    'totalWeight' => 31610.36229999999,
-    'wordCount' => 25802,
+    'totalWeight' => 31611.36229999999,
+    'wordCount' => 25803,
     'prefixes' => [
         'ก' => 0,
         'กก' => 1,
@@ -64984,6 +64984,8 @@ return [
         'เสถียรภาพ' => 1.4988,
         'เสท' => 0,
         'เสทะ' => 1,
+        'เสธ' => 0,
+        'เสธ.' => 1,
         'เสน' => 1,
         'เสนง' => 1,
         'เสนห' => 0,
