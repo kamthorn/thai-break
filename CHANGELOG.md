@@ -38,10 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frequent misspellings (`เฟสบุ๊ค`, `อนุญาติ`), and car and shop brands. Word F1 on the base dictionary goes up on every
   test set: LST20 test 86.9 to 87.1, LST20 eval 83.5 to 83.8, Blackboard 86.6 to 86.8, Wisesight-1000 84.5 to 84.7.
   On 65,014 news paragraphs 3,068 are segmented differently, always because of one of the new words; the
-  base plus dict-extra scores are unchanged because dict-extra already had these words. **Tokens change,
+  base plus dict-extra scores were unchanged by these words because dict-extra already had them (it gained 19 compounds later, see below). **Tokens change,
   so reindex if you search on `words()` output.** A single dictionary word wider than the line is cut at cluster boundaries
   when `wrap(..., cutLongWords)` is used, so `กรุงเทพมหานคร` in a 4-column line is now `กรุง|เทพม|หานค|ร`
   instead of `กรุง|เทพ|มหา|นคร`.
+- **thai-break-dict-extra has 19 more words** (14,381), mostly compounds kept whole (`ค้นคว้า`, `ค้นหา`, `สวยงาม`,
+  `พูดคุย`, `เติบโต`, `ตัดสินใจ`, `ค่อนข้าง`, `แกนนำ`, `ยาบ้า`, ...); `ค้าขาย` has weight 1.0 so it does not
+  take `ค้า` from `แม่ค้า`. With the base dictionary plus dict-extra, word F1 is LST20 test 84.0 (was 83.7),
+  LST20 eval 80.9 (80.6), Blackboard 84.5 (84.2), Wisesight-1000 82.8 (82.7); the base dictionary alone
+  is 87.1 / 83.9 / 86.8 / 84.8.
 - **Faster segmentation again, same tokens.** Thai character clusters are matched with a DFA built from the
   same cluster rules, instead of a regular expression: in Rust at first use (157 states, 9 KB, 0.7 ms), in
   Go and TypeScript from tables that `cargo run --example thaibreak_gen_tcc` writes into `go/tcc_dfa.go` and
