@@ -1,9 +1,9 @@
 # ThaiBreak Web API Service (Rust)
 
-บริการ Web API ประสิทธิภาพสูงสำหรับการตัดคำภาษาไทย (Thai Word Segmentation) และการจัดแบ่งบรรทัด (Typographic Line Breaking) พัฒนาด้วยภาษา **Rust** บน **Axum / Tokio** ขับเคลื่อนโดย Core Engine [ThaiBreak](https://github.com/kamthorn/thai-break)
+บริการ Web API ประสิทธิภาพสูงสำหรับการตัดคำภาษาไทย (Thai Word Segmentation) และการจัดแบ่งบรรทัด (Typographic Line Breaking) พัฒนาด้วยภาษา **Rust** บน **Axum / Tokio** ขับเคลื่อนโดย Core Engine ThaiBreak
 
 > [!NOTE]
-> นี่คือ **ตัวอย่าง** การนำ thai-break ไปทำเป็น HTTP service (อยู่ใน `examples/service/` ของ monorepo [thai-break](https://github.com/kamthorn/thai-break) ใช้ engine ใน `rust/` ของ repo เดียวกันผ่าน path dependency) ยังไม่ได้ปล่อย Docker image หรือรองรับการใช้งานจริง ถ้าต้องการตัดคำในแอปพลิเคชัน แนะนำให้ใช้ library ตรง ๆ (Rust, Go, TypeScript, PHP, Python)
+> นี่คือ **ตัวอย่าง** การนำ thai-break ไปทำเป็น HTTP service (อยู่ใน `examples/service/` ของ monorepo thai-break ใช้ engine ใน `rust/` ของ repo เดียวกันผ่าน path dependency) ยังไม่ได้ปล่อย Docker image หรือรองรับการใช้งานจริง ถ้าต้องการตัดคำในแอปพลิเคชัน แนะนำให้ใช้ library ตรง ๆ (Rust, Go, TypeScript, PHP, Python)
 
 ออกแบบมาเฉพาะสำหรับใช้งานเป็น **Internal Microservice** เบื้องหลัง API Gateway (Kong, Traefik, Nginx, AWS API Gateway, Cloudflare) โดยทำงานแบบ Stateless, Zero-Authen Overhead, ประหยัดหน่วยความจำระดับขีดสุด และตอบสนองระดับ Sub-millisecond
 
@@ -278,7 +278,7 @@ Service นี้ใช้พจนานุกรม 2 ชั้นรวมก
 | องค์ประกอบ | ที่มา | ลิขสิทธิ์ | จำนวน |
 |---|---|---|---|
 | **Base Dictionary** | `data/words.txt` ของ thai-break (ราชบัณฑิตยสถาน) | Public Domain | 25,411 คำ |
-| **Extra Dictionary** | [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) `dist/words-extra.tsv` | CC0-1.0 | 14,331 คำ |
+| **Extra Dictionary** | thai-break-dict-extra `dist/words-extra.tsv` | CC0-1.0 | 14,331 คำ |
 | **Lines Dictionary** | `dist/words-extra-lines.tsv` (ตัดชื่อเฉพาะ/โรงเรียน/คำประสมข่าวออกเพื่อให้พับบรรทัดได้ยืดหยุ่น) | CC0-1.0 | 5,663 คำ |
 | **Bigram Model** (ไม่บังคับ ไม่อยู่ใน repo) | `thai-break-dict-extra/data/bigrams-prachathai.tsv` สกัดจาก Prachathai-67k (54,380 บทความ) | Apache-2.0 | 955,967 คู่คำ |
 

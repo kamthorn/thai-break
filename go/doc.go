@@ -4,7 +4,7 @@
 //
 // Basic usage:
 //
-//	import thaibreak "github.com/kamthorn/thai-break/go"
+//	import thaibreak "thaibreak/go"
 //
 //	// Tokenize Thai sentence into words:
 //	words := thaibreak.Words("ภาษาไทยเข้าใจง่าย")

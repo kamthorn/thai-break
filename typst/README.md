@@ -1,6 +1,4 @@
-# thaibreak
-
-Natural Thai word segmentation and typographic line breaking for [Typst](https://typst.app/), powered by [`kamthorn/thai-break`](https://github.com/kamthorn/thai-break) (Rust core with dictionary prefix trie).
+Natural Thai word segmentation and typographic line breaking for [Typst](https://typst.app/), powered by ThaiBreak (Rust core with dictionary prefix trie).
 
 ## Features
 

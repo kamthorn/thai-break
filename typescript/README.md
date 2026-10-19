@@ -1,6 +1,5 @@
 # ThaiBreak for JavaScript & TypeScript
 
-[![npm version](https://img.shields.io/npm/v/thai-break.svg)](https://www.npmjs.com/package/thai-break)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **ThaiBreak** (`thai-break`) is a high-performance, dictionary-based Thai word segmentation and typographic line breaking engine for JavaScript and TypeScript (Node.js, Deno, Bun, and modern browsers).
@@ -111,4 +110,4 @@ init({ dictBinary: fs.readFileSync('path/to/words.dawg') });
 
 ## License
 
-[Apache-2.0](LICENSE) © Kamthorn Krairaksa
+[Apache-2.0](LICENSE) © ThaiBreak Contributors

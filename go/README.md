@@ -1,7 +1,5 @@
 # ThaiBreak for Go
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/kamthorn/thai-break/go.svg)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
-[![Go version](https://img.shields.io/github/v/tag/kamthorn/thai-break?filter=go%2Fv*&sort=semver&label=go)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **ThaiBreak** is a high-performance, dictionary-based Thai word segmentation and typographic line breaking engine for Go. It strictly implements the **Unicode Line Breaking Algorithm (UAX #14)** and **W3C Thai Layout Requirements**, making it ideal for PDF generation, terminal rendering, HTML typesetting, and NLP text processing.
@@ -12,7 +10,7 @@
 
 - ⚡ **Microsecond-Level Latency:** ~30–45 µs per sentence in Go (>25,000 sentences/sec per core).
 - 💾 **Compact DAWG Dictionary (v1.1.0):** Embedded 171 KB minimal acyclic automaton (`words.dawg`) with zero external dependencies, 48 µs instant startup, < 0.2 MB memory footprint, and 24.5M lookups/sec.
-- 🎯 **Accuracy:** Viterbi dynamic programming with a unigram word model (optional bigram bonuses), scoring **93.8%** word-boundary F1 (87.1% word F1) on the LST20 test set with the default dictionary. See the main README for how it is measured.
+- 🎯 **Accuracy:** Viterbi dynamic programming with a unigram word model (optional bigram bonuses).
 - 📐 **Unicode UAX #14 & W3C Typographic Rules:**
   - Implements every rule of the Unicode 16.0 Line Breaking Algorithm (LB1–LB31) and passes all 16,672 cases of the official `LineBreakTest.txt`.
   - Uses the dictionary only inside Thai (SA) runs; next to other characters Thai letters are alphabetic, so `ราคา100บาท`, `ภาษาPHPเป็น` and `ไทย(สยาม)` stay together.
@@ -25,14 +23,6 @@
 
 ---
 
-## Installation
-
-```bash
-go get github.com/kamthorn/thai-break/go
-```
-
----
-
 ## Quick Start
 
 ```go
@@ -41,7 +31,7 @@ package main
 import (
 	"fmt"
 
-	thaibreak "github.com/kamthorn/thai-break/go"
+	thaibreak "thaibreak/go"
 )
 
 func main() {

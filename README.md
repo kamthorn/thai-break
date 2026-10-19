@@ -1,516 +1,101 @@
-# ThaiBreak — Fast Thai Word Segmenter & Typographic Line Breaker
+# ThaiBreak: High-Throughput Thai Word Segmentation & Typographic Line Breaking Engine
 
-[![CI](https://github.com/kamthorn/thai-break/actions/workflows/ci.yml/badge.svg)](https://github.com/kamthorn/thai-break/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Packagist Version](https://img.shields.io/packagist/v/kamthorn/thai-break.svg)](https://packagist.org/packages/kamthorn/thai-break)
-[![Go Reference](https://pkg.go.dev/badge/github.com/kamthorn/thai-break/go.svg)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
-[![Go version](https://img.shields.io/github/v/tag/kamthorn/thai-break?filter=go%2Fv*&sort=semver&label=go)](https://pkg.go.dev/github.com/kamthorn/thai-break/go)
-[![npm version](https://img.shields.io/npm/v/thai-break.svg)](https://www.npmjs.com/package/thai-break)
-[![crates.io](https://img.shields.io/crates/v/thaibreak.svg)](https://crates.io/crates/thaibreak)
-[![PyPI version](https://img.shields.io/pypi/v/thaibreak.svg)](https://pypi.org/project/thaibreak/)
 
-ระบบตัดคำและตัดแบ่งบรรทัดภาษาไทยประสิทธิภาพสูงแบบ **Multi-Language Engine** รองรับ **PHP / Laravel**, **Go**, **TypeScript / Node.js**, **Rust Core**, **C / C++**, **Python**, และ **WebAssembly**  
+An open-source, deterministic, high-accuracy Thai word segmentation and typographic line breaking engine implemented in Rust, designed for high-throughput production environments (search indexing, database query parsing, web rendering, and typesetting).
 
-ใช้อัลกอริทึม **Shortest Path Viterbi DAG** ร่วมกับ **Theeramunkong 30-Rule Thai Character Cluster (TCC)** บนพจนานุกรมมาตรฐานภาษาไทย (`data/words.txt` 25,804 คำ)
+## Key Highlights
 
-🚀 **Zero External Corpus Dependency:** ไม่พึ่งพาคลังข้อความที่มีข้อจำกัดทางลิขสิทธิ์ เป็น Open Source Apache-2.0 แท้ 100% ใช้งานเชิงพาณิชย์ได้อย่างสบายใจ  
-⚡ **ความเร็วสูงระดับไมโครวินาที:** ~30-45 µs ใน Go/Rust, ~0.3 ms ใน PHP/Node.js (~25,000 ประโยค/วินาทีต่อ core)  
-💾 **Ultra-Lightweight & Low Memory:** พจนานุกรมบีบอัดแบบ **Compact DAWG (171 KB)** และ **FST (296 KB)** ใช้ RAM ต่ำกว่า 0.2–0.5 MB (ลดลง 95%)  
-📄 **Typographic Line Breaker & Soft Wrapping:** ตัดแบ่งบรรทัดป้องกันสระลอย/ตกขอบ ตาม **Unicode UAX #14 (Unicode 16.0) ครบทุกกฎ** ผ่านชุดทดสอบทางการของ Unicode และ **W3C tlreq** สำหรับ PDF (dompdf, mPDF, TCPDF, Typst) และ Web  
-🔥 **พร้อมใช้งานกับ Laravel:** Auto-Discovery, Facade, Blade Directives (`@thaibreak`, `@thaiwrap`), `Str` Macros
+- **State-of-the-Art Accuracy for Non-Neural Segmenters:** Achieves **86.71% Word F1** and **93.56% Boundary F1** on the 5.05-million-word NECTEC BEST Corpus benchmark, outperforming ICU4C (81.73%), LibThai (81.71%), ICU4X Dictionary (79.96%), and ICU4X LSTM (84.81%).
+- **Ultra-High Throughput:** Processes text at **16.25 - 22.99 MB/s per core** (~1.46M - 2.06M words/second) and scales to **243.45 MB/s** (~21.95M words/second) on a 28-core system in native Rust.
+- **Extended TCC Deterministic DFA:** Extends the classic Thai Character Cluster ruleset to properly capture compound vowel onsets (e.g., เครื่อง, เพลิง, เปล่า), colloquial loanword vowel shorteners (`[ข-ฮ]็อck` like ล็อก, ช็อก), and multi-character silent endings (`K`), compiled into a single leftmost-first Regex DFA for strict $O(N)$ scanning.
+- **Direct 2-Level Thai Block Jump Table:** Uses a compact Finite State Transducer (`fst::Map`) dictionary with a direct index jump table for the Unicode Thai block (U+0E00..U+0E7F) that eliminates 2 levels of Trie state transitions.
+- **Context-Aware Disambiguation & OOV Isolation:** Employs single-pass Viterbi DP with Bigram collocation rescoring, a dedicated abbreviation validator (`abbreviation_is_words`), and 39 grammatical function words that prevent out-of-vocabulary (OOV) tokens from swallowing adjacent particles.
+- **Unicode UAX #14 Line Breaking:** Implements full Unicode Standard Annex #14 line break opportunities with visual terminal column width calculation (`display_width`).
 
-🌐 **ลองใช้งานในเบราว์เซอร์:** [thai-break-demo](https://kamthorn.github.io/thai-break-demo/) ตัดคำ ตัดบรรทัด ใช้พจนานุกรมเสริม และอัปโหลดพจนานุกรมของคุณเองเพื่อทดสอบได้ ([ซอร์สโค้ด](https://github.com/kamthorn/thai-break-demo))
-
-🧪 **ตัวอย่าง HTTP service:** [`examples/service`](examples/service) ตัดคำ ตัดบรรทัด และ normalize ผ่าน REST API (Rust/Axum, Docker) เป็นตัวอย่างการนำไปใช้ ไม่ใช่ผลิตภัณฑ์ที่รองรับการใช้งานจริง
-
----
-
-## คุณสมบัติเด่น
-
-1. **Shortest Path Graph Viterbi Algorithm:** อัลกอริทึมค้นหาเส้นทางคำที่เหมาะสมที่สุดบนกราฟ ค้นหาคำที่ยาวและถูกต้องสมบูรณ์ตามธรรมชาติ
-2. **Theeramunkong et al. TCC Grammar (30 Rules):** คำนวณจุดตัดคลัสเตอร์ภาษาไทยระดับไบต์ออฟเซ็ต ป้องกันการตัดแยกสระ สระบน-ล่าง วรรณยุกต์ หรือพยัญชนะนำ 100%
-3. **FST & Compact DAWG Dictionary Architecture (v1.1.0):** โครงสร้างข้อมูลพจนานุกรม Finite State Transducer / Minimal Acyclic DFA บีบอัดคลังคำ 25,804 คำเหลือเพียง 171 KB โหลดทันใจระดับไมโครวินาที (0.04 ms ใน Go, 0.7 ms ใน Node.js, 0.00 ms ใน Rust/OPcache) พร้อมรองรับ Dynamic Overlay เมื่อมีการเพิ่มคำใหม่ขณะรันไทม์
-4. **Smart OOV & Abbreviation Handling:** รู้จักคำย่อภาษาไทย (`รพ.`, `พ.ศ.`, `มิ.ย.`), ตัวเลขคั่นจุลภาค (`10,000`), ทศนิยม (`3.14`), เปอร์เซ็นต์ (`40%`)
-5. **ThaiLineBreaker (UAX #14 & W3C Thai Text Layout):** ตัดแบ่งบรรทัดสำหรับทำ PDF หรือเว็บด้วย Unicode Line Breaking Algorithm ครบทุกกฎ (LB1–LB31) ใช้พจนานุกรมตัดคำเฉพาะภายในช่วงอักษรไทย ไม่ตัดกลางคำ ตัวเลข คำย่อ หรืออีเมล ไม่ทิ้งวรรคไว้หน้าบรรทัดใหม่ ป้องกันเครื่องหมายตกค้าง (`ๆ`, `ฯ`, วงเล็บ, อัญประกาศ)
-6. **HTML / EPUB Safe:** รักษาแท็ก HTML (`<p>`, `<b>`, `<span>`) และ HTML Entities (`&amp;`, `&quot;`) ให้คงอยู่สมบูรณ์ ไม่แทรกสัญลักษณ์ตัดคำเข้าไปภายในแท็ก
-
----
-
-## รองรับหลายภาษาโปรแกรม (Multi-Language Architecture)
-
-ThaiBreak ได้รับการออกแบบสถาปัตยกรรมแบบ Monorepo เพื่อรองรับการใช้งานในทุก Stack โดยใช้คลังคำศัพท์มาตรฐาน (`data/words.txt`: 25,804 คำ) เป็น Single Source of Truth:
+## Architecture Overview
 
 ```
-thai-break/
-├── data/                 # Shared Dictionaries (words.dawg: 171 KB, words.fst: 296 KB, words.php, words.txt)
-├── php/                  # Native PHP & Laravel Package (Composer: kamthorn/thai-break)
-│   ├── src/              # PHP Source & Laravel Integration
-│   ├── tests/            # PHPUnit & Integration Tests
-│   └── examples/         # Demo Scripts
-├── go/                   # Native Go Package (go get github.com/kamthorn/thai-break/go)
-├── typescript/           # Native TypeScript / Node.js Package (npm: thai-break)
-├── rust/                 # High-Performance Rust Core (Cargo: thaibreak)
-│   ├── include/          # C / C++ Header (thaibreak.h)
-│   └── src/              # Core Engine + C FFI + Python (PyO3) + Wasm (wasm-bindgen)
-├── python/               # Python Package (pip: thaibreak)
-└── tools/                # Dev tools: line-break table generator, CLI segmenter, accuracy benchmark
+Input Text
+    │
+    ▼
+[Text Normalizer]           (Maps common typing variants with zero-copy offset preservation)
+    │
+    ▼
+[Extended TCC DFA]         (Enforces hard orthographic cluster constraints in O(N))
+    │
+    ▼
+[Candidate Graph Search]    (FST Trie with 2-char jump table + Abbr + OOV syllable chunking)
+    │
+    ▼
+[Viterbi DP Optimizer]      (Unigram log-odds cost + Bigram collocation bonus + Tie-breaking)
+    │
+    ▼
+[Traceback & Output]        (Produces word tokens or zero-allocation line break offsets)
 ```
 
----
+## Repository Structure
 
-## 1. PHP & Laravel
-
-### การติดตั้งผ่าน Composer
-```bash
-composer require kamthorn/thai-break
+```
+├── rust/                 # Core engine in Rust (thaibreak)
+│   ├── src/tcc.rs        # Extended TCC DFA specification and table compiler
+│   ├── src/trie.rs       # Zero-copy FST dictionary and 2-level prefix table
+│   ├── src/tokenizer.rs  # Single-pass Viterbi DP and abbreviation disambiguation
+│   ├── src/bigram.rs     # Bigram collocation model
+│   └── src/linebreaker.rs# Unicode UAX #14 line breaking implementation
+├── data/                 # Standard dictionaries (words.fst, words.txt, word-weights.tsv, bigrams.tsv)
+├── python/               # Python bindings (PyO3)
+├── typescript/           # TypeScript / JavaScript port
+├── go/                   # Go port
+├── typst/                # WebAssembly plugin for Typst typesetting
+└── tools/                # Benchmark and validation utilities
 ```
 
-### การใช้งานทั่วไป (One-liner Quick Start)
-```php
-use ThaiBreak\ThaiBreak;
+## Requirements
 
-// 1. ตัดคำเป็น Array
-$words = ThaiBreak::words('ฉันรักภาษาไทย');
-// → ['ฉัน', 'รัก', 'ภาษา', 'ไทย']
+- **Rust:** 1.85+ (or latest stable)
+- **Cargo**
 
-// ตำแหน่งขอบเขตคำแบบ BreakIterator (นับไบต์ สำหรับ substr(); ส่ง true เป็นอาร์กิวเมนต์ที่สองเพื่อนับตัวอักษร สำหรับ mb_substr())
-$bounds = ThaiBreak::boundaries('ฉันรักภาษาไทย');
-// → [0, 9, 18, 30, 39]
+## Building the Core Engine
 
-// 2. ตัดคำคั่นด้วยเครื่องหมาย
-$joined = ThaiBreak::join('สวัสดีครับคุณลูกค้า', '|');
-// → "สวัสดี|ครับ|คุณ|ลูกค้า"
-
-// 3. แทรกจุดตัดบรรทัด (Zero-Width Space U+200B) สำหรับ Render PDF/HTML
-$lines = ThaiBreak::lines('ข้อความยาวๆ ที่ต้องการจัดหน้าใน PDF');
-
-// 4. ตัดแบ่งบรรทัดสำหรับ HTML (รักษาแท็กและ entities)
-$html = ThaiBreak::lines('<p>สวัสดี <b>ประเทศไทย</b> &amp; กรุงเทพมหานคร</p>', isHtml: true);
-
-// 5. Hard Wrap ตัดข้อความขึ้นบรรทัดใหม่ตามความกว้างคอลัมน์ (Display Width)
-$wrapped = ThaiBreak::wrap('ข้อความภาษาไทยขนาดยาว...', width: 40);
-```
-
-### การใช้งานใน Laravel
-ThaiBreak รองรับ Laravel Package Auto-Discovery อัตโนมัติ:
-
-```php
-use ThaiBreak; // Facade
-
-// เรียกผ่าน Facade
-$words = ThaiBreak::words('ข้อความ');
-
-// หรือเรียกผ่าน Str Macro
-$words = Str::thaiWords('ฉันรักภาษาไทย');
-$html  = Str::thaiLines('ข้อความในหน้าเว็บ');
-$pdf   = Str::thaiWrap($text, 40);
-```
-
-ใน Blade Template:
-```blade
-{{-- แทรก Zero-Width Space เพื่อให้ Browser/PDF ตัดคำได้สวยงาม (escape HTML ให้เหมือน {{ }}) --}}
-@thaibreak($post->content)
-
-{{-- HTML ที่เชื่อถือได้เท่านั้น: คงแท็กไว้และไม่ escape (เหมือน {!! !!}) ห้ามใช้กับข้อมูลจากผู้ใช้ --}}
-@thaibreakHtml($trustedHtml)
-
-{{-- ตัดบรรทัดจำกัดความกว้าง 40 ตัวอักษร --}}
-@thaiwrap($report->summary, 40)
-```
-
-### การกำหนดพจนานุกรมเพิ่มเติม (Custom Dictionary)
-```php
-use ThaiBreak\DictionaryLoader;
-use ThaiBreak\ThaiTokenizer;
-
-// ตัวเลือกที่ 1: Compact DAWG 171 KB (แนะนำ - โหลดใน 0.3 ms แรม < 0.5 MB)
-$trie = DictionaryLoader::fromDawgFile('data/words.dawg');
-
-// ตัวเลือกที่ 2: OPcache Preload (0.00 ms โหลด แรม 0 MB ต่อ worker)
-// $trie = DictionaryLoader::fromPhpFile('data/words.php');
-
-// เพิ่มคำศัพท์ใหม่แบบ Dynamic ได้ทันที
-$trie->add('คำศัพท์เฉพาะทาง', 10.0);
-
-$tokenizer = new ThaiTokenizer($trie);
-$words = $tokenizer->tokenize('ข้อความ...');
-```
-
----
-
-## 2. Go (Golang) — Native Implementation
-
-เขียนด้วย Pure Go 100% ไม่พึ่งพา CGO (`CGO_ENABLED=0`) ความเร็วสูง ~30-45 µs ต่อประโยค:
+To build the optimized release library and tools:
 
 ```bash
-go get github.com/kamthorn/thai-break/go
+cd rust
+cargo build --release
 ```
 
-```go
-package main
+## Running Unit & Correctness Tests
 
-import (
-    "fmt"
-    tb "github.com/kamthorn/thai-break/go"
-)
-
-func main() {
-    // ตัดคำ
-    words := tb.Words("ฉันรักภาษาไทย")
-    fmt.Println(words) // [ฉัน รัก ภาษา ไทย]
-
-    // ตำแหน่งขอบเขตคำแบบ BreakIterator (นับไบต์ ใช้กับ text[b[i]:b[i+1]])
-    bounds := tb.Boundaries("ฉันรักภาษาไทย") // [0 9 18 30 39]
-
-    // แทรกจุดตัดบรรทัด (Zero-Width Space U+200B)
-    lines := tb.Lines("สวัสดีครับคุณลูกค้า", false)
-
-    // ป้องกันแท็ก HTML และ Entity
-    html := tb.Lines("<b>สวัสดี</b> &amp; ประเทศไทย", true)
-
-    // ตัดบรรทัดตามความกว้างหน้าจอ (คำนวณสระ/วรรณยุกต์ไม่คิดความกว้าง)
-    wrapped := tb.Wrap("ข้อความภาษาไทยยาวๆ...", 40)
-    fmt.Println(wrapped)
-}
-```
-
----
-
-## 3. TypeScript & JavaScript (Node.js / Browser) — Native Implementation
-
-เขียนด้วย TypeScript (ES2022 / NodeNext) ทำงานได้ทั้ง Node.js, Bun, Deno และ Browser:
+Run the full suite of unit tests, TCC property-based tests, and regression tests:
 
 ```bash
-npm install thai-break
+cd rust
+cargo test
 ```
 
-```typescript
-import { words, boundaries, lines, wrap, displayWidth } from 'thai-break';
+## Benchmark & Evaluation
 
-// ตัดคำ
-const tokens = words('ฉันรักภาษาไทย');
-console.log(tokens); // ['ฉัน', 'รัก', 'ภาษา', 'ไทย']
-
-// ตำแหน่งขอบเขตคำแบบ BreakIterator (UTF-16 ตรงกับ string.slice)
-console.log(boundaries('ฉันรักภาษาไทย')); // [0, 3, 6, 10, 13]
-
-// ตัดบรรทัดสำหรับ HTML (รักษาแท็กและ entities ไม่เสียหาย)
-const htmlWithZwsp = lines('<div class="header"><b>สวัสดี</b> &amp; ประเทศไทย</div>', true);
-
-// ตัดบรรทัดจำกัดความกว้างคอลัมน์ (Display Width)
-const wrapped = wrap('ฉันรักภาษาไทยมากที่สุดในโลก', 12);
-console.log(wrapped);
-
-// คำนวณความกว้างตัวอักษรจริง (สระบน-ล่าง/วรรณยุกต์ = 0, CJK = 2)
-console.log(displayWidth('ภาษาไทย')); // 7
-```
-
----
-
-## 4. Rust Core Engine (`thaibreak`)
-
-ประสิทธิภาพสูงสุดระดับ Native Machine Code ผ่าน Cargo:
-
-```toml
-[dependencies]
-thaibreak = "1"
-```
-
-พจนานุกรมพื้นฐาน (`words.fst`, 296 KB) ฝังอยู่ในไลบรารีแล้ว (feature `embedded-dict` เปิดเป็นค่าเริ่มต้น) จึงเรียก `words()` ได้ทันทีโดยไม่ต้องมีไฟล์ หากต้องการใช้พจนานุกรมของตัวเองเท่านั้น ให้ใช้ `default-features = false`
-
-```rust
-use thaibreak::{words, lines, wrap, display_width, DEFAULT_BREAK_MARKER};
-
-fn main() {
-    let tokens = words("ฉันรักภาษาไทย");
-    println!("{:?}", tokens); // ["ฉัน", "รัก", "ภาษา", "ไทย"]
-
-    let html = lines("<p>สวัสดีชาวโลก</p>", DEFAULT_BREAK_MARKER, true);
-    println!("{}", html);
-
-    let width = display_width("ภาษาไทย");
-    println!("Width: {}", width); // 7
-}
-```
-
----
-
-## 5. C & C++ (ผ่าน C-ABI Shared / Static Library)
-
-เชื่อมต่อได้ทั้ง C, C++, Qt, หรือภาษาใดๆ ที่รองรับ C-ABI:
-
-```c
-#include <stdio.h>
-#include "thaibreak.h"
-
-int main() {
-    // โหลดพจนานุกรม FST (เร็วขึ้น 70x และประหยัดแรม) หรือส่ง NULL เพื่อโหลดอัตโนมัติ
-    thaibreak_init("data/words.fst", NULL);
-
-    // ตัดคำ
-    size_t count = 0;
-    char **tokens = thaibreak_tokenize("ฉันรักภาษาไทย", &count);
-    for (size_t i = 0; i < count; i++) {
-        printf("[%zu] %s\n", i, tokens[i]);
-    }
-    thaibreak_free_tokens(tokens, count);
-
-    // แทรกจุดตัดบรรทัดใน HTML
-    char *broken = thaibreak_lines("<b>สวัสดี</b> ประเทศไทย", NULL, 1);
-    printf("%s\n", broken);
-    thaibreak_free_string(broken);
-
-    return 0;
-}
-```
-
-คอมไพล์ด้วย GCC / Clang:
-```bash
-gcc -I rust/include main.c -L rust/target/release -lthaibreak -o app
-```
-
----
-
-## 6. Python (ผ่าน C-FFI / PyO3)
+Evaluation against the 5.05-million-word NECTEC BEST Corpus:
 
 ```bash
-pip install thaibreak
+# Build the native benchmark runner
+cargo build --release --bin bench_native
+
+# Execute the evaluation
+./target/release/bench_native
 ```
 
-แพ็กเกจเป็น wheel แยกตามแพลตฟอร์ม (`py3-none-<platform>`) ที่มีไลบรารี Rust และพจนานุกรมพื้นฐาน (`words.fst`) ติดมาด้วย ใช้ได้กับ Python 3.9 ขึ้นไป (ทดสอบ 3.9–3.13) โดยไม่ต้องติดตั้ง Rust: Linux x86_64/aarch64 (glibc 2.28+), macOS x86_64/arm64 และ Windows x64 แพลตฟอร์มอื่น (เช่น Alpine/musl) ต้อง build เองตามด้านล่าง
+### Benchmark Results Summary (NECTEC BEST Corpus, 5,049,010 words)
 
-```python
-import thaibreak
-
-# ไม่ต้องเรียก init ก็ใช้งานได้ (โหลดพจนานุกรมพื้นฐานที่ติดมากับแพ็กเกจ)
-# หรือระบุพจนานุกรมเอง เช่น thaibreak.init("data/words.fst")
-
-# ตัดคำ
-tokens = thaibreak.words("ฉันรักภาษาไทย")
-print(tokens) # ['ฉัน', 'รัก', 'ภาษา', 'ไทย']
-
-# ตำแหน่งขอบเขตคำแบบ BreakIterator (index ของ str; ช่องว่างและเครื่องหมายเป็น segment ด้วย)
-text = "ฉันรักภาษาไทย"
-b = thaibreak.boundaries(text)   # [0, 3, 6, 10, 13]
-segments = [text[i:j] for i, j in zip(b, b[1:])]
-
-# แทรกจุดตัดบรรทัดสำหรับ HTML
-html = thaibreak.lines("<b>สวัสดี</b> &amp; ประเทศไทย", is_html=True)
-
-# ตัดบรรทัดตามความกว้าง
-wrapped = thaibreak.wrap("ฉันรักภาษาไทยมากที่สุดในโลก", width=12)
-print(wrapped)
-```
-
-**Build wheel เอง** (ต้องมี Rust และ Python):
-
-```bash
-tools/build_python_wheel.sh      # ได้ไฟล์ใน python/dist/
-```
-
-GitHub Actions workflow `python-wheels.yml` build wheel ครบทุกแพลตฟอร์มและอัปโหลดเป็น artifact `python-wheels` (ไม่ publish ขึ้น PyPI ให้อัตโนมัติ)
-
----
-
-## 7. WebAssembly (Wasm)
-
-คอมไพล์เป็น Wasm สำหรับ Edge/Cloudflare Workers หรือเบราว์เซอร์:
-
-```bash
-cd rust && wasm-pack build --target web --features wasm
-```
-
-```javascript
-import init, { WasmThaiBreak } from './pkg/thaibreak.js';
-
-await init();
-const tb = WasmThaiBreak.withDefault();          // ใช้พจนานุกรมพื้นฐานที่ฝังในโมดูล
-// const tb = new WasmThaiBreak(dictTextString); // หรือส่งพจนานุกรมของคุณเอง (TSV)
-console.log(tb.words("ฉันรักภาษาไทย"));
-console.log(tb.boundaries("ฉันรักภาษาไทย")); // ตำแหน่ง UTF-16 ตาม string index ของ JS
-```
-
----
-
-## กฎเกณฑ์สำคัญของการตัดบรรทัด (ThaiLineBreaker)
-
-ปัญหาคลาสสิกของการ Render PDF และ EPUB ภาษาไทยคือโปรแกรมตัดคำไทยไม่เป็น ทำให้ข้อความล้นตกขอบ หรือตัดคำแยกกลางสระ/กลางพยางค์
-
-`ThaiBreak` ใช้ **Unicode Line Breaking Algorithm (UAX #14) ของ Unicode 16.0 ครบทุกกฎ (LB1–LB31)** โดยอ่านคลาส Line_Break ของทุกอักขระจากฐานข้อมูล Unicode (UCD) และตรวจกับชุดทดสอบทางการ `LineBreakTest.txt` ผ่านครบทั้ง 16,672 กรณีในทั้ง 4 ภาษา (PHP, Go, Rust, TypeScript; Python ใช้ Rust):
-
-1. **พจนานุกรมเฉพาะในช่วงอักษรไทย (SA, LB1):** UAX #14 กำหนดให้ตัดภายในช่วงอักษรไทยด้วยพจนานุกรม ThaiBreak ใช้ผลตัดคำเป็นจุดตัดบรรทัดเฉพาะระหว่างอักษรไทยกับอักษรไทย เมื่ออักษรไทยอยู่ติดกับอักขระอื่นจะถือเป็นตัวอักษร (AL) จึงไม่ตัด `ราคา100บาท`, `ปี๒๕๖๗นะ`, `ภาษาPHPเป็น`, `ไทย(สยาม)เป็น`, `«ไทย»ไทย`
-2. **ส่วนขยายเฉพาะภาษาไทย (Tailoring):** ไม้ยมก (`ๆ`) และไปยาลน้อย (`ฯ`, รวมถึง `ฯลฯ`) ไม่ขึ้นต้นบรรทัดใหม่ แม้มีวรรคคั่นอยู่ข้างหน้า (`เด็ก ๆ`) ตาม W3C tlreq เป็นกฎเดียวที่เพิ่มเติมจาก UAX #14
-3. **ห้ามขึ้นต้นบรรทัด:** เครื่องหมายปิดและวรรคตอน (`)`, `]`, `}`, `、`, `。`, `!`, `?`, `,`, `.`, `:`, `;`, `/`; LB13, LB15d) ยัติภังค์และขีด (`-`, `–`, `๚`, `๛`; LB21)
-4. **ห้ามลงท้ายบรรทัด:** วงเล็บเปิดแม้มีวรรคตามหลัง (`( ไทย )`; LB14) อัญประกาศเปิด (LB15a, LB19) และสัญลักษณ์นำหน้า เช่น `฿`, `$` เมื่อตามด้วยตัวเลขหรือตัวอักษร (LB24, LB25)
-5. **ไม่ตัดกลางตัวเลข คำย่อ อีเมล:** `1/2/2567`, `10:30`, `10-20`, `-5`, `40%`, `พ.ศ.2567`, `รพ.ศิริราช`, `e.g.`, `user@example.com` (LB23, LB25, LB28, LB29)
-6. **จุดตัดภายในคำที่ไม่ใช่ภาษาไทย:** ตัดหลังยัติภังค์หรือทับใน URL ได้ตามมาตรฐาน เช่น `state-|of-|the-|art`, `https://|example.com/|a-|b`
-7. **ป้องกัน Orphan Spaces:** ช่องว่าง (` `) เป็นจุดตัดบรรทัดอยู่แล้ว จึงไม่ใส่ break marker ติดกับช่องว่าง ป้องกันไม่ให้เกิดวรรคนำหน้าในบรรทัดใหม่
-8. **คงความถูกต้องของ HTML/EPUB:** แท็ก HTML (`<p>`, `<b>`, `<span>`), บล็อกสคริปต์/สไตล์ (`<script>`, `<style>`, `<!-- คอมเมนต์ -->`) และ HTML Entities (`&amp;`, `&quot;`) จะถูกรักษาไว้อย่างสมบูรณ์ ตรวจว่าเป็น HTML เฉพาะเมื่อพบแท็กจริง (`<` ตามด้วยตัวอักษร `/` `!` หรือ `?`) ข้อความอย่าง `x < 5 และ y > 3` จึงไม่ถูกมองเป็นแท็ก (ข้อจำกัด: ข้อความแต่ละช่วงระหว่างแท็กประมวลผลแยกกัน จึงไม่มีจุดตัดตรงรอยต่อแท็ก)
-9. **`wrap()` ใช้จุดตัดชุดเดียวกัน:** ตัดบรรทัดเฉพาะจุดที่ `insertLineBreaks()` อนุญาตหรือหลังช่องว่าง และเมื่อเปิด `cutLongWords` จะตัดคำที่ยาวเกินบรรทัดตามขอบเขต Thai Character Cluster (TCC) ไม่แยกสระหน้าหรือวรรณยุกต์ออกจากพยัญชนะ
-10. **คำนวณความกว้างคอลัมน์ถูกต้อง:** สระบน-ล่าง วรรณยุกต์ ไม่นับความกว้างคอลัมน์ (`thaiDisplayWidth`) ทำให้ตัดบรรทัดได้พอดีความกว้างจริง
-
-ตาราง Line_Break สร้างจาก UCD ด้วย `php tools/generate-linebreak-data.php <UNICODE_VERSION>` ซึ่งเขียนไฟล์ตารางของทั้ง 4 ภาษาพร้อมกัน
-
----
-
-## ผลการประเมินความแม่นยำและประสิทธิภาพ (Accuracy & Performance Benchmarks)
-
-ThaiBreak ได้รับการออกแบบให้มีความสมดุลสูงสุดระหว่าง **ความแม่นยำทางภาษาศาสตร์ (Linguistic Accuracy)**, **ความเร็วระดับไมโครวินาที (High Throughput)**, และ **ความปลอดภัยทางลิขสิทธิ์ (Commercial Clean Data)**
-
-### 1. ความแม่นยำในการตัดคำ (Accuracy Benchmark)
-
-วัดด้วย [`tools/benchmark.py`](tools/benchmark.py) ในโปรเจกต์นี้ เทียบกับคำตอบที่ตัดคำไว้แล้ว (Gold Standard) สองชุดพจนานุกรม: **ฐานอย่างเดียว** (`data/words.txt` 25,804 คำ พร้อมน้ำหนักคำจาก `data/word-weights.tsv` ซึ่งเป็นค่าเริ่มต้นของไลบรารี) และ **ฐาน + dict-extra** (38,535 คำ รวมพจนานุกรมเสริม [thai-break-dict-extra](https://github.com/kamthorn/thai-break-dict-extra) ชุดตัดคำ 14,381 คำ ซึ่งเป็นชุดเดียวกับที่ OpenSearch plugin และตัวอย่าง service ใช้ โดยคำของฐานใช้น้ำหนักชุดเดียวกัน):
-
-| ชุดทดสอบ | ฐานอย่างเดียว Word F1 | Boundary F1 | ฐาน + dict-extra Word F1 | Boundary F1 |
-| :--- | :---: | :---: | :---: | :---: |
-| **LST20 test** (NECTEC, ข่าว) | **87.1%** | **93.8%** | 84.0% | 92.3% |
-| LST20 eval | 83.9% | 91.6% | 80.9% | 90.2% |
-| Blackboard Treebank (ระดับคำย่อย, ไม่รวมประโยคที่ซ้ำกับ LST20 train) | 86.8% | 94.1% | 84.5% | 93.1% |
-| Wisesight-1000 (โซเชียลมีเดีย, CC0) | 84.8% | 91.2% | 82.8%† | 90.4%† |
-
-- **Word F1:** นับคำที่ตำแหน่งต้นและท้ายตรงกับคำตอบ **Boundary F1:** เทียบตำแหน่งจุดตัดระหว่างคำ ข้อความแบ่งเป็นท่อนที่ช่องว่างและขอบเขตประโยค และไม่นับช่องว่าง
-- **ทำไมสองคอลัมน์:** gold ของ LST20 และ Blackboard แยกคำประสมและชื่อเป็นหน่วยย่อย ส่วน dict-extra เก็บคำประสมและชื่อเฉพาะไว้เป็นคำเดียวโดยตั้งใจ เพื่อให้การค้นหาด้วยคำประสมตรงตัวได้น้ำหนักมากขึ้น (ค้นด้วยคำย่อยได้ผ่านโหมด decompound ของ plugin) คะแนนระดับคำจึงต่ำลงเมื่อใช้ dict-extra: บน LST20 test จุดตัดที่ทำนายแม่นขึ้น (precision 90.3% → 91.0%) แต่พบจุดตัดของ gold ได้น้อยลง (recall 97.7% → 93.7%) ตัวเลขนี้วัดการตัดคำเทียบ gold เท่านั้น **ไม่ได้วัดคุณภาพการค้นหา** ถ้าจะใช้ตัดคำให้ตรงกับแนวทางของคลังข้อความแบบ LST20 ให้ใช้ฐานอย่างเดียว ส่วนการตัดบรรทัดใช้ชุด `words-extra-lines` ที่ตัดชื่อเฉพาะและคำประสมออกแล้ว
-- † dict-extra มีคำสแลงที่สกัดจาก Wisesight Sentiment ซึ่งอาจซ้อนกับข้อความของ Wisesight-1000 คอลัมน์นี้จึงไม่ใช่การทดสอบกับข้อมูลที่ไม่เคยเห็น (แต่คะแนนก็ไม่ได้สูงขึ้น)
-- **คำที่ตัดผิดส่วนใหญ่ไม่มีในพจนานุกรม:** บน LST20 eval ประมาณสองในสามของคำที่ตัดผิด เช่นคำประสมภาษาข่าวตามแนวทางของ LST20 (`มีการ`, `วันที่`, `ดังกล่าว`) การเพิ่มคำด้วย `addCustomWords()` หรือพจนานุกรมเสริมจึงเป็นทางปรับแต่งหลัก แต่ผลขึ้นกับว่าคำที่เพิ่มตรงกับแนวทางตัดคำของงานของคุณหรือไม่ (ดูตารางด้านบน) พจนานุกรมแบบ TSV ที่มีน้ำหนักความถี่ของคำจะถูกใช้เป็นความน่าจะเป็นของคำ (unigram) โดยตรง
-- **คลังข้อมูลไม่ได้รวมอยู่ในโปรเจกต์:** LST20 ต้องขอจาก NECTEC และใช้ได้ตามข้อตกลงการใช้งาน (งานวิจัย ไม่ใช่เชิงพาณิชย์ และโอเพนซอร์ส ห้ามแจกจ่ายต่อ) Blackboard Treebank มาจากแหล่งข่าวเดียวกัน ส่วน Wisesight-1000 มาจาก [PyThaiNLP/wisesight-sentiment](https://github.com/PyThaiNLP/wisesight-sentiment) — วางไว้เป็นโฟลเดอร์ข้าง `thai-break/` (เช่น `../LST20_Corpus`)
-
-```bash
-# รันจากโฟลเดอร์รากของ thai-break
-# ค่าเริ่มต้นของไลบรารี: รายการคำฐานพร้อมน้ำหนักคำ
-python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
-    --dict data/words.txt --weights data/word-weights.tsv
-
-# ภาษาอื่นที่อ่านบรรทัดจาก stdin เช่น PHP
-python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
-    --dict data/words.txt --weights data/word-weights.tsv --segmenter-cmd "php tools/segment.php {dict}"
-
-# ฐาน + dict-extra (ใส่ --dict ซ้ำเพื่อรวมพจนานุกรม)
-python3 tools/benchmark.py --corpus lst20 --corpus-dir ../LST20_Corpus/test \
-    --dict data/words.txt --dict ../thai-break-dict-extra/dist/words-extra.tsv --weights data/word-weights.tsv
-```
-
-> [!NOTE]
-> ตัวเลข F1 96.03% ที่แสดงในเอกสารรุ่นก่อนทำซ้ำไม่ได้ด้วยพจนานุกรมและวิธีวัดนี้ จึงแทนด้วยผลที่วัดซ้ำได้ข้างต้น
-
-> [!NOTE]
-> **Clean & Safe for Commercial Use:**
-> ThaiBreak ใช้รายการคำ **Public Domain (ราชบัณฑิตยสถาน 25,411 คำ บวกคำที่เขียนเองหรือเป็น CC0 อีก 393 คำ)** และน้ำหนักความถี่ของคำที่ใช้บ่อย 3,000 คำ (`data/word-weights.tsv`) ซึ่งนับจากคลังข่าว [Prachathai-67k](https://huggingface.co/datasets/wannaphong/prachathai67k) (Apache-2.0, ดู[NOTICE](NOTICE)) ทำให้ซอร์สโค้ดและข้อมูลทั้งหมดอยู่ภายใต้สัญญาอนุญาต **Apache-2.0** ไม่มีข้อมูลจากคลังข้อมูลที่มีข้อจำกัด (เช่น LST20) รวมอยู่ในโปรเจกต์ คลังข้อมูลเหล่านั้นใช้เพื่อวัดผลเท่านั้น
-
-### 2. ประสิทธิภาพและการใช้ทรัพยากร (Performance & Resource Benchmarks)
-
-ทดสอบการประมวลผลจริงบน **PHP 8.4 (Native In-Memory)** ด้วยการรันข้อความซ้ำ 1,000 รอบ:
-
-#### ก. การใช้หน่วยความจำและเวลาเตรียมระบบ (Footprint & Startup per Language)
-
-| ภาษา / รูปแบบพจนานุกรม | ไฟล์จัดเก็บ | ขนาดไฟล์ | เวลาโหลด (Startup) | RAM Heap ต่อ Worker | Throughput ค้นหาคำ |
+| Engine | Architecture | Word F1 | Boundary F1 | Single-Core Speed | Multi-Core (28T) |
 | :--- | :--- | :---: | :---: | :---: | :---: |
-| **Rust** (Native FST) | `data/words.fst` | 296.2 KB | **~0.00 ms** (Zero-copy) | **0 Bytes** (Buffer) | **17.8 ล้าน lookups/s** |
-| **Go** (Compact DAWG) | `data/words.dawg` | **171.4 KB** | **0.04 ms** (48 µs) | **< 0.2 MB** | **24.5 ล้าน lookups/s** |
-| **TypeScript / Node** (Compact DAWG) | `data/words.dawg` | **171.4 KB** | **0.70 ms** | **< 0.3 MB** | **31.8 ล้าน lookups/s** |
-| **PHP** (Compact DAWG) | `data/words.dawg` | **171.4 KB** | **0.30 ms** | **< 0.5 MB** | **1.75 ล้าน lookups/s** |
-| **PHP** (OPcache Preload Array) | `data/words.php` | 2.5 MB | **0.00 ms** (Preload) | **0 MB** (Shared Memory) | **6.5 ล้าน lookups/s** |
-| **PHP** (Flat TSV Fallback) | `data/words.txt` | 492.5 KB | 21.6 ms | ~7.0 MB | 6.5 ล้าน lookups/s |
+| **This Work (Rust Native)** | **Viterbi DP + FST + Bigram** | **86.71%** | **93.56%** | **16.25 MB/s** | **243.45 MB/s** |
+| ICU4X (dict) | Trie Dictionary (Rust) | 79.96% | 89.02% | 35.20 MB/s | 746.48 MB/s |
+| ICU4C (dict) | Dictionary (C/C++) | 81.73% | 91.13% | 3.30 MB/s | - |
+| LibThai | Maximal Matching (C) | 81.71% | 91.10% | 5.00 MB/s | - |
+| ICU4X (lstm) | Neural LSTM (Rust) | 84.81% | 92.28% | 0.79 MB/s | - |
 
-- **การติดตั้งเสริมใน PHP:** **ไม่ต้องใช้ APCu** หรือ C-Extension เสริมใดๆ ทำงานบน Pure PHP ได้ทันทีผ่าน Compact DAWG หรือ OPcache Preloading
+## License
 
-#### ข. ความเร็วในการตัดคำและตัดบรรทัด (Throughput & Latency)
-
-| ขนาดข้อความทดสอบ | ความยาว | คำที่ได้ | เวลาประมวลผล (Latency) | ความเร็ว (Throughput) |
-| :--- | :---: | :---: | :---: | :---: |
-| **ประโยคสั้น** *(ข้อความแชท/ค้นหา)* | 16 ตัวอักษร | 5 คำ | **0.011 ms** *(11 ไมโครวินาที)* | **~1,440,000 chars/s** |
-| **ประโยคทั่วไป** *(ข้อความเอกสาร/ข่าว)* | 67 ตัวอักษร | 15 คำ | **0.044 ms** *(44 ไมโครวินาที)* | **~1,530,000 chars/s** |
-| **ย่อหน้ายาว** *(บทความ 1 พารากราฟ)* | 351 ตัวอักษร | 78 คำ | **0.213 ms** *(0.2 มิลลิวินาที)* | **~1,650,000 chars/s** |
-| **บทความเต็มหน้า** *(ข้อความขนาดยาว)* | 3,520 ตัวอักษร | 780 คำ | **2.630 ms** *(2.6 มิลลิวินาที)* | **~1,340,000 chars/s** |
-| **HTML Typographic Line Breaking** *(แทรก ZWSP ตาม UAX #14)* | 210 ตัวอักษร | - | **0.170 ms** | **~1,240,000 chars/s** |
-
-> [!TIP]
-> **รองรับสถาปัตยกรรม Persistent Memory (PHP-Swoole, Laravel Octane, RoadRunner):**
-> บน Laravel Octane หรือ Swoole ตัวแปร Trie จะค้างอยู่ใน RAM ของแต่ละ Worker โดยอัตโนมัติ ทำให้ทุก Request ถัดไปมี Overhead เป็นศูนย์ ตัดคำได้เร็วในระดับ **0.01 - 0.2 มิลลิวินาทีต่อ Request** (สามารถเปิด `THAIBREAK_PRELOAD=true` ใน `.env` เพื่อ Eager Preload ขึ้น RAM ทันทีตั้งแต่เริ่มบูต Worker ได้เช่นกัน)
-
----
-
-## การรันชุดทดสอบ (Tests Across All Languages)
-
-```bash
-# 1. PHP & Laravel Tests (รวม Unicode LineBreakTest conformance จาก testdata/)
-./vendor/bin/phpunit
-php php/tests/TokenizerTest.php
-
-# 2. Go Tests & Benchmarks
-cd go && go test -v ./... && go test -bench=. ./...
-
-# 3. TypeScript / Node.js Tests
-cd typescript && npm run build && npm test
-
-# 4. Rust Core Tests & Build
-cd rust && cargo test && cargo build --release
-
-# 5. Python Tests
-cd python && python3 -m unittest tests/test_thaibreak.py
-
-# 6. Benchmark Tool Tests (synthetic data only, no corpus needed)
-python3 -m unittest discover tools/tests
-```
-
----
-
-## การจัดทำโค้ดและการเปิดเผยบทบาทของ AI (AI Disclosure & Attribution)
-
-โครงการ **ThaiBreak** ได้รับการพัฒนา วางสถาปัตยกรรม และกำกับดูแลทิศทางโดยมนุษย์ (**Kamthorn Krairaksa**) โดยมีการใช้เทคโนโลยีปัญญาประดิษฐ์ (Generative AI) ในรูปแบบ **Pair Programming & Multi-Agent Engineering** ร่วมจัดทำโค้ดอย่างโปร่งใส ดังนี้:
-
-- **Claude Sonnet 4.6 (Anthropic):** ร่วมออกแบบโครงสร้างอัลกอริทึมหลัก (Thai Character Cluster: TCC, DAG Word Graph, Viterbi Forward/Backward Dynamic Programming, W3C/Unicode Typographic Line Breaking Rules) และการพัฒนาโค้ด Native ในภาษา PHP, Go, TypeScript รวมถึง Rust Core Engine
-- **Gemini 3.8 Flash (Google DeepMind):** ร่วมวิเคราะห์ประสิทธิภาพ (Performance Optimization), การตรวจสอบความถูกต้องข้ามภาษา (Cross-language Verification), การจัดทำชุดทดสอบรอบด้าน (Test Suites across all 5+ languages), การตรวจสอบความปลอดภัยและการจัดการหน่วยความจำ (Memory Safety & C-FFI Hardening) และการคัดกรองฐานข้อมูลพจนานุกรมให้เป็น Public Domain 100%
-
-> โค้ดทุกโมดูลได้รับการออกแบบ ตรวจทาน ปรับแก้สถาปัตยกรรม และผ่านการทดสอบอัตโนมัติ (Automated Unit & Integration Tests) ครบถ้วนทุกภาษา ทั้ง PHP, Go, TypeScript, Rust, C/C++ และ Python เพื่อความมั่นใจในคุณภาพ ความปลอดภัย และความถูกต้องตามหลักภาษาศาสตร์
-
----
-
-## OpenSearch / Elasticsearch Integration
-
-สำหรับการใช้งาน ThaiBreak engine บน **OpenSearch** หรือ **Elasticsearch** ผ่าน Plugin สำเร็จรูป ดูที่:
-
-### opensearch-analysis-thaibreak v1.0.0
-
-[![Release](https://img.shields.io/github/v/release/kamthorn/opensearch-analysis-thaibreak?color=blue)](https://github.com/kamthorn/opensearch-analysis-thaibreak/releases)
-[![Docker](https://img.shields.io/badge/docker-ghcr.io-blue?logo=docker)](https://github.com/kamthorn/opensearch-analysis-thaibreak/pkgs/container/opensearch-thaibreak)
-
-Plugin OpenSearch ที่ใช้ Viterbi+TCC engine เดียวกัน พร้อม Token Filters ครบชุด:
-
-| Token Filter | คำอธิบาย |
-|---|---|
-| `thai_tone` | ลบวรรณยุกต์และไม้ไต่คู้เพื่อค้นหาแบบ Loose |
-| `thai_soundex` | Phonetic matching ด้วย Udom83 Algorithm |
-| `thai_keyboard` | แปลง Kedmanee ↔ QWERTY สำหรับ mis-type |
-| `thai_number` | แปลงเลขไทย (๐-๙) และคำอ่านตัวเลขเป็นอารบิก |
-
-**รันผ่าน Docker Image สำเร็จรูป (GHCR):**
-```bash
-docker run -d -p 9200:9200 -p 9600:9600 \
-  -e "discovery.type=single-node" \
-  -e "plugins.security.disabled=true" \
-  --name opensearch-thaibreak \
-  ghcr.io/kamthorn/opensearch-thaibreak:2.18.0
-```
-
-**หรือติดตั้งลงใน OpenSearch เดิม:**
-```bash
-# ติดตั้งสำหรับ OpenSearch 2.18.0
-bin/opensearch-plugin install \
-  https://github.com/kamthorn/opensearch-analysis-thaibreak/releases/download/v1.0.0/analysis-thaibreak-2.18.0.0.zip
-```
-
-รองรับ OpenSearch: `2.11.1` · `2.15.0` · `2.17.1` · `2.18.0` · `2.19.0` · `3.8.0`
-
-🔗 [github.com/kamthorn/opensearch-analysis-thaibreak](https://github.com/kamthorn/opensearch-analysis-thaibreak)
-
----
-
-## เอกสารอ้างอิง
-
-- **Royal Institute Dictionary:** พจนานุกรมฉบับราชบัณฑิตยสถาน (Public Domain Standard Thai Wordlist)
-- **Prachathai-67k:** คลังข่าวประชาไท 67,000 บทความ ([wannaphong/prachathai67k](https://huggingface.co/datasets/wannaphong/prachathai67k), Apache-2.0) ใช้นับน้ำหนักความถี่ของคำ
-- **Thai Character Cluster (TCC):** Theeramunkong et al., *Multi-segmentation for Thai word extraction*, 2000
-- **Unicode Line Breaking Algorithm:** [Unicode Standard Annex #14 (UAX #14)](https://www.unicode.org/reports/tr14/)
-- **W3C Requirements for Thai Text Layout:** [W3C Working Group Note (tlreq)](https://www.w3.org/TR/tlreq/)
-- **License:** [Apache-2.0](LICENSE)
-
+This project is licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

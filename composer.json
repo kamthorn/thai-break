@@ -1,13 +1,13 @@
 {
-    "name": "kamthorn/thai-break",
+    "name": "thaibreak/thai-break",
     "description": "Fast, high-accuracy Thai word segmentation & typographic line breaker for PHP and Laravel (dompdf, mPDF, Web)",
     "type": "library",
     "keywords": ["thai", "word-segmentation", "line-breaker", "thai-break", "tokenizer", "tcc", "laravel", "mpdf", "dompdf", "tcpdf"],
-    "homepage": "https://github.com/kamthorn/thai-break",
+    "homepage": "",
     "license": "Apache-2.0",
     "authors": [
         {
-            "name": "kamthorn",
+            "name": "Anonymous Authors",
             "role": "Developer"
         }
     ],

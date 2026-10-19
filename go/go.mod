@@ -1,3 +1,3 @@
-module github.com/kamthorn/thai-break/go
+module thaibreak/go
 
 go 1.21

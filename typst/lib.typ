@@ -1,5 +1,5 @@
 /// Typst plugin for Thai word segmentation and typographic line breaking.
-/// Powered by kamthorn/thai-break (Rust core + dictionary trie).
+/// Powered by ThaiBreak (Rust core + dictionary trie).
 
 #let _plugin = plugin("thaibreak.wasm")
 
