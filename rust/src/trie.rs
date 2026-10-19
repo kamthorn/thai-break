@@ -474,10 +474,12 @@ impl FstTrie {
 
     #[inline]
     pub fn contains(&self, word: &str) -> bool {
-        if let Some(&w) = self.overlay.get(word) {
-            return w > 0.0;
+        // An overlay entry of weight 0 only marks a prefix of an added word ("ไป" for "ไปตำ"); the
+        // word may still be in the FST
+        match self.overlay.get(word) {
+            Some(&w) if w > 0.0 => true,
+            _ => self.map.contains_key(word),
         }
-        self.map.contains_key(word)
     }
 }
 

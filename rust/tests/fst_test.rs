@@ -184,3 +184,18 @@ fn fst_header_with_impossible_weight_count_is_an_error() {
     bytes.extend_from_slice(&u32::MAX.to_le_bytes());
     assert!(thaibreak::ThaiTrie::from_fst_bytes(bytes.into()).is_err());
 }
+
+#[test]
+fn a_prefix_of_an_added_word_is_still_a_dictionary_word() {
+    // Adding "ไปตำ" puts "ไป" into the overlay as a prefix marker; "ไป" must stay a word, or the
+    // full stop in "ต่อไป." is taken for an abbreviation
+    let mut trie = ThaiTrie::embedded().expect("embedded dictionary");
+    assert!(trie.contains("ไป"));
+    assert!(!trie.contains("ไปตำ"));
+    trie.add("ไปตำ", 1.0);
+    assert!(trie.contains("ไป"), "a prefix marker hides a dictionary word");
+    assert!(trie.contains("ไปตำ"));
+    assert!(!trie.contains("ไปต"), "a prefix that is no word is not a word");
+    let tok = Tokenizer::new(trie, None);
+    assert_eq!(tok.tokenize("ต่อไป.", false).join("|"), "ต่อ|ไป|.");
+}

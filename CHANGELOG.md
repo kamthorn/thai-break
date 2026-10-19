@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.5.0] - 2026-10-18
+## [1.5.0] - 2026-10-19
 
 ### Fixed
 - **A Rust panic no longer aborts the host process.** `panic = "abort"` is gone from the release profile, so
@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exception) instead of killing the Python, PHP or C program that loaded the library. The library is 59 KB
   (3%) larger and about 2% slower; the Typst wasm is unchanged (wasm always aborts). `cargo test --release`
   works now.
+- **A word added to the Rust dictionary no longer hides the dictionary word that is its prefix.** After
+  `add("ไปตำ")`, `contains("ไป")` was false because the overlay holds `ไป` as a prefix marker, so the full stop of
+  `ต่อไป.` was read as part of an abbreviation (`ต่อ|ไป.`). This hit custom words in Rust and Python; Go,
+  TypeScript and PHP were not affected.
 - **Go, TypeScript and PHP check a DAWG file when they load it.** A header with more states than the file has
   bytes, a state that runs past the end, or (Go, TypeScript) an edge to a state that does not exist is an error
   now. A forged header (`numStates = 0xFFFFFFFF`) used to allocate gigabytes. PHP load time is unchanged (0.4 ms).
