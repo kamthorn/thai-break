@@ -31,6 +31,7 @@ const GENERAL_RULES: &[&str] = &[
     "c[ะ-ู]tk",
     "c[ิุู]์",
     "cรรc์",
+    "[ข-ฮ]็อck",
     "c็",
     "ct[ะาำ]?k",
     "แc็ck",

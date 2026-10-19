@@ -48,6 +48,7 @@ func initTCCRegex() {
 			"c[ะ-ู]tk",
 			"c[ิุู]์",
 			"cรรc์",
+			"[ข-ฮ]็อck",
 			"c็",
 			"ct[ะาำ]?k",
 			"แc็ck",

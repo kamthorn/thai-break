@@ -45,6 +45,14 @@ const SEGMENTATION_CASES: [string, string, string][] = [
   ['a -ีย vowel before an ASCII digit is one cluster', 'ค่าเฉลี่ย1', 'ค่า|เฉลี่ย|1'],
   ['U+0085 is white space and is dropped', 'เขา\u0085กิน', 'เขา|กิน'],
   ['a -ีย vowel before a space is one cluster', 'แนวทางไกร่เกลี่ย หรือแก', 'แนวทาง|ไกร่เกลี่ย|หรือ|แก'],
+  ['a common word does not start an abbreviation', 'พบพล.อ.ประยุทธ์', 'พบ|พล.อ.|ประยุทธ์'],
+  ['a closed -็อ- syllable is kept as one TCC cluster', 'คุณต็อดเล่นติ๊กต็อก', 'คุณ|ต็อด|เล่น|ติ๊กต็อก'],
+  ['ก็ before อ- is not merged into a -็อ- cluster', 'เขาก็อดทน', 'เขา|ก็|อดทน'],
+  ['นาย does not steal the initial ก of a following name', 'นายกษิตกล่าวว่า', 'นาย|กษิต|กล่าว|ว่า'],
+  ['หมอ does not steal the initial ก of a following name', 'หมอกฤษฏ์คอนเฟิร์ม', 'หมอ|กฤษฏ์|คอนเฟิร์ม'],
+  ['นายก before an abbreviation stays นายก', 'นายกอบต.', 'นายก|อบต.'],
+  ['an abbreviation does not steal the final consonant of a cอc word', 'เดินตามรอยพ.ต.ท.ทักษิณ', 'เดิน|ตาม|รอย|พ.ต.ท.|ทักษิณ'],
+  ['จ. does not steal the final consonant of a cอc word', 'ไฟฟ้าน้ำพองจ.ขอนแก่น', 'ไฟฟ้า|น้ำ|พอง|จ.|ขอนแก่น'],
 ];
 
 test('long text is segmented to the end', () => {

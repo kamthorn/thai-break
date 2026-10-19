@@ -210,25 +210,83 @@ impl Tokenizer {
     /// Whether what the abbreviation pattern matched is really words and a full stop. The pattern
     /// accepts any one to four consonant letters before a full stop, and อ ว ย count as consonants,
     /// so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when
-    /// - it starts with a function word followed by more letters ("ของส.ส." is ของ + ส.ส.), or
+    /// - it starts with a function word or common word followed by more letters ("ของส.ส." is ของ + ส.ส.,
+    ///   "พบพล.อ." is พบ + พล.อ.), or
     /// - it is one dictionary word with a vowel or tone mark and a final full stop that is not followed
     ///   by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants
     ///   only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
     ///
     /// `end` is the index of the character after the match.
-    fn abbreviation_is_words(&self, chars: &[char], end: usize, abbr: &str) -> bool {
+    fn abbreviation_is_words(&self, chars: &[char], i: usize, end: usize, abbr: &str, prefixes: &[(usize, f64)]) -> bool {
         let first = abbr.split('.').next().unwrap_or("");
-        if OOV_BOUNDARY_WORDS.iter().any(|f| first.len() > f.len() && first.starts_with(f)) {
+        let first_len = first.chars().count();
+        let abbr_len = end - i;
+        let dots = abbr.matches('.').count();
+        let in_dict = prefixes.iter().any(|&(e, _)| e == i + first_len + 1 || e == i + abbr_len)
+            || self.trie.contains(abbr);
+        let second_is_single = chars.get(i + first_len + 2) == Some(&'.');
+        if first_len == 2
+            && !in_dict
+            && i >= 2
+            && chars[i - 1] == 'อ'
+            && matches!(chars[i], 'ง' | 'น' | 'ม' | 'ย')
+            && ('ก'..='ฮ').contains(&chars[i + 1])
+            && ((dots == 1 && chars[i + 1] == 'จ')
+                || (dots >= 2
+                    && second_is_single
+                    && !matches!(&chars[i..i + 2], ['พ', 'ล'] | ['ส', 'ภ'] | ['บ', 'ก'] | ['บ', 'ช'])))
+        {
             return true;
         }
+        if first_len >= 3 && !in_dict {
+            if OOV_BOUNDARY_WORDS.iter().any(|f| first.len() > f.len() && first.starts_with(f)) {
+                return true;
+            }
+            if first_len == 3 && dots == 1 && chars[i + 1] == 'ผ' && chars[i + 2] == 'อ' {
+                return true;
+            }
+            if first_len == 3
+                && i >= 1
+                && chars[i] == 'อ'
+                && matches!(chars[i + 1], 'ง' | 'น' | 'ม' | 'ย' | 'ก')
+                && ((dots >= 2 && second_is_single) || (dots == 1 && matches!(chars[i + 2], 'จ' | 'อ' | 'ต')))
+            {
+                return true;
+            }
+            for &(w_end, weight) in prefixes {
+                let k = w_end - i;
+                if k < 2 || k >= first_len {
+                    continue;
+                }
+                let rem_first = first_len - k;
+                let is_word_plus_abbr = if rem_first == 2 {
+                    weight > 1.2
+                } else if dots >= 2 {
+                    second_is_single && (k == 3 || weight > 1.2)
+                } else if first_len == 4 {
+                    matches!(chars[i + 3], 'จ' | 'อ' | 'ต' | 'ม' | 'ภ')
+                } else {
+                    weight > 1.5 && matches!(chars[i + 2], 'จ' | 'ม')
+                };
+                if is_word_plus_abbr {
+                    return true;
+                }
+            }
+            if first_len == 4 && dots >= 2 {
+                let sub: String = chars[i + 1..i + 3].iter().collect();
+                if self.trie.contains(&sub) {
+                    return true;
+                }
+            }
+        }
         let next_is_thai = chars.get(end).is_some_and(|c| ('\u{0e01}'..='\u{0e5b}').contains(c));
-        abbr.matches('.').count() == 1
+        dots == 1
             && abbr.ends_with('.')
-            && first.chars().count() >= 2
+            && first_len >= 2
             && first.chars().any(|c| !('ก'..='ฮ').contains(&c))
             && !next_is_thai
             && self.trie.contains(first)
-            && !self.trie.contains(abbr)
+            && !in_dict
     }
 
     pub fn tokenize(&self, text: &str, keep_whitespace: bool) -> Vec<String> {
@@ -358,7 +416,8 @@ impl Tokenizer {
                 Some(_) if from[i] != usize::MAX => chars[from[i]..i].iter().collect(),
                 _ => String::new(),
             };
-            let has_prev = from[i] != usize::MAX;
+            let from_i = from[i];
+            let has_prev = from_i != usize::MAX;
             let dp_i = dp[i];
             let mut relax = |j: usize, cost: f64, unknown: bool| {
                 let edge_cost = match &self.bigram_model {
@@ -395,7 +454,7 @@ impl Tokenizer {
                     let m_str = m.as_str();
                     let abbr_len = m_str.chars().count();
                     let j = i + abbr_len;
-                    if j <= n && valid_pos[j] && !self.abbreviation_is_words(chars, i + abbr_len, m_str) {
+                    if j <= n && valid_pos[j] && !self.abbreviation_is_words(chars, i, j, m_str, &prefixes) {
                         let letters = abbr_len - m_str.matches('.').count();
                         relax(j, (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters as f64) * rare_cost, false);
                     }
@@ -422,9 +481,13 @@ impl Tokenizer {
                     }
                 }
 
-                // 4. Out-of-vocabulary words of 1..=OOV_MAX_CLUSTERS TCC clusters
+                // 4. Out-of-vocabulary words of 1..=OOV_MAX_CLUSTERS TCC clusters.
+                // Do not start an OOV edge right after "นายก" or "หมอก" ("นาย"/"หมอ" + 'ก'), so the
+                // title does not steal the initial 'ก' of a following name ("นาย|กษิต", "หมอ|กฤษฏ์").
+                let stole_title_k = from_i.saturating_add(4) == i
+                    && matches!(&chars[from_i..i], ['น', 'า', 'ย', 'ก'] | ['ห', 'ม', 'อ', 'ก']);
                 let mut clusters = 0;
-                for j in i + 1..=n {
+                for j in if stole_title_k { n + 1..=n } else { i + 1..=n } {
                     if !is_oov_char(chars[j - 1]) {
                         break;
                     }

@@ -209,28 +209,100 @@ export class Tokenizer {
   /**
    * Whether what the abbreviation pattern matched is really words and a full stop. The pattern
    * accepts any one to four consonant letters before a full stop, and อ ว ย count as consonants, so
-   * it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when it starts
-   * with a function word followed by more letters ("ของส.ส." is ของ + ส.ส.), or when it is one
-   * dictionary word with a vowel or tone mark and a final full stop that is not followed by a letter
-   * ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants only (มทส. นพ.)
-   * stays an abbreviation even when the dictionary has it without the full stop. `end` is the index of
-   * the character after the match.
+   * it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when
+   * - it starts with a function word or common word followed by more letters ("ของส.ส." is ของ + ส.ส.,
+   *   "พบพล.อ." is พบ + พล.อ.), or
+   * - it is one dictionary word with a vowel or tone mark and a final full stop that is not followed
+   *   by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants
+   *   only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
+   *
+   * `end` is the index of the character after the match.
    */
-  private abbreviationIsWords(chars: string[], end: number, abbr: string): boolean {
+  private abbreviationIsWords(
+    chars: string[],
+    i: number,
+    end: number,
+    abbr: string,
+    prefixes: { end: number; weight: number }[],
+  ): boolean {
     const first = abbr.split('.')[0];
-    if (OOV_BOUNDARY_WORDS.some((f) => first.length > f.length && first.startsWith(f))) {
+    const firstLen = Array.from(first).length;
+    const abbrLen = end - i;
+    const dots = abbr.split('.').length - 1;
+    const inDict =
+      prefixes.some((m) => m.end === i + firstLen + 1 || m.end === i + abbrLen) ||
+      this.trie.has(abbr);
+    const secondIsSingle = chars[i + firstLen + 2] === '.';
+    if (
+      firstLen === 2 &&
+      !inDict &&
+      i >= 2 &&
+      chars[i - 1] === 'อ' &&
+      (chars[i] === 'ง' || chars[i] === 'น' || chars[i] === 'ม' || chars[i] === 'ย') &&
+      chars[i + 1] >= 'ก' &&
+      chars[i + 1] <= 'ฮ' &&
+      ((dots === 1 && chars[i + 1] === 'จ') ||
+        (dots >= 2 && secondIsSingle && first !== 'พล' && first !== 'สภ' && first !== 'บก' && first !== 'บช'))
+    ) {
       return true;
+    }
+    if (firstLen >= 3 && !inDict) {
+      if (OOV_BOUNDARY_WORDS.some((f) => first.length > f.length && first.startsWith(f))) {
+        return true;
+      }
+      if (firstLen === 3 && dots === 1 && chars[i + 1] === 'ผ' && chars[i + 2] === 'อ') {
+        return true;
+      }
+      if (
+        firstLen === 3 &&
+        i >= 1 &&
+        chars[i] === 'อ' &&
+        (chars[i + 1] === 'ง' ||
+          chars[i + 1] === 'น' ||
+          chars[i + 1] === 'ม' ||
+          chars[i + 1] === 'ย' ||
+          chars[i + 1] === 'ก') &&
+        ((dots >= 2 && secondIsSingle) ||
+          (dots === 1 && (chars[i + 2] === 'จ' || chars[i + 2] === 'อ' || chars[i + 2] === 'ต')))
+      ) {
+        return true;
+      }
+      for (const m of prefixes) {
+        const k = m.end - i;
+        if (k < 2 || k >= firstLen) {
+          continue;
+        }
+        const remFirst = firstLen - k;
+        let isWordPlusAbbr = false;
+        if (remFirst === 2) {
+          isWordPlusAbbr = m.weight > 1.2;
+        } else if (dots >= 2) {
+          isWordPlusAbbr = secondIsSingle && (k === 3 || m.weight > 1.2);
+        } else if (firstLen === 4) {
+          const ch = chars[i + 3];
+          isWordPlusAbbr = ch === 'จ' || ch === 'อ' || ch === 'ต' || ch === 'ม' || ch === 'ภ';
+        } else {
+          const ch = chars[i + 2];
+          isWordPlusAbbr = m.weight > 1.5 && (ch === 'จ' || ch === 'ม');
+        }
+        if (isWordPlusAbbr) {
+          return true;
+        }
+      }
+      if (firstLen === 4 && dots >= 2 && this.trie.has(chars.slice(i + 1, i + 3).join(''))) {
+        return true;
+      }
     }
     const next = end < chars.length ? chars[end] : '';
     const nextIsThai = next >= '\u0e01' && next <= '\u0e5b';
     return (
-      abbr.split('.').length === 2 &&
+      dots === 1 &&
       abbr.endsWith('.') &&
-      Array.from(first).length >= 2 &&
+      firstLen >= 2 &&
       /[^ก-ฮ]/u.test(first) &&
       !nextIsThai &&
       this.trie.has(first) &&
-      !this.trie.has(abbr)
+      !inDict
     );
   }
 
@@ -366,7 +438,8 @@ export class Tokenizer {
 
       if (isThaiRune(code)) {
         // 1. Thai dictionary words starting at i
-        for (const m of this.trie.prefixesFromChars(chars, i, MAX_WORD_LEN)) {
+        const prefixes = this.trie.prefixesFromChars(chars, i, MAX_WORD_LEN);
+        for (const m of prefixes) {
           if (m.end <= n && validPos[m.end]) {
             edgeTo[edges] = m.end;
             edgeCost[edges] = Math.log(normalizer / m.weight);
@@ -387,7 +460,7 @@ export class Tokenizer {
           const mStr = mAbbr[0];
           const abbrLen = Array.from(mStr).length;
           const j = i + abbrLen;
-          if (j <= n && validPos[j] && !this.abbreviationIsWords(chars, j, mStr)) {
+          if (j <= n && validPos[j] && !this.abbreviationIsWords(chars, i, j, mStr, prefixes)) {
             const letters = abbrLen - mStr.split('.').length + 1;
             edgeTo[edges] = j;
             edgeCost[edges] = (ABBR_COST_FACTOR + ABBR_LETTER_COST_FACTOR * letters) * rareCost;
@@ -411,11 +484,19 @@ export class Tokenizer {
           }
         }
 
-        // 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
+        // 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters.
+        // Do not start an OOV edge right after "นายก" or "หมอก" ("นาย"/"หมอ" + 'ก'), so the
+        // title does not steal the initial 'ก' of a following name ("นาย|กษิต", "หมอ|กฤษฏ์").
+        const stoleTitleK =
+          from[i] >= 0 &&
+          from[i] + 4 === i &&
+          chars[i - 1] === 'ก' &&
+          ((chars[i - 4] === 'น' && chars[i - 3] === 'า' && chars[i - 2] === 'ย') ||
+            (chars[i - 4] === 'ห' && chars[i - 3] === 'ม' && chars[i - 2] === 'อ'));
         let clusters = 0;
         const startsLo = fwStartsLo[i];
         const startsHi = fwStartsHi[i];
-        oov: for (let j = i + 1; j <= n && isOovCode(codes[j - 1]); j++) {
+        oov: for (let j = i + 1; !stoleTitleK && j <= n && isOovCode(codes[j - 1]); j++) {
           if (!validPos[j]) {
             continue;
           }

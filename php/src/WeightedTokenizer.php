@@ -338,7 +338,8 @@ class WeightedTokenizer
 
             if (isset($thaiChars[$chars[$i]])) {
                 // ── 1. Thai dictionary words starting at position $i
-                foreach ($this->trie->prefixesFromChars($chars, $i) as $entry) {
+                $prefixes = $this->trie->prefixesFromChars($chars, $i);
+                foreach ($prefixes as $entry) {
                     $j = $i + mb_strlen($entry['word'], 'UTF-8');
                     if ($j <= $n && $validPos[$j]) {
                         $edges[] = [$j, log($normalizer / $entry['weight']), false];
@@ -357,7 +358,7 @@ class WeightedTokenizer
                 if ($dot && preg_match(self::PAT_ABBR, $text, $mAbbr, 0, $bytePos) && $mAbbr[0] !== '') {
                     $abbrLen = mb_strlen($mAbbr[0], 'UTF-8');
                     $j       = $i + $abbrLen;
-                    if ($j <= $n && $validPos[$j] && !$this->abbreviationIsWords($chars, $j, $mAbbr[0])) {
+                    if ($j <= $n && $validPos[$j] && !$this->abbreviationIsWords($chars, $i, $j, $mAbbr[0], $prefixes)) {
                         $letters  = $abbrLen - substr_count($mAbbr[0], '.');
                         $edges[]  = [$j, (self::ABBR_COST_FACTOR + self::ABBR_LETTER_COST_FACTOR * $letters) * $rareCost, false];
                     }
@@ -382,10 +383,15 @@ class WeightedTokenizer
                     }
                 }
 
-                // ── 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters
+                // ── 4. Out-of-vocabulary words of 1..OOV_MAX_CLUSTERS TCC clusters.
+                // Do not start an OOV edge right after "นายก" or "หมอก" ("นาย"/"หมอ" + 'ก'), so the
+                // title does not steal the initial 'ก' of a following name ("นาย|กษิต", "หมอ|กฤษฏ์").
+                $stoleTitleK = $from[$i] >= 0 && $from[$i] + 4 === $i && $chars[$i - 1] === 'ก'
+                    && (($chars[$i - 4] === 'น' && $chars[$i - 3] === 'า' && $chars[$i - 2] === 'ย')
+                        || ($chars[$i - 4] === 'ห' && $chars[$i - 3] === 'ม' && $chars[$i - 2] === 'อ'));
                 $clusters = 0;
                 $fwHere   = $fwStarts[$i] ?? 0;
-                for ($j = $i + 1; $j <= $n && isset($oovChars[$chars[$j - 1]]); $j++) {
+                for ($j = $i + 1; !$stoleTitleK && $j <= $n && isset($oovChars[$chars[$j - 1]]); $j++) {
                     if (!$validPos[$j]) {
                         continue;
                     }
@@ -557,32 +563,102 @@ class WeightedTokenizer
     /**
      * Whether what the abbreviation pattern matched is really words and a full stop. The pattern
      * accepts any one to four consonant letters before a full stop, and อ ว ย count as consonants,
-     * so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when it
-     * starts with a function word followed by more letters ("ของส.ส." is ของ + ส.ส.), or when it is
-     * one dictionary word with a vowel or tone mark and a final full stop that is not followed by a
-     * letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of consonants only
-     * (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
+     * so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an abbreviation when
+     * - it starts with a function word or common word followed by more letters ("ของส.ส." is ของ +
+     *   ส.ส., "พบพล.อ." is พบ + พล.อ.), or
+     * - it is one dictionary word with a vowel or tone mark and a final full stop that is not followed
+     *   by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of
+     *   consonants only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the
+     *   full stop.
      *
-     * @param list<string> $chars
-     * @param int          $end   Index of the character after the match
+     * @param list<string>                            $chars
+     * @param int                                     $i        Start character index
+     * @param int                                     $end      Index of the character after the match
+     * @param string                                  $abbr
+     * @param list<array{word: string, weight: float}> $prefixes
      */
-    private function abbreviationIsWords(array $chars, int $end, string $abbr): bool
+    private function abbreviationIsWords(array $chars, int $i, int $end, string $abbr, array $prefixes): bool
     {
-        $first = explode('.', $abbr, 2)[0];
-        foreach (self::OOV_BOUNDARY_WORDS as $f) {
-            if (strlen($first) > strlen($f) && str_starts_with($first, $f)) {
+        $first    = explode('.', $abbr, 2)[0];
+        $firstLen = mb_strlen($first, 'UTF-8');
+        $abbrLen  = $end - $i;
+        $dots     = substr_count($abbr, '.');
+        $inDict   = $this->trie->has($abbr);
+        if (!$inDict) {
+            foreach ($prefixes as $entry) {
+                $len = mb_strlen($entry['word'], 'UTF-8');
+                if ($len === $firstLen + 1 || $len === $abbrLen) {
+                    $inDict = true;
+                    break;
+                }
+            }
+        }
+        $secondIsSingle = ($chars[$i + $firstLen + 2] ?? '') === '.';
+        if (
+            $firstLen === 2
+            && !$inDict
+            && $i >= 2
+            && $chars[$i - 1] === 'อ'
+            && ($chars[$i] === 'ง' || $chars[$i] === 'น' || $chars[$i] === 'ม' || $chars[$i] === 'ย')
+            && $chars[$i + 1] >= 'ก'
+            && $chars[$i + 1] <= 'ฮ'
+            && (($dots === 1 && $chars[$i + 1] === 'จ')
+                || ($dots >= 2 && $secondIsSingle && $first !== 'พล' && $first !== 'สภ' && $first !== 'บก' && $first !== 'บช'))
+        ) {
+            return true;
+        }
+        if ($firstLen >= 3 && !$inDict) {
+            foreach (self::OOV_BOUNDARY_WORDS as $f) {
+                if (strlen($first) > strlen($f) && str_starts_with($first, $f)) {
+                    return true;
+                }
+            }
+            if ($firstLen === 3 && $dots === 1 && $chars[$i + 1] === 'ผ' && $chars[$i + 2] === 'อ') {
+                return true;
+            }
+            if (
+                $firstLen === 3
+                && $i >= 1
+                && $chars[$i] === 'อ'
+                && ($chars[$i + 1] === 'ง' || $chars[$i + 1] === 'น' || $chars[$i + 1] === 'ม' || $chars[$i + 1] === 'ย' || $chars[$i + 1] === 'ก')
+                && (($dots >= 2 && $secondIsSingle) || ($dots === 1 && ($chars[$i + 2] === 'จ' || $chars[$i + 2] === 'อ' || $chars[$i + 2] === 'ต')))
+            ) {
+                return true;
+            }
+            foreach ($prefixes as $entry) {
+                $k = mb_strlen($entry['word'], 'UTF-8');
+                if ($k < 2 || $k >= $firstLen) {
+                    continue;
+                }
+                $remFirst = $firstLen - $k;
+                if ($remFirst === 2) {
+                    $isWordPlusAbbr = $entry['weight'] > 1.2;
+                } elseif ($dots >= 2) {
+                    $isWordPlusAbbr = $secondIsSingle && ($k === 3 || $entry['weight'] > 1.2);
+                } elseif ($firstLen === 4) {
+                    $ch             = $chars[$i + 3];
+                    $isWordPlusAbbr = $ch === 'จ' || $ch === 'อ' || $ch === 'ต' || $ch === 'ม' || $ch === 'ภ';
+                } else {
+                    $ch             = $chars[$i + 2];
+                    $isWordPlusAbbr = $entry['weight'] > 1.5 && ($ch === 'จ' || $ch === 'ม');
+                }
+                if ($isWordPlusAbbr) {
+                    return true;
+                }
+            }
+            if ($firstLen === 4 && $dots >= 2 && $this->trie->has($chars[$i + 1] . $chars[$i + 2])) {
                 return true;
             }
         }
         $next       = $chars[$end] ?? '';
         $nextIsThai = $next !== '' && $next >= "\u{0e01}" && $next <= "\u{0e5b}";
 
-        return substr_count($abbr, '.') === 1
+        return $dots === 1
             && str_ends_with($abbr, '.')
-            && mb_strlen($first, 'UTF-8') >= 2
+            && $firstLen >= 2
             && preg_match('/[^ก-ฮ]/u', $first) === 1
             && !$nextIsThai
             && $this->trie->has($first)
-            && !$this->trie->has($abbr);
+            && !$inDict;
     }
 }

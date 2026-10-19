@@ -133,22 +133,83 @@ func isThaiRune(r rune) bool {
 // abbreviationIsWords reports whether what the abbreviation pattern matched is really words and a
 // full stop. The pattern accepts any one to four consonant letters before a full stop, and อ ว ย
 // count as consonants, so it matches "ไป." in "ต่อไป." and "ของส." in "ของส.ส.". It is not an
-// abbreviation when it starts with a function word followed by more letters ("ของส.ส." is ของ +
-// ส.ส.), or when it is one dictionary word with a vowel or tone mark and a final full stop that is not
-// followed by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of
-// consonants only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the full stop.
+// abbreviation when
+//   - it starts with a function word or common word followed by more letters ("ของส.ส." is ของ +
+//     ส.ส., "พบพล.อ." is พบ + พล.อ.), or
+//   - it is one dictionary word with a vowel or tone mark and a final full stop that is not followed
+//     by a letter ("ต่อไป."), unless the dictionary has the abbreviation itself. A string of
+//     consonants only (มทส. นพ.) stays an abbreviation even when the dictionary has it without the
+//     full stop.
+//
 // end is the index of the rune after the match.
-func (tok *Tokenizer) abbreviationIsWords(runes []rune, end int, abbr string) bool {
+func (tok *Tokenizer) abbreviationIsWords(runes []rune, i, end int, abbr string, prefixes []PrefixMatch) bool {
 	first, _, _ := strings.Cut(abbr, ".")
-	for _, f := range oovBoundaryWords {
-		if len(first) > len(f) && strings.HasPrefix(first, f) {
+	firstLen := utf8.RuneCountInString(first)
+	abbrLen := end - i
+	dots := strings.Count(abbr, ".")
+	inDict := false
+	for _, m := range prefixes {
+		if m.End == i+firstLen+1 || m.End == i+abbrLen {
+			inDict = true
+			break
+		}
+	}
+	if !inDict {
+		inDict = tok.trie.Contains(abbr)
+	}
+	secondIsSingle := i+firstLen+2 < len(runes) && runes[i+firstLen+2] == '.'
+	if firstLen == 2 && !inDict && i >= 2 && runes[i-1] == 'อ' &&
+		(runes[i] == 'ง' || runes[i] == 'น' || runes[i] == 'ม' || runes[i] == 'ย') &&
+		runes[i+1] >= 'ก' && runes[i+1] <= 'ฮ' &&
+		((dots == 1 && runes[i+1] == 'จ') ||
+			(dots >= 2 && secondIsSingle && first != "พล" && first != "สภ" && first != "บก" && first != "บช")) {
+		return true
+	}
+	if firstLen >= 3 && !inDict {
+		for _, f := range oovBoundaryWords {
+			if len(first) > len(f) && strings.HasPrefix(first, f) {
+				return true
+			}
+		}
+		if firstLen == 3 && dots == 1 && runes[i+1] == 'ผ' && runes[i+2] == 'อ' {
+			return true
+		}
+		if firstLen == 3 && i >= 1 && runes[i] == 'อ' &&
+			(runes[i+1] == 'ง' || runes[i+1] == 'น' || runes[i+1] == 'ม' || runes[i+1] == 'ย' || runes[i+1] == 'ก') &&
+			((dots >= 2 && secondIsSingle) || (dots == 1 && (runes[i+2] == 'จ' || runes[i+2] == 'อ' || runes[i+2] == 'ต'))) {
+			return true
+		}
+		for _, m := range prefixes {
+			k := m.End - i
+			if k < 2 || k >= firstLen {
+				continue
+			}
+			remFirst := firstLen - k
+			isWordPlusAbbr := false
+			if remFirst == 2 {
+				isWordPlusAbbr = m.Weight > 1.2
+			} else if dots >= 2 {
+				isWordPlusAbbr = secondIsSingle && (k == 3 || m.Weight > 1.2)
+			} else if firstLen == 4 {
+				switch runes[i+3] {
+				case 'จ', 'อ', 'ต', 'ม', 'ภ':
+					isWordPlusAbbr = true
+				}
+			} else {
+				isWordPlusAbbr = m.Weight > 1.5 && (runes[i+2] == 'จ' || runes[i+2] == 'ม')
+			}
+			if isWordPlusAbbr {
+				return true
+			}
+		}
+		if firstLen == 4 && dots >= 2 && tok.trie.Contains(string(runes[i+1:i+3])) {
 			return true
 		}
 	}
 	nextIsThai := end < len(runes) && runes[end] >= 0x0E01 && runes[end] <= 0x0E5B
-	return strings.Count(abbr, ".") == 1 && strings.HasSuffix(abbr, ".") &&
-		utf8.RuneCountInString(first) >= 2 && strings.ContainsFunc(first, func(r rune) bool { return r < 'ก' || r > 'ฮ' }) && !nextIsThai &&
-		tok.trie.Contains(first) && !tok.trie.Contains(abbr)
+	return dots == 1 && strings.HasSuffix(abbr, ".") &&
+		firstLen >= 2 && strings.ContainsFunc(first, func(r rune) bool { return r < 'ก' || r > 'ฮ' }) && !nextIsThai &&
+		tok.trie.Contains(first) && !inDict
 }
 
 // isOOVRune reports whether an out-of-vocabulary edge may cover r: Thai letters, vowels and marks,
@@ -376,7 +437,7 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 			if loc != nil && loc[0] == 0 {
 				mStr := subText[:loc[1]]
 				abbrLen := utf8.RuneCountInString(mStr)
-				if j := i + abbrLen; j <= n && validPos[j] && !tok.abbreviationIsWords(runes, i+abbrLen, mStr) {
+				if j := i + abbrLen; j <= n && validPos[j] && !tok.abbreviationIsWords(runes, i, i+abbrLen, mStr, matchBuf) {
 					letters := abbrLen - strings.Count(mStr, ".")
 					edges = append(edges, outEdge{j, (abbrCostFactor + abbrLetterCostFactor*float64(letters)) * rareCost, false})
 				}
@@ -405,9 +466,13 @@ func (tok *Tokenizer) segment(runes []rune) []string {
 				}
 			}
 
-			// 4. Out-of-vocabulary words of 1..oovMaxClusters TCC clusters
+			// 4. Out-of-vocabulary words of 1..oovMaxClusters TCC clusters.
+			// Do not start an OOV edge right after "นายก" or "หมอก" ("นาย"/"หมอ" + 'ก'), so the
+			// title does not steal the initial 'ก' of a following name ("นาย|กษิต", "หมอ|กฤษฏ์").
+			stoleTitleK := from[i] >= 0 && from[i]+4 == i &&
+				(string(runes[from[i]:i]) == "นายก" || string(runes[from[i]:i]) == "หมอก")
 			clusters := 0
-			for j := i + 1; j <= n && isOOVRune(runes[j-1]); j++ {
+			for j := i + 1; !stoleTitleK && j <= n && isOOVRune(runes[j-1]); j++ {
 				if !validPos[j] {
 					continue
 				}
