@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The TCC DFA is minimized.** After the subset construction, Moore's partition refinement merges equivalent
+  states: the general rules go from 164 to 54 states (9.8 KB to 3.3 KB of tables), the lookahead rules from 18 to
+  12. The generated tables of the Go and TypeScript ports (and of the OpenSearch plugin) shrink by the same
+  factor. Clusters are identical (checked on 34.7 million characters of gold corpora and news, and on random
+  strings); speed is unchanged, and building both tables in Rust takes 0.39 ms instead of 0.32 ms.
+
 ## [1.5.0] - 2026-10-19
 
 ### Fixed
