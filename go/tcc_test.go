@@ -44,6 +44,9 @@ func initTCCRegex() {
 			"เcืtอ?k",
 			"เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])tาk",
 			"เctา?ะ?k",
+			// Sara Ue after ร อ ห has no final consonant: รึ อึ หึ are particles ("รึอยาก" is รึ + อยาก, not รึอ + ยาก).
+			// This must come before the general Sara Ue rule, which would otherwise take the next consonant as a final.
+			"[รอห]ึt",
 			"c[ึื]tck",
 			"c[ะ-ู]tk",
 			"c[ิุู]์",
@@ -58,9 +61,6 @@ func initTCCRegex() {
 			"แccc์k",
 			"โctะk",
 			"[เ-ไ]ctk",
-			"ก็",
-			"อึ",
-			"หึ",
 		}
 
 		rawLookaheadRules := []string{

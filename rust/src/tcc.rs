@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 const C: &str = "[ก-ฮ]";
 const T: &str = "[่-๋]?";
@@ -27,6 +28,9 @@ const GENERAL_RULES: &[&str] = &[
     "เcืtอ?k",
     "เ(?:[กขคตปพผบด][รล]|[กขค]ว|ทร|ห[งญนมยรลว])tาk",
     "เctา?ะ?k",
+    // Sara Ue after ร อ ห has no final consonant: รึ อึ หึ are particles ("รึอยาก" is รึ + อยาก, not รึอ + ยาก).
+    // This must come before the general Sara Ue rule, which would otherwise take the next consonant as a final.
+    "[รอห]ึt",
     "c[ึื]tck",
     "c[ะ-ู]tk",
     "c[ิุู]์",
@@ -41,9 +45,6 @@ const GENERAL_RULES: &[&str] = &[
     "แccc์k",
     "โctะk",
     "[เ-ไ]ctk",
-    "ก็",
-    "อึ",
-    "หึ",
 ];
 
 /// Rules that only apply when the next character can start a syllable (all of them start with เ).
@@ -234,8 +235,9 @@ fn closure(prog: &[Inst], pcs: impl IntoIterator<Item = usize>) -> Vec<usize> {
 const DEAD: u16 = 0;
 
 /// Anchored leftmost-first DFA over classes of Thai characters, built from the NFA by subset
-/// construction on ordered thread lists (as a leftmost-first regex DFA is). It reports the same
-/// match as a regex alternation of the rules: the match of the first rule that matches.
+/// construction on ordered thread lists (as a leftmost-first regex DFA is), then minimized. It
+/// reports the same match as a regex alternation of the rules: the match of the first rule that
+/// matches.
 struct Dfa {
     /// Class of each character of the Thai block; other characters never match.
     class: [u8; 128],
@@ -248,6 +250,10 @@ struct Dfa {
 
 impl Dfa {
     fn new(rules: &[&str]) -> Self {
+        Self::subset(rules).minimize()
+    }
+
+    fn subset(rules: &[&str]) -> Self {
         let prog = compile(rules);
         let masks: Vec<u128> = prog
             .iter()
@@ -273,7 +279,7 @@ impl Dfa {
         let classes = reps.len();
 
         let mut states: Vec<Vec<usize>> = vec![Vec::new()];
-        let mut index = std::collections::HashMap::new();
+        let mut index = HashMap::new();
         index.insert(Vec::new(), DEAD);
         let start = closure(&prog, [0]);
         index.insert(start.clone(), 1);
@@ -308,6 +314,58 @@ impl Dfa {
             trans,
             is_match,
             start: 1,
+        }
+    }
+
+    /// The equivalent DFA with the fewest states (Moore's partition refinement). A search stops
+    /// at the dead state and reports the last matching state it passed, so states that agree on
+    /// matching along every path are interchangeable, and states that can never reach a match
+    /// merge with the dead state.
+    fn minimize(&self) -> Self {
+        let k = self.classes;
+        let n = self.trans.len() / k;
+        let mut block: Vec<usize> = self.is_match.iter().map(|&m| usize::from(m)).collect();
+        let mut blocks = 0;
+        loop {
+            let mut ids: HashMap<(usize, Vec<usize>), usize> = HashMap::new();
+            let next: Vec<usize> = (0..n)
+                .map(|s| {
+                    let row = (0..k).map(|c| block[self.trans[s * k + c] as usize]).collect();
+                    let len = ids.len();
+                    *ids.entry((block[s], row)).or_insert(len)
+                })
+                .collect();
+            block = next;
+            if ids.len() == blocks {
+                break;
+            }
+            blocks = ids.len();
+        }
+        // Number the blocks so that the dead state's block is 0 and the start state's block is 1
+        let mut id = vec![usize::MAX; blocks];
+        id[block[DEAD as usize]] = 0;
+        let mut fresh = 1;
+        for s in std::iter::once(self.start as usize).chain(0..n) {
+            if id[block[s]] == usize::MAX {
+                id[block[s]] = fresh;
+                fresh += 1;
+            }
+        }
+        let mut trans = vec![DEAD; blocks * k];
+        let mut is_match = vec![false; blocks];
+        for s in 0..n {
+            let b = id[block[s]];
+            is_match[b] = self.is_match[s];
+            for c in 0..k {
+                trans[b * k + c] = u16::try_from(id[block[self.trans[s * k + c] as usize]]).expect("too many TCC DFA states");
+            }
+        }
+        Self {
+            class: self.class,
+            classes: k,
+            trans,
+            is_match,
+            start: u16::try_from(id[block[self.start as usize]]).expect("too many TCC DFA states"),
         }
     }
 
@@ -544,6 +602,28 @@ mod tests {
             "สวัสดีครับ ภาษาไทย",
         ] {
             check(text);
+        }
+    }
+
+    #[test]
+    fn sara_ue_particles_take_no_final() {
+        let pos = |text: &str| tcc_pos_array(&text.chars().collect::<Vec<_>>());
+        // รึ อึ หึ end at the vowel: the next consonant starts a new cluster
+        assert!(pos("รึอยาก")[2]);
+        assert!(pos("อึอยาก")[2]);
+        assert!(pos("หึอย่าง")[2]);
+        // any other consonant takes a final: ตึก and นึก stay whole
+        assert!(!pos("ตึก")[2]);
+        assert!(!pos("นึก")[2]);
+    }
+
+    #[test]
+    fn minimized_dfa_is_smaller_and_minimal() {
+        for rules in [GENERAL_RULES, LOOKAHEAD_RULES] {
+            let full = Dfa::subset(rules);
+            let min = full.minimize();
+            assert!(min.trans.len() < full.trans.len());
+            assert_eq!(min.minimize().trans, min.trans);
         }
     }
 
